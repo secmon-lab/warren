@@ -38,6 +38,35 @@ var migrationJobs = []migrationJob{
 		Description: "Backfill Status field on pre-v0.10.0 alerts that lack the field or have the old 'unbound' value, setting them to 'active' so they appear in Firestore queries",
 		Run:         backfillAlertStatus,
 	},
+	// chat-session-redesign Phase 7 jobs. Each job lives in
+	// pkg/usecase/migration; the bodies here are thin wrappers that
+	// construct the Firestore-backed dependencies and invoke the
+	// business-logic Job.
+	{
+		Name:        "session-source-backfill",
+		Description: "Backfill SessionSource and TicketIDPtr on legacy Session rows (chat-session-redesign Phase 7).",
+		Run:         runSessionSourceBackfill,
+	},
+	{
+		Name:        "comment-to-message",
+		Description: "Rewrite ticket.Comment rows as session.Message(type=user) (chat-session-redesign Phase 7). Placeholder; returns 'not yet implemented'.",
+		Run:         runCommentToMessage,
+	},
+	{
+		Name:        "turn-synthesis",
+		Description: "Synthesize Turn entities from legacy Sessions (chat-session-redesign Phase 7). Placeholder.",
+		Run:         runTurnSynthesis,
+	},
+	{
+		Name:        "history-scope",
+		Description: "Copy legacy Ticket-scoped gollem.History files into Session-scoped destinations (chat-session-redesign Phase 7). Placeholder.",
+		Run:         runHistoryScope,
+	},
+	{
+		Name:        "cleanup-legacy",
+		Description: "Remove legacy ticket_comments, old history files, and deprecated Session fields (chat-session-redesign Phase 7). DESTRUCTIVE; --dry-run first. Placeholder.",
+		Run:         runCleanupLegacy,
+	},
 }
 
 func findMigrationJob(name string) (*migrationJob, bool) {
