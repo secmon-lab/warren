@@ -60,6 +60,37 @@ func LoadHistory(ctx context.Context, repo interfaces.Repository, ticketID types
 	return history, nil
 }
 
+// LoadSessionHistory loads the gollem.History for a Session. Returns
+// (nil, nil) when the Session has no saved history yet so callers can
+// start with an empty gollem session.
+//
+// This is the chat-session-redesign Phase 4 replacement for LoadHistory;
+// it keys on SessionID rather than TicketID so Slack (long-lived) and
+// Web/CLI (per-invocation) sessions keep independent working memory.
+func LoadSessionHistory(ctx context.Context, sessionID types.SessionID, storageSvc *storage.Service) (*gollem.History, error) {
+	history, err := storageSvc.GetSessionHistory(ctx, sessionID)
+	if err != nil {
+		logging.From(ctx).Warn("failed to load session history; starting fresh",
+			"error", err, "session_id", sessionID)
+		return nil, nil
+	}
+	return history, nil
+}
+
+// SaveSessionHistory writes history into the Session's rolling storage
+// slot. Errors are logged but not returned so a storage hiccup cannot
+// interrupt the chat response path.
+func SaveSessionHistory(ctx context.Context, sessionID types.SessionID, storageSvc *storage.Service, history *gollem.History) error {
+	if history == nil {
+		return goerr.New("history is nil after execution")
+	}
+	if err := storageSvc.PutSessionHistory(ctx, sessionID, history); err != nil {
+		return goerr.Wrap(err, "failed to put session history",
+			goerr.V("session_id", sessionID))
+	}
+	return nil
+}
+
 // SaveHistory saves a gollem History to storage and records it in the repository.
 func SaveHistory(ctx context.Context, repo interfaces.Repository, storageClient interfaces.StorageClient, storageSvc *storage.Service, ticketID types.TicketID, history *gollem.History) error {
 	logger := logging.From(ctx)
