@@ -88,21 +88,34 @@ func TestAlert_FillMetadata_TagInference(t *testing.T) {
 	gt.True(t, strings.Contains(receivedPrompt, "Network-related events"))
 }
 
-func TestFormatAvailableTags(t *testing.T) {
-	t.Run("empty input yields an explicit no-tags notice", func(t *testing.T) {
-		got := alert.FormatAvailableTags(nil)
-		gt.True(t, strings.Contains(got, "No tags are registered"))
-		gt.True(t, strings.Contains(got, "empty array"))
+func TestRenderAlertMetaPrompt(t *testing.T) {
+	t.Run("omits Available Tags section entirely when no tags are registered", func(t *testing.T) {
+		got, err := alert.RenderAlertMetaPrompt(map[string]any{"k": "v"}, "English", nil)
+		gt.NoError(t, err)
+		gt.False(t, strings.Contains(got, "Available Tags"))
+		gt.False(t, strings.Contains(got, "Select zero or more tag names"))
+		// Fallback rule for the schema's tags field is still present so the
+		// LLM knows what to put there (empty array) without being shown an
+		// irrelevant/empty list.
+		gt.True(t, strings.Contains(got, "Output an empty array for this field"))
 	})
 
-	t.Run("nil and empty-name entries are skipped, the rest become a bullet list", func(t *testing.T) {
-		got := alert.FormatAvailableTags([]*tag.Tag{
-			nil,
-			{ID: "x", Name: ""},
+	t.Run("renders Available Tags as a bullet list with name and description", func(t *testing.T) {
+		tags := []*tag.Tag{
+			nil,                 // filtered
+			{ID: "x", Name: ""}, // filtered
 			{ID: tag.NewID(), Name: "malware", Description: "Malware-related events"},
-			{ID: tag.NewID(), Name: "network"}, // description empty -> name only
-		})
-		gt.Equal(t, got, "- `malware`: Malware-related events\n- `network`\n")
+			{ID: tag.NewID(), Name: "network"}, // description empty
+		}
+		got, err := alert.RenderAlertMetaPrompt(map[string]any{"k": "v"}, "English", tags)
+		gt.NoError(t, err)
+
+		gt.True(t, strings.Contains(got, "## Available Tags"))
+		gt.True(t, strings.Contains(got, "- `malware`: Malware-related events"))
+		gt.True(t, strings.Contains(got, "- `network`\n"))
+		gt.False(t, strings.Contains(got, "- `network`: "))
+		gt.True(t, strings.Contains(got, "Select zero or more tag names"))
+		gt.False(t, strings.Contains(got, "Output an empty array for this field"))
 	})
 }
 
