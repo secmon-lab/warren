@@ -1,12 +1,14 @@
 package alert
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
+	"text/template"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -265,15 +267,87 @@ func (x *Alert) CosineSimilarity(other []float32) float64 {
 //go:embed prompt/alert_meta.md
 var alertMetaPrompt string
 
-func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) error {
+// alertMetaTmpl is compiled once. It expects a struct carrying pre-rendered
+// Alert / Schema JSON strings, the Lang code, and a filtered slice of Tag.
+var alertMetaTmpl = template.Must(template.New("alert_meta").Parse(alertMetaPrompt))
+
+type alertMetaPromptData struct {
+	Alert         string
+	Schema        string
+	Lang          string
+	AvailableTags []*tag.Tag
+}
+
+// renderAlertMetaPrompt builds the metadata prompt. It pre-filters nil /
+// empty-name tags so the template can range safely and use `{{ if
+// .AvailableTags }}` to omit the Available Tags section entirely when none
+// are registered (avoiding an awkward empty list that would confuse the LLM).
+func renderAlertMetaPrompt(alertData any, langName string, availableTags []*tag.Tag) (string, error) {
+	alertJSON, err := json.MarshalIndent(alertData, "", "  ")
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to marshal alert data")
+	}
+	schemaJSON, err := json.MarshalIndent(prompt.ToSchema(Metadata{}), "", "  ")
+	if err != nil {
+		return "", goerr.Wrap(err, "failed to marshal metadata schema")
+	}
+
+	tags := make([]*tag.Tag, 0, len(availableTags))
+	for _, t := range availableTags {
+		if t == nil || t.Name == "" {
+			continue
+		}
+		tags = append(tags, t)
+	}
+
+	var buf bytes.Buffer
+	if err := alertMetaTmpl.Execute(&buf, alertMetaPromptData{
+		Alert:         string(alertJSON),
+		Schema:        string(schemaJSON),
+		Lang:          langName,
+		AvailableTags: tags,
+	}); err != nil {
+		return "", goerr.Wrap(err, "failed to execute alert metadata template")
+	}
+	return buf.String(), nil
+}
+
+// mergeInferredTags merges LLM-inferred tag names into the existing tag name
+// list. Only names present in the allowed set are added, duplicates are
+// removed, and the original order of existing names is preserved.
+func mergeInferredTags(existing, inferred []string, allowed map[string]bool) []string {
+	if len(inferred) == 0 || len(allowed) == 0 {
+		return existing
+	}
+	seen := make(map[string]bool, len(existing)+len(inferred))
+	for _, name := range existing {
+		seen[name] = true
+	}
+	result := existing
+	for _, name := range inferred {
+		if name == "" || seen[name] || !allowed[name] {
+			continue
+		}
+		result = append(result, name)
+		seen[name] = true
+	}
+	return result
+}
+
+func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient, availableTags []*tag.Tag) error {
 	if x.Title == DefaultAlertTitle || x.Title == "" {
 		logger := logging.From(ctx)
 		logger.Info("fill metadata", "alert", x.Data)
-		prompt, err := prompt.Generate(ctx, alertMetaPrompt, map[string]any{
-			"alert":  x.Data,
-			"schema": prompt.ToSchema(Metadata{}),
-			"lang":   lang.From(ctx).Name(),
-		})
+
+		availableTagNameSet := make(map[string]bool, len(availableTags))
+		for _, t := range availableTags {
+			if t == nil || t.Name == "" {
+				continue
+			}
+			availableTagNameSet[t.Name] = true
+		}
+
+		prompt, err := renderAlertMetaPrompt(x.Data, lang.From(ctx).Name(), availableTags)
 		if err != nil {
 			return err
 		}
@@ -314,6 +388,8 @@ func (x *Alert) FillMetadata(ctx context.Context, llmClient gollem.LLMClient) er
 				x.Attributes = append(x.Attributes, resAttr)
 			}
 		}
+
+		x.Tags = mergeInferredTags(x.Tags, resp.Tags, availableTagNameSet)
 	}
 
 	embedding, err := embedding.Generate(ctx, llmClient, x.Data)

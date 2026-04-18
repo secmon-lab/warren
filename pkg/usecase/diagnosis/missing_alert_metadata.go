@@ -66,7 +66,12 @@ func (r *MissingAlertMetadataRule) Fix(ctx context.Context, repo interfaces.Repo
 		return goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", alertID))
 	}
 
-	if err := a.FillMetadata(ctx, r.llmClient); err != nil {
+	availableTags, err := repo.ListAllTags(ctx)
+	if err != nil {
+		return goerr.Wrap(err, "failed to list tags", goerr.V("alert_id", alertID))
+	}
+
+	if err := a.FillMetadata(ctx, r.llmClient, availableTags); err != nil {
 		return goerr.Wrap(err, "failed to fill alert metadata", goerr.V("alert_id", alertID))
 	}
 
