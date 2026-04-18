@@ -134,9 +134,48 @@ type Repository interface {
 	GetSessionsByTicket(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error)
 	DeleteSession(ctx context.Context, sessionID types.SessionID) error
 
+	// Session management (chat-session-redesign additions).
+	//
+	// CreateSession writes a new Session only if no document exists at its
+	// ID. Returns ErrSessionAlreadyExists when a document already exists.
+	// This is the precondition used by SessionResolver to realize
+	// deterministic Slack Session IDs without duplicates across instances.
+	CreateSession(ctx context.Context, session *session.Session) error
+	// UpdateSessionLastActive stamps Session.LastActiveAt.
+	UpdateSessionLastActive(ctx context.Context, sessionID types.SessionID, t time.Time) error
+	// PromoteSessionToTicket sets the Session's TicketID (both legacy and
+	// TicketIDPtr) so a ticketless Slack Session can be adopted once the
+	// thread is escalated into a Ticket.
+	PromoteSessionToTicket(ctx context.Context, sessionID types.SessionID, ticketID types.TicketID) error
+
+	// Session activity lock (chat-session-redesign). The lock is embedded in
+	// the Session document (Session.Lock), so acquire/refresh/release
+	// operate transactionally on that sub-field.
+	AcquireSessionLock(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) (bool, error)
+	RefreshSessionLock(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) error
+	ReleaseSessionLock(ctx context.Context, sessionID types.SessionID, holderID string) error
+
+	// Session Turn management (chat-session-redesign).
+	PutTurn(ctx context.Context, turn *session.Turn) error
+	GetTurn(ctx context.Context, turnID types.TurnID) (*session.Turn, error)
+	GetTurnsBySession(ctx context.Context, sessionID types.SessionID) ([]*session.Turn, error)
+	UpdateTurnStatus(ctx context.Context, turnID types.TurnID, status session.TurnStatus, endedAt *time.Time) error
+	UpdateTurnIntent(ctx context.Context, turnID types.TurnID, intent string) error
+
 	// Session message management
 	PutSessionMessage(ctx context.Context, message *session.Message) error
 	GetSessionMessages(ctx context.Context, sessionID types.SessionID) ([]*session.Message, error)
+	// GetMessagesByTurn returns messages belonging to a specific Turn
+	// (TurnID match). Messages with nil TurnID are not returned.
+	GetMessagesByTurn(ctx context.Context, turnID types.TurnID) ([]*session.Message, error)
+	// SearchSessionMessages performs a full-text search across all Sessions
+	// of a Ticket. Initial implementation may scan-and-filter; later
+	// iterations can swap in vector search.
+	SearchSessionMessages(ctx context.Context, ticketID types.TicketID, query string, limit int) ([]*session.Message, error)
+	// GetTicketSessionMessages returns Messages from every Session tied to
+	// ticketID. source and msgType are optional filters (nil = no filter).
+	// This is the replacement query for the deprecated ticket.Comment APIs.
+	GetTicketSessionMessages(ctx context.Context, ticketID types.TicketID, source *session.SessionSource, msgType *session.MessageType, limit, offset int) ([]*session.Message, error)
 
 	// Diagnosis management
 	// PutDiagnosis saves or updates a diagnosis header record.

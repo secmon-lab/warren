@@ -62,3 +62,13 @@ tasks:
     desc: "Generate GraphQL code"
     cmds:
       - go tool gqlgen generate
+
+  test:slack-golden:
+    desc: "Run the Slack regression protection golden tests (Phase 0 gate)"
+    cmds:
+      - go test ./pkg/usecase/ -run TestSlackGolden
+
+  test:slack-golden:update:
+    desc: "Regenerate Slack golden fixtures under pkg/usecase/testdata/slack_golden (commit the diff separately with an explanation)"
+    cmds:
+      - go test ./pkg/usecase/ -run TestSlackGolden -update-slack-golden

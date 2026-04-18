@@ -487,6 +487,39 @@ func defineFirestoreIndexes() *fireconf.Config {
 		},
 	})
 
+	// chat-session-redesign indexes.
+	//
+	// Turns: list Turns of a Session in time order; also used during
+	// session cleanup queries.
+	firestoreCollections = append(firestoreCollections, fireconf.Collection{
+		Name: "turns",
+		Indexes: []fireconf.Index{
+			{
+				QueryScope: fireconf.QueryScopeCollection,
+				Fields: []fireconf.IndexField{
+					{Path: "session_id", Order: fireconf.OrderAscending},
+					{Path: "started_at", Order: fireconf.OrderAscending},
+				},
+			},
+		},
+	})
+
+	// Session Messages subcollection (sessions/{sid}/messages/{mid}):
+	// turn_id + created_at ASC supports GetMessagesByTurn on a collection
+	// group query.
+	firestoreCollections = append(firestoreCollections, fireconf.Collection{
+		Name: "messages",
+		Indexes: []fireconf.Index{
+			{
+				QueryScope: fireconf.QueryScopeCollectionGroup,
+				Fields: []fireconf.IndexField{
+					{Path: "turn_id", Order: fireconf.OrderAscending},
+					{Path: "created_at", Order: fireconf.OrderAscending},
+				},
+			},
+		},
+	})
+
 	return &fireconf.Config{
 		Collections: firestoreCollections,
 	}

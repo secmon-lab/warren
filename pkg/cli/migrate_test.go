@@ -12,7 +12,7 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	config := cli.DefineFirestoreIndexes()
 
 	gt.Value(t, config).NotNil()
-	gt.Equal(t, len(config.Collections), 5) // alerts, tickets, lists, memories, records
+	gt.Equal(t, len(config.Collections), 7) // alerts, tickets, lists, memories, records, turns, messages
 
 	// Helper function to find collection by name
 	findCollection := func(name string) *fireconf.Collection {

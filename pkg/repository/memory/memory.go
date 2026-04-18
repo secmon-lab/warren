@@ -41,7 +41,8 @@ type Memory struct {
 	diagnosisIssues map[types.DiagnosisID]map[string]*diagnosis.Issue
 
 	// Session management
-	session *sessionStore
+	session   *sessionStore
+	turnStore *turnStore
 
 	// Knowledge management
 	knowledge *knowledgeStore
@@ -81,6 +82,7 @@ func New() *Memory {
 		diagnoses:          make(map[types.DiagnosisID]*diagnosis.Diagnosis),
 		diagnosisIssues:    make(map[types.DiagnosisID]map[string]*diagnosis.Issue),
 		session:            newSessionStore(),
+		turnStore:          newTurnStore(),
 		knowledge:          newKnowledgeStore(),
 		hitl:               newHITLStore(),
 		queuedAlerts:       make(map[types.QueuedAlertID]*alert.QueuedAlert),

@@ -1,0 +1,72 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "elements": [
+            {
+              "text": "📊 \u003chttps://warren.example.com/tickets/TCKT_FIXED_0001/sessions/SESS_FIXED_0001|Session Details\u003e",
+              "type": "mrkdwn"
+            }
+          ],
+          "type": "context"
+        },
+        {
+          "elements": [
+            {
+              "action_id": "resolve_ticket",
+              "style": "primary",
+              "text": {
+                "emoji": false,
+                "text": "Resolve",
+                "type": "plain_text"
+              },
+              "type": "button",
+              "value": "TCKT_FIXED_0001"
+            },
+            {
+              "action_id": "edit_ticket",
+              "text": {
+                "emoji": false,
+                "text": "Edit",
+                "type": "plain_text"
+              },
+              "type": "button",
+              "value": "TCKT_FIXED_0001"
+            }
+          ],
+          "type": "actions"
+        }
+      ],
+      "channel": "C_TICKET",
+      "thread_ts": "1700000000.000000"
+    }
+  },
+  {
+    "seq": 1,
+    "method": "PostMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "elements": [
+            {
+              "action_id": "edit_ticket",
+              "text": {
+                "emoji": false,
+                "text": "Edit",
+                "type": "plain_text"
+              },
+              "type": "button",
+              "value": "TCKT_FIXED_0002"
+            }
+          ],
+          "type": "actions"
+        }
+      ],
+      "channel": "C_TICKET",
+      "thread_ts": "1700000000.000000"
+    }
+  }
+]
