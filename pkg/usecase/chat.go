@@ -23,10 +23,16 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/slackctx"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 // ChatFromWebSocket processes a chat message from a WebSocket connection.
 // It fetches the ticket by ID, builds a ChatContext, and delegates to ChatUC.
+//
+// chat-session-redesign Phase 3.2: a fresh Web Session is created for each
+// invocation and the incoming user message is persisted as Type=user
+// before Execute runs. The legacy in-Execute Session is still produced;
+// Phase 3+ reconciles the two.
 func (x *UseCases) ChatFromWebSocket(ctx context.Context, ticketID types.TicketID, message string) error {
 	t, err := x.repository.GetTicket(ctx, ticketID)
 	if err != nil {
@@ -35,6 +41,8 @@ func (x *UseCases) ChatFromWebSocket(ctx context.Context, ticketID types.TicketI
 	if t == nil {
 		return goerr.New("ticket not found")
 	}
+
+	x.persistFreshUserMessage(ctx, ticketID, sessModel.SessionSourceWeb, message)
 
 	chatCtx, err := x.buildChatContext(ctx, t, nil, message)
 	if err != nil {
@@ -161,9 +169,48 @@ func slackUserID(m *slack.Message) string {
 	return ""
 }
 
+// persistFreshUserMessage creates a fresh Web/CLI Session and stores the
+// incoming user message as a Type=user Message on it. Errors are logged
+// but not returned so the Chat*From* flow cannot break on Session write
+// hiccups — the legacy Execute path still runs unaffected.
+func (x *UseCases) persistFreshUserMessage(ctx context.Context, ticketID types.TicketID, source sessModel.SessionSource, content string) {
+	if x.sessionResolver == nil {
+		return
+	}
+	userID := types.UserID(user.FromContext(ctx))
+	sess, err := x.sessionResolver.CreateFreshSession(ctx, ticketID, source, userID)
+	if err != nil {
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to create fresh session for user input",
+			goerr.V("ticket_id", ticketID),
+			goerr.V("source", source),
+		))
+		return
+	}
+	tid := ticketID
+	author := &sessModel.Author{
+		UserID:      userID,
+		DisplayName: string(userID),
+	}
+	m := sessModel.NewMessageV2(ctx, sess.ID, &tid, nil, sessModel.MessageTypeUser, content, author)
+	if err := x.repository.PutSessionMessage(ctx, m); err != nil {
+		errutil.Handle(ctx, goerr.Wrap(err, "failed to persist user input message",
+			goerr.V("session_id", sess.ID),
+		))
+	}
+}
+
 // ChatFromCLI processes a chat message from the CLI.
 // The ticket is already constructed by the CLI layer.
+//
+// chat-session-redesign Phase 3.2: user input is persisted into a fresh
+// CLI Session as Type=user before Execute runs. Each CLI invocation gets
+// its own Session; interactive mode re-enters ChatFromCLI per line and
+// produces a new Session per input for now (consolidating interactive
+// lines under a single Session is Phase 3+ work).
 func (x *UseCases) ChatFromCLI(ctx context.Context, t *ticket.Ticket, message string) error {
+	if t != nil && t.ID != "" {
+		x.persistFreshUserMessage(ctx, t.ID, sessModel.SessionSourceCLI, message)
+	}
 	chatCtx, err := x.buildChatContext(ctx, t, nil, message)
 	if err != nil {
 		return err
