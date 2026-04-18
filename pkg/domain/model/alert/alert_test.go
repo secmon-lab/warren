@@ -62,9 +62,9 @@ func TestAlert_FillMetadata_TagInference(t *testing.T) {
 	}
 
 	available := []*tag.Tag{
-		{ID: "tag_1", Name: "malware", Description: "Malware-related events"},
-		{ID: "tag_2", Name: "network", Description: "Network-related events"},
-		{ID: "tag_3", Name: "phishing", Description: "Phishing-related events"},
+		{ID: tag.NewID(), Name: "malware", Description: "Malware-related events"},
+		{ID: tag.NewID(), Name: "network", Description: "Network-related events"},
+		{ID: tag.NewID(), Name: "phishing", Description: "Phishing-related events"},
 	}
 
 	a := alert.New(t.Context(), "test.alert.v1", map[string]any{
