@@ -163,6 +163,7 @@ func TestWarren_Specs(t *testing.T) {
 		"warren_search_tickets_by_words",
 		"warren_update_finding",
 		"warren_get_ticket_comments",
+		"warren_get_ticket_session_messages",
 	}
 	gt.Value(t, len(specs)).Equal(len(expectedCommands))
 
