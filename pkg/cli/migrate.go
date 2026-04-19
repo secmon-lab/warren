@@ -549,18 +549,23 @@ func backfillAlertStatus(ctx context.Context, projectID, databaseID string, dryR
 // deprecatedIndexedCollections lists collections that previously had index
 // definitions but whose queries turned out to be served by Firestore's
 // automatic single-field indexes (or had no query at all). They remain
-// declared here with an empty index set so that fireconf's Migrate keeps
+// declared with an empty index set so that fireconf's Migrate keeps
 // iterating over them and tears down any residual indexes left in Firestore.
 // Entries may be removed once the deployment targets no longer have any
 // indexes under these collections.
+//
+//   - lists:    no FindNearest query exists on this collection (list.Embedding
+//     is used as the INPUT to FindNearestTickets, not searched directly).
+//   - memories: subcollectionMemories has no repository method issuing queries.
+//   - records:  execution_memories/{id}/records subcollection has no queries.
 var deprecatedIndexedCollections = []string{"lists", "memories", "records"}
 
 func defineFirestoreIndexes() *fireconf.Config {
-	// Only collections that perform FindNearest (vector search) or
-	// multi-field queries requiring a composite index are managed here.
-	// Collections whose queries are satisfied by Firestore's automatic
-	// single-field indexes (merge joins for equality-only combinations)
-	// are intentionally omitted.
+	// This definition keeps the alerts/tickets index declarations exactly
+	// as they were on main to minimise behavioural risk. The only change in
+	// this migration is the removal of indexes under collections that have
+	// no corresponding query in the firestore repository (see
+	// deprecatedIndexedCollections above).
 	vectorCollections := []string{"alerts", "tickets"}
 
 	var firestoreCollections []fireconf.Collection
@@ -568,7 +573,7 @@ func defineFirestoreIndexes() *fireconf.Config {
 	for _, collectionName := range vectorCollections {
 		var indexes []fireconf.Index
 
-		// Single-field Embedding vector index
+		// Single-field Embedding index
 		indexes = append(indexes, fireconf.Index{
 			QueryScope: fireconf.QueryScopeCollection,
 			Fields: []fireconf.IndexField{
@@ -599,7 +604,7 @@ func defineFirestoreIndexes() *fireconf.Config {
 			},
 		})
 
-		// CreatedAt + __name__ + Embedding composite index (for FindNearestWithSpan)
+		// CreatedAt + Embedding composite index
 		indexes = append(indexes, fireconf.Index{
 			QueryScope: fireconf.QueryScopeCollection,
 			Fields: []fireconf.IndexField{
@@ -620,44 +625,23 @@ func defineFirestoreIndexes() *fireconf.Config {
 			},
 		})
 
-		// tickets-specific composite indexes
+		// Status + CreatedAt + __name__ index only for 'tickets'
 		if collectionName == "tickets" {
-			// Status + CreatedAt + __name__ supports
-			//   GetTicketsByStatusAndSpan: Where(Status ==).Where(CreatedAt range).OrderBy(CreatedAt desc)
-			// and also the Status-in + OrderBy(CreatedAt) path of GetTicketsByStatus when no assignee filter is set.
 			indexes = append(indexes, fireconf.Index{
 				QueryScope: fireconf.QueryScopeCollection,
 				Fields: []fireconf.IndexField{
-					{Path: "Status", Order: fireconf.OrderAscending},
-					{Path: "CreatedAt", Order: fireconf.OrderDescending},
-					{Path: "__name__", Order: fireconf.OrderDescending},
-				},
-			})
-
-			// Status + Assignee.ID + CreatedAt supports GetTicketsByStatus / CountTicketsByStatus
-			// when both status and assigneeID filters are set and results are ordered by CreatedAt.
-			// buildTicketBaseQuery at pkg/repository/firestore/ticket.go:344 documents this requirement.
-			indexes = append(indexes, fireconf.Index{
-				QueryScope: fireconf.QueryScopeCollection,
-				Fields: []fireconf.IndexField{
-					{Path: "Status", Order: fireconf.OrderAscending},
-					{Path: "Assignee.ID", Order: fireconf.OrderAscending},
-					{Path: "CreatedAt", Order: fireconf.OrderDescending},
-				},
-			})
-		}
-
-		// alerts-specific composite indexes
-		if collectionName == "alerts" {
-			// TicketID + Status supports GetAlertWithoutTicket / CountAlertsWithoutTicket:
-			//   Where(TicketID ==).Where(Status in [...])
-			// The `in` operator combined with a second equality can require a composite
-			// index depending on how the query planner chooses to satisfy it.
-			indexes = append(indexes, fireconf.Index{
-				QueryScope: fireconf.QueryScopeCollection,
-				Fields: []fireconf.IndexField{
-					{Path: "TicketID", Order: fireconf.OrderAscending},
-					{Path: "Status", Order: fireconf.OrderAscending},
+					{
+						Path:  "Status",
+						Order: fireconf.OrderAscending,
+					},
+					{
+						Path:  "CreatedAt",
+						Order: fireconf.OrderDescending,
+					},
+					{
+						Path:  "__name__",
+						Order: fireconf.OrderDescending,
+					},
 				},
 			})
 		}
@@ -667,40 +651,6 @@ func defineFirestoreIndexes() *fireconf.Config {
 			Indexes: indexes,
 		})
 	}
-
-	// knowledges: ListKnowledgesByCategoryAndTags issues
-	//   Where("category", "==", ...).Where("tags", "array-contains", ...)
-	// which is an equality + array-contains combination and therefore
-	// requires a composite index in Firestore.
-	firestoreCollections = append(firestoreCollections, fireconf.Collection{
-		Name: "knowledges",
-		Indexes: []fireconf.Index{
-			{
-				QueryScope: fireconf.QueryScopeCollection,
-				Fields: []fireconf.IndexField{
-					{Path: "category", Order: fireconf.OrderAscending},
-					{Path: "tags", Array: fireconf.ArrayConfigContains},
-				},
-			},
-		},
-	})
-
-	// issues (subcollection under diagnoses/{id}): ListDiagnosisIssues issues
-	//   Where("Status", "==", ...).Where("RuleID", "==", ...).OrderBy("CreatedAt", asc)
-	// Two equality filters + OrderBy on a different field requires a composite index.
-	firestoreCollections = append(firestoreCollections, fireconf.Collection{
-		Name: "issues",
-		Indexes: []fireconf.Index{
-			{
-				QueryScope: fireconf.QueryScopeCollection,
-				Fields: []fireconf.IndexField{
-					{Path: "Status", Order: fireconf.OrderAscending},
-					{Path: "RuleID", Order: fireconf.OrderAscending},
-					{Path: "CreatedAt", Order: fireconf.OrderAscending},
-				},
-			},
-		},
-	})
 
 	// Keep deprecated collections declared with an empty index set so
 	// that fireconf's Migrate will detect and delete any residual indexes

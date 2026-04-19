@@ -14,13 +14,11 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	config := cli.DefineFirestoreIndexes()
 
 	gt.Value(t, config).NotNil()
-	// alerts, tickets: vector and composite indexes for real queries.
-	// knowledges: equality + array-contains composite for ListKnowledgesByCategoryAndTags.
-	// issues: subcollection composite for ListDiagnosisIssues.
+	// alerts, tickets: vector and composite indexes (unchanged from main).
 	// lists, memories, records: declared with empty index sets so that
 	//   fireconf's Migrate can clean up residual indexes left over from
 	//   previous deployments.
-	gt.Equal(t, len(config.Collections), 7)
+	gt.Equal(t, len(config.Collections), 5)
 
 	findCollection := func(name string) *fireconf.Collection {
 		for _, col := range config.Collections {
@@ -34,8 +32,8 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	t.Run("alerts collection", func(t *testing.T) {
 		col := findCollection("alerts")
 		gt.Value(t, col).NotNil()
-		// Embedding + __name__+Embedding + CreatedAt+__name__+Embedding + TicketID+Status
-		gt.Equal(t, len(col.Indexes), 4)
+		// Embedding + __name__+Embedding + CreatedAt+__name__+Embedding
+		gt.Equal(t, len(col.Indexes), 3)
 
 		// Single-field Embedding vector index
 		embeddingIndex := col.Indexes[0]
@@ -63,22 +61,13 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 		gt.Equal(t, compositeIndex.Fields[2].Path, "Embedding")
 		gt.Value(t, compositeIndex.Fields[2].Vector).NotNil()
 		gt.Equal(t, compositeIndex.Fields[2].Vector.Dimension, 256)
-
-		// TicketID + Status composite for GetAlertWithoutTicket / CountAlertsWithoutTicket
-		ticketStatus := col.Indexes[3]
-		gt.Equal(t, len(ticketStatus.Fields), 2)
-		gt.Equal(t, ticketStatus.Fields[0].Path, "TicketID")
-		gt.Equal(t, ticketStatus.Fields[0].Order, fireconf.OrderAscending)
-		gt.Equal(t, ticketStatus.Fields[1].Path, "Status")
-		gt.Equal(t, ticketStatus.Fields[1].Order, fireconf.OrderAscending)
 	})
 
 	t.Run("tickets collection", func(t *testing.T) {
 		col := findCollection("tickets")
 		gt.Value(t, col).NotNil()
-		// Embedding + __name__+Embedding + CreatedAt+__name__+Embedding
-		//   + Status+CreatedAt+__name__ + Status+Assignee.ID+CreatedAt
-		gt.Equal(t, len(col.Indexes), 5)
+		// Embedding + __name__+Embedding + CreatedAt+__name__+Embedding + Status+CreatedAt+__name__
+		gt.Equal(t, len(col.Indexes), 4)
 
 		// Status + CreatedAt + __name__ composite (for GetTicketsByStatusAndSpan)
 		statusIndex := col.Indexes[3]
@@ -89,47 +78,6 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 		gt.Equal(t, statusIndex.Fields[1].Order, fireconf.OrderDescending)
 		gt.Equal(t, statusIndex.Fields[2].Path, "__name__")
 		gt.Equal(t, statusIndex.Fields[2].Order, fireconf.OrderDescending)
-
-		// Status + Assignee.ID + CreatedAt composite (for GetTicketsByStatus with assignee)
-		assigneeIndex := col.Indexes[4]
-		gt.Equal(t, len(assigneeIndex.Fields), 3)
-		gt.Equal(t, assigneeIndex.Fields[0].Path, "Status")
-		gt.Equal(t, assigneeIndex.Fields[0].Order, fireconf.OrderAscending)
-		gt.Equal(t, assigneeIndex.Fields[1].Path, "Assignee.ID")
-		gt.Equal(t, assigneeIndex.Fields[1].Order, fireconf.OrderAscending)
-		gt.Equal(t, assigneeIndex.Fields[2].Path, "CreatedAt")
-		gt.Equal(t, assigneeIndex.Fields[2].Order, fireconf.OrderDescending)
-	})
-
-	t.Run("knowledges collection", func(t *testing.T) {
-		col := findCollection("knowledges")
-		gt.Value(t, col).NotNil()
-		gt.Equal(t, len(col.Indexes), 1)
-
-		// category + tags array-contains composite
-		idx := col.Indexes[0]
-		gt.Equal(t, len(idx.Fields), 2)
-		gt.Equal(t, idx.Fields[0].Path, "category")
-		gt.Equal(t, idx.Fields[0].Order, fireconf.OrderAscending)
-		gt.Equal(t, idx.Fields[1].Path, "tags")
-		gt.Equal(t, idx.Fields[1].Array, fireconf.ArrayConfigContains)
-	})
-
-	t.Run("issues subcollection", func(t *testing.T) {
-		col := findCollection("issues")
-		gt.Value(t, col).NotNil()
-		gt.Equal(t, len(col.Indexes), 1)
-
-		// Status + RuleID + CreatedAt composite for ListDiagnosisIssues
-		idx := col.Indexes[0]
-		gt.Equal(t, idx.QueryScope, fireconf.QueryScopeCollection)
-		gt.Equal(t, len(idx.Fields), 3)
-		gt.Equal(t, idx.Fields[0].Path, "Status")
-		gt.Equal(t, idx.Fields[0].Order, fireconf.OrderAscending)
-		gt.Equal(t, idx.Fields[1].Path, "RuleID")
-		gt.Equal(t, idx.Fields[1].Order, fireconf.OrderAscending)
-		gt.Equal(t, idx.Fields[2].Path, "CreatedAt")
-		gt.Equal(t, idx.Fields[2].Order, fireconf.OrderAscending)
 	})
 
 	t.Run("deprecated collections declared with empty index set", func(t *testing.T) {
