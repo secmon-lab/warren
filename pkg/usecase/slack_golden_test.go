@@ -325,6 +325,72 @@ func TestSlackGolden_HandleSlackMessage_UserMessageSaved(t *testing.T) {
 	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("handle_slack_message/user_message_saved.json"), rec.CallsJSON())
 }
 
+// TestSlackGolden_HandleSlackMessage_DedupesOnRetry asserts that Slack
+// retries (Events API re-deliveries) and `message_changed` follow-ups
+// collapse onto a single SessionMessage row instead of duplicating
+// the user's input in the Conversation timeline. This reproduces the
+// bug screenshot where the same mention appeared twice.
+//
+// The test drives HandleSlackMessage twice with the same Slack ts and
+// asserts the ticket's SessionMessages contain exactly one type=user
+// row with that content.
+func TestSlackGolden_HandleSlackMessage_DedupesOnRetry(t *testing.T) {
+	ctx := context.Background()
+
+	rec := testutil.NewRecorder()
+	client := testutil.NewSlackClientMock(rec)
+	svc, err := slackSvc.New(client, "C_DEFAULT")
+	gt.NoError(t, err).Required()
+	rec.Reset()
+
+	repo := repository.NewMemory()
+	thread := slackModel.Thread{
+		ChannelID: "C_TICKET",
+		ThreadID:  "1700000000.000000",
+		TeamID:    "T_TEAM",
+	}
+	t1 := ticket.Ticket{
+		ID:          types.TicketID("TCKT_FIXED_0002"),
+		SlackThread: &thread,
+		Status:      types.TicketStatusOpen,
+	}
+	gt.NoError(t, repo.PutTicket(ctx, t1)).Required()
+
+	uc := usecase.New(
+		usecase.WithRepository(repo),
+		usecase.WithSlackService(svc),
+	)
+
+	sameTs := "1700000001.000200"
+	sameContent := "<@U08A3TTRENS> is this related?"
+
+	// First delivery (original `message` event).
+	gt.NoError(t, uc.HandleSlackMessage(ctx,
+		slackModel.NewTestMessage(thread.ChannelID, thread.ThreadID, thread.TeamID,
+			sameTs, "U_USER", sameContent),
+	))
+	// Second delivery (retry OR `message_changed` follow-up). The
+	// deterministic MessageID derived from (session_id, slack_ts)
+	// makes the write idempotent so we do not grow a second row.
+	gt.NoError(t, uc.HandleSlackMessage(ctx,
+		slackModel.NewTestMessage(thread.ChannelID, thread.ThreadID, thread.TeamID,
+			sameTs, "U_USER", sameContent),
+	))
+
+	slackSource := sessModel.SessionSourceSlack
+	userType := sessModel.MessageTypeUser
+	msgs, err := repo.GetTicketSessionMessages(ctx, t1.ID, &slackSource, &userType, 0, 0)
+	gt.NoError(t, err).Required()
+
+	matching := 0
+	for _, m := range msgs {
+		if m.Content == sameContent {
+			matching++
+		}
+	}
+	gt.V(t, matching).Equal(1)
+}
+
 // TestSlackGolden_HandleSlackMessage_BotMessageSkipped captures the short-
 // circuit path: when Slack delivers a message whose author is warren itself,
 // we drop it before any repository or API work happens.

@@ -83,8 +83,36 @@ func (uc *UseCases) persistSlackThreadMessageAsSessionMessage(ctx context.Contex
 		// meaningful authorship in the Session timeline.
 		return
 	}
+
+	// Resolve the Slack user's display name and cache it on Author so
+	// downstream readers (frontend MessageBubble, GraphQL) show a
+	// human-readable name instead of the raw Slack ID. Slack events
+	// only carry the user ID, so we have to hit the Slack API — the
+	// slackService caches profiles to avoid per-message calls.
+	if uc.slackService != nil && slackMsg.User() != nil {
+		if profile, profErr := uc.slackService.GetUserProfile(ctx, slackMsg.User().ID); profErr == nil && profile != "" {
+			author.DisplayName = profile
+		} else if profErr != nil {
+			// Profile lookup failures are non-fatal — fall back to the
+			// author as constructed (DisplayName = user ID).
+			logging.From(ctx).Debug("failed to resolve slack profile for message author",
+				"error", profErr, "user_id", slackMsg.User().ID)
+		}
+	}
+
 	tid := ticketID
+	// Dedupe on (SessionID + Slack ts): Slack fires both `message` and
+	// (when the message contains a URL) `message_changed` events for
+	// the same logical message, and Events API retries also arrive if
+	// the initial 200 OK is slow. Using a deterministic MessageID
+	// collapses all of these into a single row. slack_ts is unique per
+	// Slack message within a workspace, so sessionID+ts is sufficient.
+	ts := slackMsg.Timestamp()
+	externalKey := string(sess.ID) + "|" + ts
 	m := sessModel.NewMessageV2(ctx, sess.ID, &tid, nil, sessModel.MessageTypeUser, slackMsg.Text(), author)
+	if ts != "" {
+		m.ID = types.DeterministicMessageID(externalKey)
+	}
 	if err := uc.repository.PutSessionMessage(ctx, m); err != nil {
 		errutil.Handle(ctx, goerr.Wrap(err, "failed to persist Slack user message as session.Message",
 			goerr.V("session_id", sess.ID),
