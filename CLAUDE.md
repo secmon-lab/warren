@@ -135,5 +135,8 @@ When making changes, before finishing the task, always:
 - All git commit messages must be in English
 - All PR titles and descriptions must be in English
 
+### Git Commits
+- **Commit messages must be a single line.** No body paragraphs. State the change in one sentence. Explanation goes in the PR description, not the commit.
+
 ### Directory
 - When you are mentioned about `tmp` directory, you SHOULD NOT see `/tmp`. You need to check `./tmp` directory from root of the repository.

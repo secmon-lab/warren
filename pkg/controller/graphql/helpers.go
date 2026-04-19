@@ -2,12 +2,22 @@ package graphql
 
 import (
 	"context"
+	"regexp"
 
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
 	"github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	slackService "github.com/secmon-lab/warren/pkg/service/slack"
+	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
+
+// slackUserIDRegexp matches a bare Slack user ID (e.g. "U08A3TTRENS",
+// "W12345678"). When the persisted Author.DisplayName looks like a raw
+// Slack ID we re-resolve it via the Slack profile API at read time so
+// the Conversation UI shows a human-readable name. This auto-heals
+// pre-fix rows whose DisplayName was written as the user ID.
+var slackUserIDRegexp = regexp.MustCompile(`^[UW][A-Z0-9]{7,}$`)
 
 // toGraphQLSessionMessage converts a domain session.Message to its
 // GraphQL representation including chat-session-redesign fields (TurnID,
@@ -47,6 +57,36 @@ func toGraphQLSessionMessage(m *session.Message) *graphql1.SessionMessage {
 		}
 	}
 	return out
+}
+
+// resolveAuthorDisplayName patches out.Author.DisplayName when it was
+// persisted as a bare Slack user ID (the pre-fix behavior for
+// pre-resolved profiles). Non-Slack authors and already-resolved rows
+// are returned unchanged. Lookup errors fall through silently — the
+// raw ID is a usable fallback.
+func resolveAuthorDisplayName(ctx context.Context, svc *slackService.Service, out *graphql1.SessionMessage) {
+	if svc == nil || out == nil || out.Author == nil {
+		return
+	}
+	a := out.Author
+	// Only attempt Slack lookup when the author is a Slack member —
+	// Web/CLI authors have their own DisplayName and their UserIDs do
+	// not match the Slack ID format anyway.
+	if a.SlackUserID == nil || *a.SlackUserID == "" {
+		return
+	}
+	if a.DisplayName != "" && !slackUserIDRegexp.MatchString(a.DisplayName) {
+		return
+	}
+	name, err := svc.GetUserProfile(ctx, *a.SlackUserID)
+	if err != nil {
+		logging.From(ctx).Debug("failed to resolve slack display name for session message",
+			"error", err, "slack_user_id", *a.SlackUserID)
+		return
+	}
+	if name != "" {
+		a.DisplayName = name
+	}
 }
 
 // toGraphQLSession converts a domain session.Session to a GraphQL Session
