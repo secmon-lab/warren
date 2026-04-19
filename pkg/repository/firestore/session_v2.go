@@ -261,10 +261,11 @@ func (r *Firestore) SearchSessionMessages(ctx context.Context, ticketID types.Ti
 			}
 		}
 	}
-	// Sort newest first.
-	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
-		out[i], out[j] = out[j], out[i]
-	}
+	// Sort newest first across Session boundaries. The slice-reverse
+	// we used previously only worked when messages came from a single
+	// Session; GetSessionsByTicket returns Sessions in arbitrary
+	// order so a full CreatedAt-DESC sort is required here.
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
 	if limit > 0 && len(out) > limit {
 		out = out[:limit]
 	}

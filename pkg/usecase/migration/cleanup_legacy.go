@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/m-mizutani/goerr/v2"
-	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/storage"
 )
@@ -28,9 +27,9 @@ import (
 // verification of comment-to-message, session-source-backfill,
 // history-scope, and turn-synthesis outputs on a production snapshot.
 type CleanupLegacyJob struct {
-	store        LegacyCommentStore
-	storageSvc   *storage.Service
-	listSessions func(ctx context.Context) ([]*sessModel.Session, error)
+	store      LegacyCommentStore
+	storageSvc *storage.Service
+	forEach    SessionForEach
 }
 
 // NewCleanupLegacyJob constructs the job. `store` provides the raw
@@ -39,15 +38,18 @@ type CleanupLegacyJob struct {
 // pkg/cli/migrate_chat_session.go:firestoreCommentSource), in tests
 // a Memory-backed implementation is sufficient. storageSvc is required
 // to purge legacy latest.json files; pass nil to skip storage cleanup.
+// `forEach` streams Sessions; it is currently unused by the cleanup
+// body but retained in the signature so callers can pre-wire it
+// uniformly across migration jobs.
 func NewCleanupLegacyJob(
 	store LegacyCommentStore,
 	storageSvc *storage.Service,
-	listSessions func(ctx context.Context) ([]*sessModel.Session, error),
+	forEach SessionForEach,
 ) *CleanupLegacyJob {
 	return &CleanupLegacyJob{
-		store:        store,
-		storageSvc:   storageSvc,
-		listSessions: listSessions,
+		store:      store,
+		storageSvc: storageSvc,
+		forEach:    forEach,
 	}
 }
 

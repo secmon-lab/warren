@@ -18,15 +18,16 @@ import (
 // The job is idempotent: rows that already carry a valid Source are
 // counted as Skipped.
 type SessionSourceBackfillJob struct {
-	repo     interfaces.Repository
-	listAll  func(ctx context.Context) ([]*sessModel.Session, error)
+	repo    interfaces.Repository
+	forEach SessionForEach
 }
 
-// NewSessionSourceBackfillJob constructs the job. listAll lets tests
-// stub out the "list every Session in the system" step; production
-// wiring passes a function that iterates `sessions` via Firestore.
-func NewSessionSourceBackfillJob(repo interfaces.Repository, listAll func(ctx context.Context) ([]*sessModel.Session, error)) *SessionSourceBackfillJob {
-	return &SessionSourceBackfillJob{repo: repo, listAll: listAll}
+// NewSessionSourceBackfillJob constructs the job. `forEach` streams
+// every Session through the handle callback; tests pass an in-memory
+// closure and the CLI wires a Firestore iterator. Streaming avoids
+// loading the entire session collection into memory.
+func NewSessionSourceBackfillJob(repo interfaces.Repository, forEach SessionForEach) *SessionSourceBackfillJob {
+	return &SessionSourceBackfillJob{repo: repo, forEach: forEach}
 }
 
 func (j *SessionSourceBackfillJob) Name() string { return "session-source-backfill" }
@@ -36,21 +37,18 @@ func (j *SessionSourceBackfillJob) Description() string {
 }
 
 func (j *SessionSourceBackfillJob) Run(ctx context.Context, opts Options) (*Result, error) {
-	if j.listAll == nil {
-		return nil, goerr.New("session-source-backfill: listAll dependency is not wired")
-	}
-	sessions, err := j.listAll(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to list sessions for backfill")
+	if j.forEach == nil {
+		return nil, goerr.New("session-source-backfill: forEach dependency is not wired")
 	}
 
-	result := &Result{JobName: j.Name(), Scanned: len(sessions)}
+	result := &Result{JobName: j.Name()}
 	var slackCount, webCount int
 
-	for _, s := range sessions {
+	if err := j.forEach(ctx, func(s *sessModel.Session) error {
+		result.Scanned++
 		if s.Source.Valid() && s.TicketIDPtr != nil {
 			result.Skipped++
-			continue
+			return nil
 		}
 		inferred := inferSource(s)
 		ticketPtr := inferTicketIDPtr(s)
@@ -63,12 +61,9 @@ func (j *SessionSourceBackfillJob) Run(ctx context.Context, opts Options) (*Resu
 			case sessModel.SessionSourceWeb:
 				webCount++
 			}
-			continue
+			return nil
 		}
 
-		// Apply the inferred values. TicketIDPtr propagation uses the
-		// existing PromoteSessionToTicket method so we do not duplicate
-		// transactional logic here.
 		updated := *s
 		updated.Source = inferred
 		if ticketPtr != nil {
@@ -76,7 +71,7 @@ func (j *SessionSourceBackfillJob) Run(ctx context.Context, opts Options) (*Resu
 		}
 		if err := j.repo.PutSession(ctx, &updated); err != nil {
 			result.Errors++
-			continue
+			return nil
 		}
 		result.Migrated++
 		switch inferred {
@@ -85,6 +80,9 @@ func (j *SessionSourceBackfillJob) Run(ctx context.Context, opts Options) (*Resu
 		case sessModel.SessionSourceWeb:
 			webCount++
 		}
+		return nil
+	}); err != nil {
+		return nil, goerr.Wrap(err, "failed to iterate sessions for backfill")
 	}
 
 	result.MergeDetails(map[string]any{

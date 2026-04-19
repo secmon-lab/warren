@@ -11,7 +11,18 @@ package migration
 import (
 	"context"
 	"maps"
+
+	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 )
+
+// SessionForEach streams every Session in the target dataset through
+// the supplied handle callback. Migration jobs consume this instead
+// of a ([]*Session, error) returner so they process one Session at a
+// time — keeping memory use bounded regardless of collection size.
+//
+// If handle returns a non-nil error, iteration stops and the error
+// bubbles up from forEach.
+type SessionForEach func(ctx context.Context, handle func(*sessModel.Session) error) error
 
 // Job describes a single migration unit. Name is the CLI flag
 // (`--job <name>`); Description is the short blurb printed by

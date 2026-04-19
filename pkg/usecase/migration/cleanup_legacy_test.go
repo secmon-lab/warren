@@ -9,7 +9,6 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
 	adapterStorage "github.com/secmon-lab/warren/pkg/adapter/storage"
-	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/service/storage"
@@ -91,9 +90,7 @@ func TestCleanupLegacy_DeletesCommentsAndHistory(t *testing.T) {
 		Messages: []gollem.Message{{Role: gollem.RoleUser}},
 	}))
 
-	job := migration.NewCleanupLegacyJob(store, svc,
-		func(_ context.Context) ([]*sessModel.Session, error) { return nil, nil },
-	)
+	job := migration.NewCleanupLegacyJob(store, svc, sessionsForEach(nil))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	// 2 comments + 1 latest.json
@@ -125,9 +122,7 @@ func TestCleanupLegacy_DryRunNoDeletes(t *testing.T) {
 		Messages: []gollem.Message{{Role: gollem.RoleUser}},
 	}))
 
-	job := migration.NewCleanupLegacyJob(store, svc,
-		func(_ context.Context) ([]*sessModel.Session, error) { return nil, nil },
-	)
+	job := migration.NewCleanupLegacyJob(store, svc, sessionsForEach(nil))
 	res, err := job.Run(ctx, migration.Options{DryRun: true})
 	gt.NoError(t, err)
 	gt.V(t, res.Migrated).Equal(2)
@@ -147,9 +142,7 @@ func TestCleanupLegacy_WithoutStorageSkipsHistory(t *testing.T) {
 		ID: types.NewCommentID(), TicketID: tid, Comment: "c", CreatedAt: time.Now(),
 	})
 
-	job := migration.NewCleanupLegacyJob(store, nil,
-		func(_ context.Context) ([]*sessModel.Session, error) { return nil, nil },
-	)
+	job := migration.NewCleanupLegacyJob(store, nil, sessionsForEach(nil))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	gt.V(t, res.Migrated).Equal(1)

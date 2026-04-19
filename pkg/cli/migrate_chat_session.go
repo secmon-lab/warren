@@ -45,35 +45,46 @@ func openFirestoreRepository(ctx context.Context, projectID, databaseID string) 
 	return repo, cleanup, nil
 }
 
-// listAllSessions enumerates every Session document in the `sessions`
-// collection for backfill-style jobs. The Firestore repository keeps
-// its own `sessions` collection so the low-level iterator is colocated
-// here to avoid leaking it through the Repository interface.
-func listAllSessions(ctx context.Context, projectID, databaseID string) ([]*sessModel.Session, error) {
+// forEachSession streams every Session document in the `sessions`
+// collection through `handle`, one row at a time. Using a streaming
+// callback instead of accumulating into a slice keeps migration
+// memory bounded to a single Session struct regardless of how many
+// legacy rows the target database holds — critical for production
+// data where Session count can reach tens of thousands.
+//
+// The Firestore repository keeps its own `sessions` collection so the
+// low-level iterator is colocated here rather than leaked through the
+// Repository interface.
+func forEachSession(
+	ctx context.Context,
+	projectID, databaseID string,
+	handle func(*sessModel.Session) error,
+) error {
 	db, err := firestore.NewClientWithDatabase(ctx, projectID, databaseID)
 	if err != nil {
-		return nil, goerr.Wrap(err, "failed to open firestore client")
+		return goerr.Wrap(err, "failed to open firestore client")
 	}
 	defer safe.Close(ctx, db)
 
 	iter := db.Collection("sessions").Documents(ctx)
-	var out []*sessModel.Session
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
 			break
 		}
 		if err != nil {
-			return nil, goerr.Wrap(err, "failed to iterate sessions")
+			return goerr.Wrap(err, "failed to iterate sessions")
 		}
 		var s sessModel.Session
 		if err := doc.DataTo(&s); err != nil {
-			return nil, goerr.Wrap(err, "failed to decode session",
+			return goerr.Wrap(err, "failed to decode session",
 				goerr.V("doc_id", doc.Ref.ID))
 		}
-		out = append(out, &s)
+		if err := handle(&s); err != nil {
+			return err
+		}
 	}
-	return out, nil
+	return nil
 }
 
 // firestoreCommentSource satisfies migration.LegacyCommentStore using
@@ -182,11 +193,11 @@ func runSessionSourceBackfill(ctx context.Context, rt *migrateRuntime) error {
 	}
 	defer cleanup()
 
-	listAll := func(ctx context.Context) ([]*sessModel.Session, error) {
-		return listAllSessions(ctx, rt.projectID, rt.databaseID)
+	forEach := func(ctx context.Context, handle func(*sessModel.Session) error) error {
+		return forEachSession(ctx, rt.projectID, rt.databaseID, handle)
 	}
 
-	job := migration.NewSessionSourceBackfillJob(repo, listAll)
+	job := migration.NewSessionSourceBackfillJob(repo, forEach)
 	result, err := job.Run(ctx, migration.Options{DryRun: rt.dryRun})
 	if err != nil {
 		return err
@@ -233,11 +244,11 @@ func runTurnSynthesis(ctx context.Context, rt *migrateRuntime) error {
 	}
 	defer cleanup()
 
-	listAll := func(ctx context.Context) ([]*sessModel.Session, error) {
-		return listAllSessions(ctx, rt.projectID, rt.databaseID)
+	forEach := func(ctx context.Context, handle func(*sessModel.Session) error) error {
+		return forEachSession(ctx, rt.projectID, rt.databaseID, handle)
 	}
 
-	job := migration.NewTurnSynthesisJob(repo, listAll)
+	job := migration.NewTurnSynthesisJob(repo, forEach)
 	result, err := job.Run(ctx, migration.Options{DryRun: rt.dryRun})
 	if err != nil {
 		return err
@@ -272,11 +283,11 @@ func runHistoryScope(ctx context.Context, rt *migrateRuntime) error {
 		return err
 	}
 
-	listAll := func(ctx context.Context) ([]*sessModel.Session, error) {
-		return listAllSessions(ctx, rt.projectID, rt.databaseID)
+	forEach := func(ctx context.Context, handle func(*sessModel.Session) error) error {
+		return forEachSession(ctx, rt.projectID, rt.databaseID, handle)
 	}
 
-	job := migration.NewHistoryScopeJob(storageSvc, listAll)
+	job := migration.NewHistoryScopeJob(storageSvc, forEach)
 	result, err := job.Run(ctx, migration.Options{DryRun: rt.dryRun})
 	if err != nil {
 		return err
@@ -305,11 +316,11 @@ func runCleanupLegacy(ctx context.Context, rt *migrateRuntime) error {
 	}
 
 	store := firestoreCommentSource{projectID: rt.projectID, databaseID: rt.databaseID}
-	listSessions := func(ctx context.Context) ([]*sessModel.Session, error) {
-		return listAllSessions(ctx, rt.projectID, rt.databaseID)
+	forEach := func(ctx context.Context, handle func(*sessModel.Session) error) error {
+		return forEachSession(ctx, rt.projectID, rt.databaseID, handle)
 	}
 
-	job := migration.NewCleanupLegacyJob(store, storageSvc, listSessions)
+	job := migration.NewCleanupLegacyJob(store, storageSvc, forEach)
 	result, err := job.Run(ctx, migration.Options{DryRun: rt.dryRun})
 	if err != nil {
 		return err

@@ -1,3 +1,4 @@
+import ReactMarkdown from "react-markdown";
 import { SessionMessage } from "@/lib/types";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import { Bot, User, AlertTriangle, Wrench, ListTodo } from "lucide-react";
@@ -23,20 +24,38 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <span className="font-medium">
             {message.author?.displayName || label}
           </span>
-          <span className="mx-1">·</span>
-          <span>{label}</span>
-          <span className="mx-1">·</span>
-          <span>{formatRelativeTime(message.createdAt)}</span>
+          {formatRelativeTime(message.createdAt) && (
+            <>
+              <span className="mx-1">·</span>
+              <span>{formatRelativeTime(message.createdAt)}</span>
+            </>
+          )}
         </div>
         <div
-          className={`inline-block max-w-full rounded-lg px-3 py-2 text-sm whitespace-pre-wrap break-words ${bubbleClass(
+          className={`inline-block max-w-full rounded-lg px-3 py-2 text-sm break-words ${bubbleClass(
             message.type,
           )}`}>
-          {message.content}
+          {renderContent(message)}
         </div>
       </div>
     </div>
   );
+}
+
+// renderContent dispatches on message type: AI-produced messages
+// (response / plan / warning) frequently contain markdown, so render
+// them via ReactMarkdown. User messages and raw traces are rendered
+// as pre-wrapped plain text to preserve spacing and avoid
+// misinterpreting user-typed asterisks.
+function renderContent(m: SessionMessage) {
+  if (m.type === "response" || m.type === "plan" || m.type === "warning") {
+    return (
+      <div className="prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
+        <ReactMarkdown>{m.content}</ReactMarkdown>
+      </div>
+    );
+  }
+  return <span className="whitespace-pre-wrap">{m.content}</span>;
 }
 
 function messageTypeLabel(t: SessionMessage["type"]): string {

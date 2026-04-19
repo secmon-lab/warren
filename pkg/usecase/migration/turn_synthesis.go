@@ -19,14 +19,15 @@ import (
 // Turn persisted, so re-runs are safe.
 type TurnSynthesisJob struct {
 	repo    interfaces.Repository
-	listAll func(ctx context.Context) ([]*sessModel.Session, error)
+	forEach SessionForEach
 }
 
-// NewTurnSynthesisJob constructs the job. listAll enumerates every
-// Session; the CLI wrapper provides a Firestore-backed implementation
-// (see pkg/cli/migrate_chat_session.go:listAllSessions).
-func NewTurnSynthesisJob(repo interfaces.Repository, listAll func(ctx context.Context) ([]*sessModel.Session, error)) *TurnSynthesisJob {
-	return &TurnSynthesisJob{repo: repo, listAll: listAll}
+// NewTurnSynthesisJob constructs the job. `forEach` streams every
+// Session through the handle callback; the CLI wrapper wires a
+// Firestore iterator (see pkg/cli/migrate_chat_session.go:
+// forEachSession).
+func NewTurnSynthesisJob(repo interfaces.Repository, forEach SessionForEach) *TurnSynthesisJob {
+	return &TurnSynthesisJob{repo: repo, forEach: forEach}
 }
 
 func (j *TurnSynthesisJob) Name() string { return "turn-synthesis" }
@@ -36,51 +37,46 @@ func (j *TurnSynthesisJob) Description() string {
 }
 
 func (j *TurnSynthesisJob) Run(ctx context.Context, opts Options) (*Result, error) {
-	if j.repo == nil || j.listAll == nil {
+	if j.repo == nil || j.forEach == nil {
 		return nil, goerr.New("turn-synthesis: dependencies not wired")
 	}
 
-	sessions, err := j.listAll(ctx)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to list sessions")
-	}
-
 	result := &Result{JobName: j.Name()}
-	for _, s := range sessions {
+	if err := j.forEach(ctx, func(s *sessModel.Session) error {
 		if s == nil {
-			continue
+			return nil
 		}
 		result.Scanned++
 
 		existingTurns, err := j.repo.GetTurnsBySession(ctx, s.ID)
 		if err != nil {
 			result.Errors++
-			continue
+			return nil
 		}
 		if len(existingTurns) > 0 {
 			result.Skipped++
-			continue
+			return nil
 		}
 
 		msgs, err := j.repo.GetSessionMessages(ctx, s.ID)
 		if err != nil {
 			result.Errors++
-			continue
+			return nil
 		}
 		if len(msgs) == 0 {
 			result.Skipped++
-			continue
+			return nil
 		}
 
 		if opts.DryRun {
 			result.Migrated++
-			continue
+			return nil
 		}
 
 		turn := sessModel.NewTurn(ctx, s.ID)
 		// Close immediately: legacy Sessions are already completed.
 		closedAt := clock.Now(ctx)
-		if s.LastActiveAt != (s.LastActiveAt) && !s.LastActiveAt.IsZero() {
+		if !s.LastActiveAt.IsZero() {
 			closedAt = s.LastActiveAt
 		}
 		turn.Status = sessModel.TurnStatusCompleted
@@ -88,7 +84,7 @@ func (j *TurnSynthesisJob) Run(ctx context.Context, opts Options) (*Result, erro
 
 		if err := j.repo.PutTurn(ctx, turn); err != nil {
 			result.Errors++
-			continue
+			return nil
 		}
 
 		// Stamp every Message with the new TurnID.
@@ -105,9 +101,12 @@ func (j *TurnSynthesisJob) Run(ctx context.Context, opts Options) (*Result, erro
 		}
 		if stampErrs > 0 {
 			result.Errors += stampErrs
-			continue
+			return nil
 		}
 		result.Migrated++
+		return nil
+	}); err != nil {
+		return nil, goerr.Wrap(err, "failed to iterate sessions for turn-synthesis")
 	}
 	return result, nil
 }

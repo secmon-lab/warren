@@ -37,11 +37,7 @@ func TestHistoryScope_CopiesLegacyTicketHistoryToSession(t *testing.T) {
 		Source:      sessModel.SessionSourceSlack,
 		TicketIDPtr: &tid,
 	}}
-	listAll := func(_ context.Context) ([]*sessModel.Session, error) {
-		return sessions, nil
-	}
-
-	job := migration.NewHistoryScopeJob(svc, listAll)
+	job := migration.NewHistoryScopeJob(svc, sessionsForEach(sessions))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	gt.V(t, res.Scanned).Equal(1)
@@ -67,9 +63,7 @@ func TestHistoryScope_SkipsSessionWithExistingHistory(t *testing.T) {
 	sessions := []*sessModel.Session{{
 		ID: sid, Source: sessModel.SessionSourceSlack, TicketIDPtr: &tid,
 	}}
-	job := migration.NewHistoryScopeJob(svc, func(_ context.Context) ([]*sessModel.Session, error) {
-		return sessions, nil
-	})
+	job := migration.NewHistoryScopeJob(svc, sessionsForEach(sessions))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	gt.V(t, res.Migrated).Equal(0)
@@ -88,9 +82,7 @@ func TestHistoryScope_SkipsWebAndCLISessions(t *testing.T) {
 		{ID: "sid_web", Source: sessModel.SessionSourceWeb, TicketIDPtr: &tid},
 		{ID: "sid_cli", Source: sessModel.SessionSourceCLI, TicketIDPtr: &tid},
 	}
-	job := migration.NewHistoryScopeJob(svc, func(_ context.Context) ([]*sessModel.Session, error) {
-		return sessions, nil
-	})
+	job := migration.NewHistoryScopeJob(svc, sessionsForEach(sessions))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	gt.V(t, res.Scanned).Equal(2)
@@ -103,9 +95,7 @@ func TestHistoryScope_SkipsSessionsWithoutTicket(t *testing.T) {
 	client := adapterStorage.NewMemoryClient()
 	svc := storage.New(client)
 	sessions := []*sessModel.Session{{ID: "sid_orphan", Source: sessModel.SessionSourceSlack}}
-	job := migration.NewHistoryScopeJob(svc, func(_ context.Context) ([]*sessModel.Session, error) {
-		return sessions, nil
-	})
+	job := migration.NewHistoryScopeJob(svc, sessionsForEach(sessions))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	gt.V(t, res.Skipped).Equal(1)
@@ -123,9 +113,7 @@ func TestHistoryScope_DryRunDoesNotWrite(t *testing.T) {
 	sessions := []*sessModel.Session{{
 		ID: sid, Source: sessModel.SessionSourceSlack, TicketIDPtr: &tid,
 	}}
-	job := migration.NewHistoryScopeJob(svc, func(_ context.Context) ([]*sessModel.Session, error) {
-		return sessions, nil
-	})
+	job := migration.NewHistoryScopeJob(svc, sessionsForEach(sessions))
 	res, err := job.Run(ctx, migration.Options{DryRun: true})
 	gt.NoError(t, err)
 	gt.V(t, res.Migrated).Equal(1)

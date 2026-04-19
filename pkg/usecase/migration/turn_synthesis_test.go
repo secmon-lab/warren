@@ -22,9 +22,7 @@ func TestTurnSynthesis_CreatesOneTurnPerSession(t *testing.T) {
 	gt.NoError(t, repo.PutSessionMessage(ctx, m1))
 	gt.NoError(t, repo.PutSessionMessage(ctx, m2))
 
-	job := migration.NewTurnSynthesisJob(repo, func(_ context.Context) ([]*sessModel.Session, error) {
-		return []*sessModel.Session{{ID: sid}}, nil
-	})
+	job := migration.NewTurnSynthesisJob(repo, sessionsForEach([]*sessModel.Session{{ID: sid}}))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	gt.V(t, res.Migrated).Equal(1)
@@ -51,9 +49,7 @@ func TestTurnSynthesis_SkipsSessionWithTurnAlready(t *testing.T) {
 	existingTurn := sessModel.NewTurn(ctx, sid)
 	gt.NoError(t, repo.PutTurn(ctx, existingTurn))
 
-	job := migration.NewTurnSynthesisJob(repo, func(_ context.Context) ([]*sessModel.Session, error) {
-		return []*sessModel.Session{{ID: sid}}, nil
-	})
+	job := migration.NewTurnSynthesisJob(repo, sessionsForEach([]*sessModel.Session{{ID: sid}}))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	gt.V(t, res.Skipped).Equal(1)
@@ -66,9 +62,7 @@ func TestTurnSynthesis_SkipsSessionWithoutMessages(t *testing.T) {
 	sid := types.SessionID("sid_ts_empty")
 	gt.NoError(t, repo.PutSession(ctx, &sessModel.Session{ID: sid}))
 
-	job := migration.NewTurnSynthesisJob(repo, func(_ context.Context) ([]*sessModel.Session, error) {
-		return []*sessModel.Session{{ID: sid}}, nil
-	})
+	job := migration.NewTurnSynthesisJob(repo, sessionsForEach([]*sessModel.Session{{ID: sid}}))
 	res, err := job.Run(ctx, migration.Options{})
 	gt.NoError(t, err)
 	gt.V(t, res.Skipped).Equal(1)
@@ -83,9 +77,7 @@ func TestTurnSynthesis_DryRunNoWrites(t *testing.T) {
 	m := sessModel.NewMessageV2(ctx, sid, nil, nil, sessModel.MessageTypeUser, "hi", nil)
 	gt.NoError(t, repo.PutSessionMessage(ctx, m))
 
-	job := migration.NewTurnSynthesisJob(repo, func(_ context.Context) ([]*sessModel.Session, error) {
-		return []*sessModel.Session{{ID: sid}}, nil
-	})
+	job := migration.NewTurnSynthesisJob(repo, sessionsForEach([]*sessModel.Session{{ID: sid}}))
 	res, err := job.Run(ctx, migration.Options{DryRun: true})
 	gt.NoError(t, err)
 	gt.V(t, res.Migrated).Equal(1)

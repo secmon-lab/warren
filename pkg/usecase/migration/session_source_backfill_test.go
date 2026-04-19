@@ -14,9 +14,21 @@ import (
 // listAllFrom builds a closure that returns every session currently in
 // the in-memory repository. Used to wire production-equivalent
 // enumeration for tests without coupling to Firestore iteration details.
-func listAllFrom(repo *repository.Memory) func(ctx context.Context) ([]*sessModel.Session, error) {
-	return func(ctx context.Context) ([]*sessModel.Session, error) {
-		return repo.AllSessions(), nil
+func listAllFrom(repo *repository.Memory) migration.SessionForEach {
+	return sessionsForEach(repo.AllSessions())
+}
+
+// sessionsForEach wraps a []*Session slice into a SessionForEach so
+// migration tests can feed a pre-populated list into jobs without
+// spinning up an iterator.
+func sessionsForEach(sessions []*sessModel.Session) migration.SessionForEach {
+	return func(_ context.Context, handle func(*sessModel.Session) error) error {
+		for _, s := range sessions {
+			if err := handle(s); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
 }
 

@@ -111,15 +111,15 @@ export function TicketConversation({ ticketId }: TicketConversationProps) {
             Error loading conversation: {messagesError.message}
           </div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4">
-          <div className="border-r md:pr-4">
+        <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 h-[640px]">
+          <div className="border-r md:pr-4 overflow-y-auto">
             <SessionSidebar
               sessions={sessions}
               selected={selected}
               onSelect={(s) => setSelected(s)}
             />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex flex-col min-h-0">
             {wsEnabled ? (
               <WebChatPane
                 ticketId={ticketId}
@@ -252,9 +252,9 @@ interface ReadOnlyPaneProps {
 
 function ReadOnlyPane({ messages, loading, session }: ReadOnlyPaneProps) {
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col h-full min-h-0">
       {session?.source === "slack" && session.slackURL && (
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs text-muted-foreground mb-2">
           Slack thread — continue the conversation in{" "}
           <a
             href={session.slackURL}
@@ -266,7 +266,9 @@ function ReadOnlyPane({ messages, loading, session }: ReadOnlyPaneProps) {
           .
         </div>
       )}
-      <ConversationMainPane messages={messages} loading={loading} />
+      <div className="flex-1 overflow-y-auto pr-1">
+        <ConversationMainPane messages={messages} loading={loading} />
+      </div>
     </div>
   );
 }
@@ -343,11 +345,11 @@ function WebChatPane({
   );
 
   return (
-    <div className="flex flex-col min-h-[320px]">
+    <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-end mb-2">
         <ConnectionBadge status={status} />
       </div>
-      <div className="flex-1 space-y-3">
+      <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-0">
         <ConversationMainPane
           messages={persistedMessages}
           loading={messagesLoading}
