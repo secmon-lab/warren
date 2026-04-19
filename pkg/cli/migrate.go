@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"time"
 
@@ -187,20 +189,218 @@ func migrateIndexes(ctx context.Context, projectID, databaseID string, dryRun bo
 		return goerr.Wrap(err, "failed to create fireconf client")
 	}
 
+	// Fetch the current Firestore state so we can present a human-readable
+	// diff to stdout before (and after) applying changes. The structured
+	// logger output from fireconf is still emitted for operational logs.
+	collectionNames := collectionNamesOf(indexConfig)
+	current, err := client.Import(ctx, collectionNames...)
+	if err != nil {
+		return goerr.Wrap(err, "failed to import current firestore config",
+			goerr.V("collections", collectionNames))
+	}
+
+	diff, err := client.DiffConfigs(current)
+	if err != nil {
+		return goerr.Wrap(err, "failed to diff firestore config")
+	}
+
+	printMigrationPlan(os.Stdout, projectID, databaseID, dryRun, indexConfig, diff)
+
+	if dryRun {
+		return nil
+	}
+
 	if err := client.Migrate(ctx); err != nil {
 		return goerr.Wrap(err, "failed to migrate indexes")
 	}
 
-	if !dryRun {
-		// Wait for all indexes to become READY.
-		// fireconf's LRO wait may return before vector indexes are actually usable,
-		// so we poll the Admin API directly until every index is in READY state.
-		if err := waitForIndexesReady(ctx, projectID, databaseID, indexConfig, logger.With("phase", "wait_ready")); err != nil {
-			return goerr.Wrap(err, "indexes did not become ready")
+	// Wait for all indexes to become READY.
+	// fireconf's LRO wait may return before vector indexes are actually usable,
+	// so we poll the Admin API directly until every index is in READY state.
+	if err := waitForIndexesReady(ctx, projectID, databaseID, indexConfig, logger.With("phase", "wait_ready")); err != nil {
+		return goerr.Wrap(err, "indexes did not become ready")
+	}
+
+	printMigrationDone(os.Stdout, diff)
+
+	return nil
+}
+
+func collectionNamesOf(cfg *fireconf.Config) []string {
+	names := make([]string, 0, len(cfg.Collections))
+	for _, col := range cfg.Collections {
+		names = append(names, col.Name)
+	}
+	return names
+}
+
+// formatIndexFields returns a compact human-readable representation of
+// an index definition, e.g. "[CreatedAt desc, __name__ desc, Embedding vector]".
+func formatIndexFields(fields []fireconf.IndexField) string {
+	parts := make([]string, 0, len(fields))
+	for _, f := range fields {
+		parts = append(parts, f.Path+" "+fieldModifier(f))
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
+}
+
+func fieldModifier(f fireconf.IndexField) string {
+	switch {
+	case f.Vector != nil:
+		return fmt.Sprintf("vector(%d)", f.Vector.Dimension)
+	case f.Array == fireconf.ArrayConfigContains:
+		return "array-contains"
+	case f.Order == fireconf.OrderDescending:
+		return "desc"
+	case f.Order == fireconf.OrderAscending:
+		return "asc"
+	default:
+		return string(f.Order)
+	}
+}
+
+// printMigrationPlan writes a human-readable summary of the planned migration
+// to the given writer. It lists every declared index per collection annotated
+// with ADD / DELETE / KEEP, followed by a totals line.
+func printMigrationPlan(w io.Writer, projectID, databaseID string, dryRun bool, want *fireconf.Config, diff *fireconf.DiffResult) {
+	mode := "APPLY"
+	if dryRun {
+		mode = "DRY-RUN"
+	}
+
+	pw := &planWriter{w: w}
+	pw.line(strings.Repeat("=", 70))
+	pw.line("  Firestore index migration plan")
+	pw.line(strings.Repeat("=", 70))
+	pw.printf("  Project:  %s\n", projectID)
+	pw.printf("  Database: %s\n", databaseID)
+	pw.printf("  Mode:     %s\n", mode)
+	pw.line(strings.Repeat("-", 70))
+
+	addByCollection := map[string][]fireconf.Index{}
+	delByCollection := map[string][]fireconf.Index{}
+	for _, cd := range diff.Collections {
+		if len(cd.IndexesToAdd) > 0 {
+			addByCollection[cd.Name] = append(addByCollection[cd.Name], cd.IndexesToAdd...)
+		}
+		if len(cd.IndexesToDelete) > 0 {
+			delByCollection[cd.Name] = append(delByCollection[cd.Name], cd.IndexesToDelete...)
 		}
 	}
 
-	return nil
+	// Show every declared collection so operators can see the full target state.
+	var totalAdd, totalDelete, totalKeep int
+
+	declaredNames := map[string]struct{}{}
+	for _, col := range want.Collections {
+		declaredNames[col.Name] = struct{}{}
+		pw.line("")
+		pw.printf("Collection: %s\n", col.Name)
+
+		adds := addByCollection[col.Name]
+		dels := delByCollection[col.Name]
+
+		// Any declared index that is NOT in the add list is considered "kept"
+		// (already present in Firestore and unchanged).
+		for _, idx := range col.Indexes {
+			if indexMatchesAny(idx, adds) {
+				pw.printf("  + ADD    %s\n", formatIndexFields(idx.Fields))
+				totalAdd++
+			} else {
+				pw.printf("    KEEP   %s\n", formatIndexFields(idx.Fields))
+				totalKeep++
+			}
+		}
+		for _, idx := range dels {
+			pw.printf("  - DELETE %s\n", formatIndexFields(idx.Fields))
+			totalDelete++
+		}
+	}
+
+	// Deletions may target collections that no longer appear in the declared config.
+	for name, dels := range delByCollection {
+		if _, ok := declaredNames[name]; ok {
+			continue
+		}
+		pw.line("")
+		pw.printf("Collection: %s (no longer declared)\n", name)
+		for _, idx := range dels {
+			pw.printf("  - DELETE %s\n", formatIndexFields(idx.Fields))
+			totalDelete++
+		}
+	}
+
+	pw.line("")
+	pw.line(strings.Repeat("-", 70))
+	pw.printf("Summary: %d to add, %d to delete, %d unchanged (%d total declared).\n",
+		totalAdd, totalDelete, totalKeep, totalAdd+totalKeep)
+	pw.line(strings.Repeat("=", 70))
+}
+
+func printMigrationDone(w io.Writer, diff *fireconf.DiffResult) {
+	var added, deleted int
+	for _, cd := range diff.Collections {
+		added += len(cd.IndexesToAdd)
+		deleted += len(cd.IndexesToDelete)
+	}
+	pw := &planWriter{w: w}
+	pw.line("")
+	pw.printf("Migration applied successfully: %d added, %d deleted. All indexes are READY.\n", added, deleted)
+}
+
+// planWriter is a thin io.Writer wrapper that discards write errors. It is used
+// for best-effort diagnostic output to stdout where a failed write cannot be
+// meaningfully recovered from and does not warrant propagating up the call stack.
+type planWriter struct {
+	w io.Writer
+}
+
+func (p *planWriter) line(s string) {
+	_, _ = fmt.Fprintln(p.w, s)
+}
+
+func (p *planWriter) printf(format string, args ...any) {
+	_, _ = fmt.Fprintf(p.w, format, args...)
+}
+
+// indexMatchesAny reports whether idx is structurally equal to any index in the list.
+// Two indexes match when their QueryScope and field definitions line up field-by-field.
+func indexMatchesAny(idx fireconf.Index, list []fireconf.Index) bool {
+	for _, other := range list {
+		if indexesEqual(idx, other) {
+			return true
+		}
+	}
+	return false
+}
+
+func indexesEqual(a, b fireconf.Index) bool {
+	if a.QueryScope != b.QueryScope {
+		return false
+	}
+	if len(a.Fields) != len(b.Fields) {
+		return false
+	}
+	for i := range a.Fields {
+		if !fieldsEqual(a.Fields[i], b.Fields[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func fieldsEqual(a, b fireconf.IndexField) bool {
+	if a.Path != b.Path || a.Order != b.Order || a.Array != b.Array {
+		return false
+	}
+	switch {
+	case a.Vector == nil && b.Vector == nil:
+		return true
+	case a.Vector == nil || b.Vector == nil:
+		return false
+	default:
+		return a.Vector.Dimension == b.Vector.Dimension
+	}
 }
 
 // waitForIndexesReady polls Firestore Admin API until all managed indexes are READY.
@@ -343,15 +543,19 @@ func backfillAlertStatus(ctx context.Context, projectID, databaseID string, dryR
 }
 
 func defineFirestoreIndexes() *fireconf.Config {
-	collections := []string{"alerts", "tickets", "lists"}
+	// Only collections that perform FindNearest (vector search) or
+	// multi-field queries requiring a composite index are managed here.
+	// Collections whose queries are satisfied by Firestore's automatic
+	// single-field indexes (merge joins for equality-only combinations)
+	// are intentionally omitted.
+	collections := []string{"alerts", "tickets"}
 
 	var firestoreCollections []fireconf.Collection
 
-	// Indexes for alerts, tickets, lists (with Embedding field)
 	for _, collectionName := range collections {
 		var indexes []fireconf.Index
 
-		// Single-field Embedding index
+		// Single-field Embedding vector index
 		indexes = append(indexes, fireconf.Index{
 			QueryScope: fireconf.QueryScopeCollection,
 			Fields: []fireconf.IndexField{
@@ -382,7 +586,7 @@ func defineFirestoreIndexes() *fireconf.Config {
 			},
 		})
 
-		// CreatedAt + Embedding composite index
+		// CreatedAt + __name__ + Embedding composite index (for FindNearestWithSpan)
 		indexes = append(indexes, fireconf.Index{
 			QueryScope: fireconf.QueryScopeCollection,
 			Fields: []fireconf.IndexField{
@@ -403,7 +607,7 @@ func defineFirestoreIndexes() *fireconf.Config {
 			},
 		})
 
-		// Status + CreatedAt + __name__ index only for 'tickets'
+		// Status + CreatedAt + __name__ index only for 'tickets' (GetTicketsByStatusAndSpan)
 		if collectionName == "tickets" {
 			indexes = append(indexes, fireconf.Index{
 				QueryScope: fireconf.QueryScopeCollection,
@@ -429,63 +633,6 @@ func defineFirestoreIndexes() *fireconf.Config {
 			Indexes: indexes,
 		})
 	}
-
-	// Index for memories subcollection (COLLECTION query scope)
-	// This is used for agent-specific memory searches: agents/{agentID}/memories/*
-	// Note: COLLECTION scope is required for queries on a specific subcollection path
-	firestoreCollections = append(firestoreCollections, fireconf.Collection{
-		Name: "memories",
-		Indexes: []fireconf.Index{
-			{
-				QueryScope: fireconf.QueryScopeCollection,
-				Fields: []fireconf.IndexField{
-					{
-						Path: "QueryEmbedding",
-						Vector: &fireconf.VectorConfig{
-							Dimension: 256,
-						},
-					},
-				},
-			},
-			// __name__ + QueryEmbedding composite index (required for DistanceResultField queries)
-			// Note: vector field must be last in composite index
-			{
-				QueryScope: fireconf.QueryScopeCollection,
-				Fields: []fireconf.IndexField{
-					{
-						Path:  "__name__",
-						Order: fireconf.OrderAscending,
-					},
-					{
-						Path: "QueryEmbedding",
-						Vector: &fireconf.VectorConfig{
-							Dimension: 256,
-						},
-					},
-				},
-			},
-		},
-	})
-
-	// Index for execution_memories/records subcollection (COLLECTION query scope)
-	// This is used for schema-specific execution memory searches: execution_memories/{schemaID}/records/*
-	// Note: COLLECTION scope is required for queries on a specific subcollection path
-	firestoreCollections = append(firestoreCollections, fireconf.Collection{
-		Name: "records",
-		Indexes: []fireconf.Index{
-			{
-				QueryScope: fireconf.QueryScopeCollection,
-				Fields: []fireconf.IndexField{
-					{
-						Path: "Embedding",
-						Vector: &fireconf.VectorConfig{
-							Dimension: 256,
-						},
-					},
-				},
-			},
-		},
-	})
 
 	return &fireconf.Config{
 		Collections: firestoreCollections,
