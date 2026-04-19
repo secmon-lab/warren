@@ -14,10 +14,13 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	config := cli.DefineFirestoreIndexes()
 
 	gt.Value(t, config).NotNil()
-	// Only alerts and tickets are managed: they are the only collections
-	// where FindNearest queries and multi-field composite queries exist
-	// in the firestore repository implementation.
-	gt.Equal(t, len(config.Collections), 2)
+	// alerts, tickets: vector and composite indexes for real queries.
+	// knowledges: equality + array-contains composite for ListKnowledgesByCategoryAndTags.
+	// issues: subcollection composite for ListDiagnosisIssues.
+	// lists, memories, records: declared with empty index sets so that
+	//   fireconf's Migrate can clean up residual indexes left over from
+	//   previous deployments.
+	gt.Equal(t, len(config.Collections), 7)
 
 	findCollection := func(name string) *fireconf.Collection {
 		for _, col := range config.Collections {
@@ -31,8 +34,8 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	t.Run("alerts collection", func(t *testing.T) {
 		col := findCollection("alerts")
 		gt.Value(t, col).NotNil()
-		// Embedding + __name__+Embedding + CreatedAt+__name__+Embedding
-		gt.Equal(t, len(col.Indexes), 3)
+		// Embedding + __name__+Embedding + CreatedAt+__name__+Embedding + TicketID+Status
+		gt.Equal(t, len(col.Indexes), 4)
 
 		// Single-field Embedding vector index
 		embeddingIndex := col.Indexes[0]
@@ -60,13 +63,22 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 		gt.Equal(t, compositeIndex.Fields[2].Path, "Embedding")
 		gt.Value(t, compositeIndex.Fields[2].Vector).NotNil()
 		gt.Equal(t, compositeIndex.Fields[2].Vector.Dimension, 256)
+
+		// TicketID + Status composite for GetAlertWithoutTicket / CountAlertsWithoutTicket
+		ticketStatus := col.Indexes[3]
+		gt.Equal(t, len(ticketStatus.Fields), 2)
+		gt.Equal(t, ticketStatus.Fields[0].Path, "TicketID")
+		gt.Equal(t, ticketStatus.Fields[0].Order, fireconf.OrderAscending)
+		gt.Equal(t, ticketStatus.Fields[1].Path, "Status")
+		gt.Equal(t, ticketStatus.Fields[1].Order, fireconf.OrderAscending)
 	})
 
 	t.Run("tickets collection", func(t *testing.T) {
 		col := findCollection("tickets")
 		gt.Value(t, col).NotNil()
-		// Embedding + __name__+Embedding + CreatedAt+__name__+Embedding + Status+CreatedAt+__name__
-		gt.Equal(t, len(col.Indexes), 4)
+		// Embedding + __name__+Embedding + CreatedAt+__name__+Embedding
+		//   + Status+CreatedAt+__name__ + Status+Assignee.ID+CreatedAt
+		gt.Equal(t, len(col.Indexes), 5)
 
 		// Status + CreatedAt + __name__ composite (for GetTicketsByStatusAndSpan)
 		statusIndex := col.Indexes[3]
@@ -77,14 +89,59 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 		gt.Equal(t, statusIndex.Fields[1].Order, fireconf.OrderDescending)
 		gt.Equal(t, statusIndex.Fields[2].Path, "__name__")
 		gt.Equal(t, statusIndex.Fields[2].Order, fireconf.OrderDescending)
+
+		// Status + Assignee.ID + CreatedAt composite (for GetTicketsByStatus with assignee)
+		assigneeIndex := col.Indexes[4]
+		gt.Equal(t, len(assigneeIndex.Fields), 3)
+		gt.Equal(t, assigneeIndex.Fields[0].Path, "Status")
+		gt.Equal(t, assigneeIndex.Fields[0].Order, fireconf.OrderAscending)
+		gt.Equal(t, assigneeIndex.Fields[1].Path, "Assignee.ID")
+		gt.Equal(t, assigneeIndex.Fields[1].Order, fireconf.OrderAscending)
+		gt.Equal(t, assigneeIndex.Fields[2].Path, "CreatedAt")
+		gt.Equal(t, assigneeIndex.Fields[2].Order, fireconf.OrderDescending)
 	})
 
-	t.Run("dead collections are not declared", func(t *testing.T) {
-		// These collections had index definitions that did not correspond to any
-		// actual query in the firestore repository. They must no longer appear.
-		gt.Value(t, findCollection("lists")).Nil()
-		gt.Value(t, findCollection("memories")).Nil()
-		gt.Value(t, findCollection("records")).Nil()
+	t.Run("knowledges collection", func(t *testing.T) {
+		col := findCollection("knowledges")
+		gt.Value(t, col).NotNil()
+		gt.Equal(t, len(col.Indexes), 1)
+
+		// category + tags array-contains composite
+		idx := col.Indexes[0]
+		gt.Equal(t, len(idx.Fields), 2)
+		gt.Equal(t, idx.Fields[0].Path, "category")
+		gt.Equal(t, idx.Fields[0].Order, fireconf.OrderAscending)
+		gt.Equal(t, idx.Fields[1].Path, "tags")
+		gt.Equal(t, idx.Fields[1].Array, fireconf.ArrayConfigContains)
+	})
+
+	t.Run("issues subcollection", func(t *testing.T) {
+		col := findCollection("issues")
+		gt.Value(t, col).NotNil()
+		gt.Equal(t, len(col.Indexes), 1)
+
+		// Status + RuleID + CreatedAt composite for ListDiagnosisIssues
+		idx := col.Indexes[0]
+		gt.Equal(t, idx.QueryScope, fireconf.QueryScopeCollection)
+		gt.Equal(t, len(idx.Fields), 3)
+		gt.Equal(t, idx.Fields[0].Path, "Status")
+		gt.Equal(t, idx.Fields[0].Order, fireconf.OrderAscending)
+		gt.Equal(t, idx.Fields[1].Path, "RuleID")
+		gt.Equal(t, idx.Fields[1].Order, fireconf.OrderAscending)
+		gt.Equal(t, idx.Fields[2].Path, "CreatedAt")
+		gt.Equal(t, idx.Fields[2].Order, fireconf.OrderAscending)
+	})
+
+	t.Run("deprecated collections declared with empty index set", func(t *testing.T) {
+		// These collections previously had index declarations that did not
+		// correspond to any real query. They remain declared with zero indexes
+		// so that fireconf's Migrate can sweep up residual indexes left over
+		// in Firestore from previous deployments.
+		for _, name := range []string{"lists", "memories", "records"} {
+			col := findCollection(name)
+			gt.Value(t, col).NotNil()
+			gt.Equal(t, len(col.Indexes), 0)
+		}
 	})
 }
 
@@ -209,5 +266,56 @@ func TestPrintMigrationPlan(t *testing.T) {
 		gt.True(t, strings.Contains(out, "    KEEP   [Embedding vector(256)]"))
 		gt.True(t, strings.Contains(out, "    KEEP   [Status asc, CreatedAt desc]"))
 		gt.True(t, strings.Contains(out, "Summary: 0 to add, 0 to delete, 2 unchanged (2 total declared)."))
+	})
+
+	t.Run("empty declared collection with pending deletions", func(t *testing.T) {
+		// Simulates a deprecated collection that is declared with no indexes
+		// but still has residual indexes in Firestore to clean up.
+		wantWithEmpty := &fireconf.Config{
+			Collections: []fireconf.Collection{
+				{Name: "lists", Indexes: nil},
+			},
+		}
+		diff := &fireconf.DiffResult{
+			Collections: []fireconf.CollectionDiff{
+				{
+					Name: "lists",
+					IndexesToDelete: []fireconf.Index{
+						{
+							QueryScope: fireconf.QueryScopeCollection,
+							Fields: []fireconf.IndexField{
+								{Path: "Embedding", Vector: &fireconf.VectorConfig{Dimension: 256}},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var buf bytes.Buffer
+		cli.PrintMigrationPlanForTest(&buf, "proj", "(default)", true, wantWithEmpty, diff)
+		out := buf.String()
+
+		gt.True(t, strings.Contains(out, "Collection: lists"))
+		gt.True(t, strings.Contains(out, "  - DELETE [Embedding vector(256)]"))
+		// No "(no indexes declared…)" hint because there IS a deletion to show.
+		gt.False(t, strings.Contains(out, "(no indexes declared"))
+		gt.True(t, strings.Contains(out, "Summary: 0 to add, 1 to delete, 0 unchanged (0 total declared)."))
+	})
+
+	t.Run("empty declared collection with no pending work", func(t *testing.T) {
+		// Simulates a deprecated collection that has already been fully cleaned up.
+		wantWithEmpty := &fireconf.Config{
+			Collections: []fireconf.Collection{
+				{Name: "memories", Indexes: nil},
+			},
+		}
+
+		var buf bytes.Buffer
+		cli.PrintMigrationPlanForTest(&buf, "proj", "(default)", true, wantWithEmpty, &fireconf.DiffResult{})
+		out := buf.String()
+
+		gt.True(t, strings.Contains(out, "Collection: memories"))
+		gt.True(t, strings.Contains(out, "  (no indexes declared, no existing indexes to remove)"))
 	})
 }
