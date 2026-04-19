@@ -24,12 +24,20 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-      <div className={`flex-shrink-0 rounded-full overflow-hidden ${avatarURL ? "" : "p-2"} ${iconBgClass(message.type)}`}>
+      {/* Fixed 32px circle for every role. The avatar-less case uses
+          padding + a small icon; the avatar case fills the circle
+          with the image. Both render at the same outer diameter so
+          the layout stays aligned whether a user has a Slack avatar
+          or not. */}
+      <div
+        className={`flex-shrink-0 h-8 w-8 rounded-full overflow-hidden flex items-center justify-center ${iconBgClass(
+          message.type,
+        )}`}>
         {avatarURL ? (
           <img
             src={avatarURL}
             alt={message.author?.displayName || label}
-            className="h-8 w-8 object-cover rounded-full"
+            className="h-full w-full object-cover"
             onError={(e) => {
               // Fall back to the generic icon if the avatar URL
               // returns an error (unauthenticated session, deleted
