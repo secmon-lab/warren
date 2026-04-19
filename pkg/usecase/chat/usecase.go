@@ -214,8 +214,14 @@ func (u *UseCase) createSession(ctx context.Context, target *ticket.Ticket, mess
 func (u *UseCase) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, chatCtx *chatModel.ChatContext) context.Context {
 	origNotify, origTrace, origWarn := msg.Funcs(ctx)
 
+	// Slack posting is scoped to Slack-originated chats. Web and CLI
+	// Sessions on a ticket that *also* has a SlackThread must NOT
+	// leak the AI response into that thread — the user called this
+	// out as a regression.
+	isSlackChat := target.SlackThread != nil && u.slackService != nil &&
+		(chatCtx == nil || chatCtx.Session == nil || chatCtx.Session.Source == session.SessionSourceSlack)
 	var slackThreadSvc interfaces.SlackThreadService
-	if u.slackService != nil && target.SlackThread != nil {
+	if isSlackChat {
 		slackThreadSvc = u.slackService.NewThread(*target.SlackThread)
 	}
 

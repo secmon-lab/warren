@@ -122,6 +122,11 @@ export function TicketConversation({ ticketId }: TicketConversationProps) {
           <div className="min-w-0 flex flex-col min-h-0">
             {wsEnabled ? (
               <WebChatPane
+                // Remount when the selected session flips so the
+                // live buffer and the useWebSocket hook state start
+                // completely fresh — prevents the Live-section-
+                // mixing-across-sessions bug.
+                key={`${wsSessionID ?? "new"}`}
                 ticketId={ticketId}
                 sessionIdForResume={wsSessionID}
                 persistedMessages={persistedForSelected}
@@ -294,25 +299,60 @@ function WebChatPane({
 }: WebChatPaneProps) {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { status, messages: wsMessages, sendMessage } = useWebSocket(
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Live buffer holds messages emitted over WebSocket while a Turn
+  // is in flight. It is flushed whenever a turn completes — at that
+  // point the backend has persisted the AI outputs and a refetch
+  // upstream pulls them into `persistedMessages`, so keeping them in
+  // the live buffer would double-render.
+  const [liveBuffer, setLiveBuffer] = useState<SessionMessage[]>([]);
+
+  const { status, sendMessage } = useWebSocket(
     ticketId,
     {
       onMessage: (m) => {
-        if (m.type === "status" && /^Turn /.test(m.content)) {
+        // Every message received while a Turn is active becomes a
+        // synthetic SessionMessage row so it renders with the same
+        // MessageBubble styling as persisted content.
+        if (m.type === "message") {
+          setLiveBuffer((prev) => [
+            ...prev,
+            synthesizeMessage(m.message_id || `live-${Date.now()}`, "response", m.content),
+          ]);
+        } else if (m.type === "trace") {
+          setLiveBuffer((prev) => [
+            ...prev,
+            synthesizeMessage(m.message_id || `live-${Date.now()}`, "trace", m.content),
+          ]);
+        } else if (m.type === "status" && /^Turn /.test(m.content)) {
+          // Turn closed — drop the live buffer so we don't double
+          // render against the just-persisted rows, then ask the
+          // parent to refetch.
+          setLiveBuffer([]);
           onTurnCompleted();
+        } else if (m.type === "status" && /^Session /.test(m.content)) {
+          onSessionCreated();
         }
       },
     },
     sessionIdForResume,
   );
 
+  const timeline = useMemo(() => {
+    const merged = [...persistedMessages, ...liveBuffer];
+    // Persisted messages already sort by CreatedAt ASC; live messages
+    // are appended after them in arrival order. For the current
+    // in-flight Turn this yields the correct visual order.
+    return merged;
+  }, [persistedMessages, liveBuffer]);
+
+  // Auto-scroll to bottom on new messages (user just sent, agent
+  // replied, trace arrived).
   useEffect(() => {
-    if (wsMessages.length === 0) return;
-    const last = wsMessages[wsMessages.length - 1];
-    if (last.type === "status" && /^Session /.test(last.content)) {
-      onSessionCreated();
-    }
-  }, [wsMessages, onSessionCreated]);
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [timeline.length]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -320,8 +360,20 @@ function WebChatPane({
     if (!trimmed) return;
     if (status !== "connected") return;
     if (sendMessage(trimmed)) {
+      // Echo the user's own input into the live buffer immediately
+      // so the timeline feels responsive (the persisted write races
+      // the WS round-trip; server-side echoing would require another
+      // envelope hop).
+      setLiveBuffer((prev) => [
+        ...prev,
+        synthesizeMessage(`local-${Date.now()}`, "user", trimmed),
+      ]);
       setMessage("");
-      setTimeout(() => textareaRef.current?.focus(), 0);
+      setTimeout(() => {
+        textareaRef.current?.focus();
+        const el = scrollRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+      }, 0);
     }
   };
 
@@ -332,46 +384,15 @@ function WebChatPane({
     }
   };
 
-  const liveMessages = useMemo(
-    () =>
-      wsMessages
-        .filter((m) => m.type === "message" || m.type === "trace")
-        .map((m, idx) => ({
-          id: m.message_id || `ws-${idx}`,
-          type: m.type as "message" | "trace",
-          content: m.content,
-        })),
-    [wsMessages],
-  );
-
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center justify-end mb-2">
         <ConnectionBadge status={status} />
       </div>
-      <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-0">
-        <ConversationMainPane
-          messages={persistedMessages}
-          loading={messagesLoading}
-        />
-        {liveMessages.length > 0 && (
-          <div className="space-y-1 border-t pt-2 mt-2">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Live
-            </div>
-            {liveMessages.map((m) => (
-              <div key={m.id} className="text-sm">
-                {m.type === "trace" ? (
-                  <span className="text-muted-foreground italic text-xs">
-                    {m.content}
-                  </span>
-                ) : (
-                  <span className="whitespace-pre-wrap">{m.content}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto pr-1 min-h-0">
+        <ConversationMainPane messages={timeline} loading={messagesLoading} />
       </div>
       <form
         onSubmit={handleSubmit}
@@ -435,6 +456,24 @@ function ConnectionBadge({
 }
 
 // --- helpers ----------------------------------------------------------
+
+// synthesizeMessage builds a SessionMessage-shaped object from a raw
+// WebSocket payload so the live stream can render through the same
+// MessageBubble path as persisted rows.
+function synthesizeMessage(
+  id: string,
+  type: SessionMessage["type"],
+  content: string,
+): SessionMessage {
+  return {
+    id,
+    sessionID: "live",
+    type,
+    content,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 function sortSessions(sessions: Session[]): Session[] {
   const order = (s: string) => {

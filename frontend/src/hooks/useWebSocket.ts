@@ -51,13 +51,42 @@ export function useWebSocket(
   const { user } = useAuth();
   const [status, setStatus] = useState<WebSocketStatus>('disconnected');
   const [messages, setMessages] = useState<ChatResponse[]>([]);
-  
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectCountRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  // Use persistent tab ID for this ticket
-  const tabIdRef = useRef<string>(getOrCreateTabId(ticketId));
+  // Use persistent tab ID for this ticket. The chat-session-redesign
+  // binds one Session per connection, so we suffix the tab ID with
+  // the Session key ("new" when the user clicked "New Chat", the
+  // session ID when resuming). Different sessions therefore get
+  // different cache buckets in wsManager and no longer pollute each
+  // other's live message buffer.
+  const sessionKey = sessionId ?? 'new';
+  const tabIdRef = useRef<string>(
+    `${getOrCreateTabId(ticketId)}:${sessionKey}`,
+  );
+  // Keep the ref in sync when the caller switches sessions: we rely
+  // on wsManager to close the previous socket on key change and on
+  // the setMessages([]) reset below to flush stale content.
+  useEffect(() => {
+    const nextKey = `${getOrCreateTabId(ticketId)}:${sessionKey}`;
+    if (tabIdRef.current !== nextKey) {
+      // Close the previous connection so its onmessage handler
+      // stops firing into this hook's state.
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+        } catch {
+          /* ignore */
+        }
+        wsRef.current = null;
+      }
+      tabIdRef.current = nextKey;
+      setMessages([]);
+      setStatus('disconnected');
+    }
+  }, [ticketId, sessionKey]);
 
   const onStatusChangeRef = useRef(onStatusChange);
   const onMessageRef = useRef(onMessage);
