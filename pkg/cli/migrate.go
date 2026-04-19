@@ -546,26 +546,19 @@ func backfillAlertStatus(ctx context.Context, projectID, databaseID string, dryR
 	return nil
 }
 
-// deprecatedIndexedCollections lists collections that previously had index
-// definitions but whose queries turned out to be served by Firestore's
-// automatic single-field indexes (or had no query at all). They remain
-// declared with an empty index set so that fireconf's Migrate keeps
-// iterating over them and tears down any residual indexes left in Firestore.
-// Entries may be removed once the deployment targets no longer have any
-// indexes under these collections.
-//
-//   - lists:    no FindNearest query exists on this collection (list.Embedding
-//     is used as the INPUT to FindNearestTickets, not searched directly).
-//   - memories: subcollectionMemories has no repository method issuing queries.
-//   - records:  execution_memories/{id}/records subcollection has no queries.
-var deprecatedIndexedCollections = []string{"lists", "memories", "records"}
-
 func defineFirestoreIndexes() *fireconf.Config {
-	// This definition keeps the alerts/tickets index declarations exactly
-	// as they were on main to minimise behavioural risk. The only change in
-	// this migration is the removal of indexes under collections that have
-	// no corresponding query in the firestore repository (see
-	// deprecatedIndexedCollections above).
+	// Collections previously declared here but dropped because no repository
+	// query targets them:
+	//   - lists:    no FindNearest query exists on this collection
+	//               (list.Embedding is used as the INPUT to FindNearestTickets,
+	//               not searched directly).
+	//   - memories: subcollectionMemories has no repository method issuing queries.
+	//   - records:  execution_memories/{id}/records subcollection has no queries.
+	// They are not redeclared with empty indexes because the target Firestore
+	// databases do not carry residual indexes for them. If a deployment is
+	// discovered to still have such indexes, either sweep them manually via
+	// the Firestore Admin API or temporarily re-add the collection here with
+	// Indexes: nil for one migration cycle.
 	vectorCollections := []string{"alerts", "tickets"}
 
 	var firestoreCollections []fireconf.Collection
@@ -649,16 +642,6 @@ func defineFirestoreIndexes() *fireconf.Config {
 		firestoreCollections = append(firestoreCollections, fireconf.Collection{
 			Name:    collectionName,
 			Indexes: indexes,
-		})
-	}
-
-	// Keep deprecated collections declared with an empty index set so
-	// that fireconf's Migrate will detect and delete any residual indexes
-	// left over from previous deployments.
-	for _, collectionName := range deprecatedIndexedCollections {
-		firestoreCollections = append(firestoreCollections, fireconf.Collection{
-			Name:    collectionName,
-			Indexes: nil,
 		})
 	}
 

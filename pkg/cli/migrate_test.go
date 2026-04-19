@@ -14,11 +14,11 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	config := cli.DefineFirestoreIndexes()
 
 	gt.Value(t, config).NotNil()
-	// alerts, tickets: vector and composite indexes (unchanged from main).
-	// lists, memories, records: declared with empty index sets so that
-	//   fireconf's Migrate can clean up residual indexes left over from
-	//   previous deployments.
-	gt.Equal(t, len(config.Collections), 5)
+	// Only alerts and tickets carry explicit index declarations. The
+	// previously-declared lists / memories / records entries were dropped
+	// because no query targets them and the target Firestore databases
+	// carry no residual indexes for those collections.
+	gt.Equal(t, len(config.Collections), 2)
 
 	findCollection := func(name string) *fireconf.Collection {
 		for _, col := range config.Collections {
@@ -80,16 +80,13 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 		gt.Equal(t, statusIndex.Fields[2].Order, fireconf.OrderDescending)
 	})
 
-	t.Run("deprecated collections declared with empty index set", func(t *testing.T) {
-		// These collections previously had index declarations that did not
-		// correspond to any real query. They remain declared with zero indexes
-		// so that fireconf's Migrate can sweep up residual indexes left over
-		// in Firestore from previous deployments.
-		for _, name := range []string{"lists", "memories", "records"} {
-			col := findCollection(name)
-			gt.Value(t, col).NotNil()
-			gt.Equal(t, len(col.Indexes), 0)
-		}
+	t.Run("dead collections are not declared", func(t *testing.T) {
+		// Previously-declared collections without any corresponding query.
+		// They are dropped entirely from the config since no residual
+		// indexes exist in the target Firestore databases.
+		gt.Value(t, findCollection("lists")).Nil()
+		gt.Value(t, findCollection("memories")).Nil()
+		gt.Value(t, findCollection("records")).Nil()
 	})
 }
 
