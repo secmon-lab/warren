@@ -5,7 +5,7 @@
 // streaming and Turn creation are covered by Go integration tests.
 import { test, expect } from "../fixtures";
 import { TicketDetailPage } from "../pages/TicketDetailPage";
-import { createTicketViaAPI } from "../helpers/api";
+import { archiveTicketViaAPI, createTicketViaAPI } from "../helpers/api";
 
 test.describe("Ticket Conversation (Phase 6)", () => {
   test("renders unified conversation card with sidebar + New Chat", async ({
@@ -18,17 +18,25 @@ test.describe("Ticket Conversation (Phase 6)", () => {
       "Phase 6 unified conversation E2E",
     );
 
-    const detail = new TicketDetailPage(page);
-    await detail.goto(ticket.id);
+    try {
+      const detail = new TicketDetailPage(page);
+      await detail.goto(ticket.id);
 
-    await expect(detail.ticketTitle).toBeVisible();
-    await expect(detail.conversationHeading).toBeVisible();
+      await expect(detail.ticketTitle).toBeVisible();
+      await expect(detail.conversationHeading).toBeVisible();
 
-    // The "New Chat" sidebar action is always present.
-    await expect(detail.conversationNewChatButton).toBeVisible();
+      // The "New Chat" sidebar action is always present.
+      await expect(detail.conversationNewChatButton).toBeVisible();
 
-    // A freshly created ticket has no Slack/Web/CLI sessions yet —
-    // the sidebar renders the empty-state message.
-    await expect(page.getByText("No sessions yet.")).toBeVisible();
+      // A freshly created ticket has no Slack/Web/CLI sessions yet —
+      // the sidebar renders the empty-state message.
+      await expect(page.getByText("No sessions yet.")).toBeVisible();
+    } finally {
+      // Always archive the test ticket so subsequent spec files (e.g.
+      // ticket.spec) that assume an empty active-ticket list still
+      // pass. E2E tests share the same Firestore emulator across
+      // files, so cleanup has to be explicit.
+      await archiveTicketViaAPI(page, ticket.id);
+    }
   });
 });
