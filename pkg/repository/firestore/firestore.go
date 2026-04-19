@@ -41,9 +41,7 @@ func (r *Firestore) Close() error {
 const (
 	collectionAlerts            = "alerts"
 	collectionAlertLists        = "lists"
-	collectionHistories         = "histories"
 	collectionTickets           = "tickets"
-	collectionComments          = "comments"
 	collectionTokens            = "tokens"
 	collectionActivities        = "activities"
 	collectionTags              = "tags"

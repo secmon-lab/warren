@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/m-mizutani/goerr/v2"
 	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -14,8 +13,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
-// HandleSlackMessage handles a message from a slack user. It saves the
-// message both as a legacy ticket.Comment and as a session.Message with
+// HandleSlackMessage handles a message from a slack user. It persists
+// the message as a session.Message (type=user) on the Slack Session
+// bound to the ticket's thread. Pre-redesign ticket.Comment writes have
 // Type=user on the Slack Session. The legacy persistence remains to keep
 // pre-redesign readers (graphql / base tool) functional until Phase 3.4
 // migrates callers; the session.Message path is the new source of truth
@@ -48,23 +48,12 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 		return nil
 	}
 
-	// Legacy write: ticket.Comment remains the input for Slack-origin
-	// comments across GraphQL, base tool, refine, and the chat prompts
-	// until subsequent phases migrate all readers off it.
-	comment := existingTicket.NewComment(ctx, slackMsg.Text(), slackMsg.User(), slackMsg.ID())
-	if err := uc.repository.PutTicketComment(ctx, comment); err != nil {
-		if data, jsonErr := json.Marshal(comment); jsonErr == nil {
-			logger.Error("failed to save ticket comment", "error", err, "comment", string(data))
-		}
-		msg.Trace(ctx, "💥 Failed to insert alert comment\n> %s", err.Error())
-		return goerr.Wrap(err, "failed to insert alert comment", goerr.V("comment", comment))
-	}
-
-	// New write: mirror the message into the Slack Session as a
-	// type=user Message with TurnID=nil (non-mention Slack thread
-	// messages do not belong to any AI Turn). Failures are logged but do
-	// not propagate, so a migration-era issue cannot break the existing
-	// Slack comment pipeline.
+	// chat-session-redesign Phase 7 (confinement): the legacy
+	// ticket.Comment write path has been removed. Slack-origin thread
+	// messages are persisted exclusively as type=user
+	// session.Message(TurnID=nil) rows. Pre-redesign Comment documents
+	// still exist in production until cleanup-legacy runs; they are
+	// accessible only via the migration package.
 	uc.persistSlackThreadMessageAsSessionMessage(ctx, existingTicket.ID, slackMsg)
 
 	return nil

@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import {
   ChatResponse,
+  EventEnvelope,
   createChatMessage,
   createPingMessage,
   isChatResponse,
+  isEventEnvelope,
 } from '@/lib/websocket-types';
 import { wsManager } from '@/lib/websocket-manager';
 
@@ -164,14 +166,28 @@ export function useWebSocket(
       try {
         const data = JSON.parse(event.data);
         console.log('Parsed WebSocket message:', data);
-        
+
+        // Phase 6: new discriminated envelope from the chat-session
+        // redesign backend. Translate into the legacy ChatResponse
+        // shape so existing render paths keep working while the UI is
+        // migrated incrementally.
+        if (isEventEnvelope(data)) {
+          const translated = translateEventToChatResponse(data);
+          if (translated) {
+            setMessages(prev => [...prev, translated]);
+            wsManager.addMessage(ticketId, tabIdRef.current, translated);
+            onMessageRef.current?.(translated);
+          }
+          return;
+        }
+
         if (isChatResponse(data)) {
           // Add to messages array and cache (except pong messages)
           if (data.type !== 'pong') {
             setMessages(prev => [...prev, data]);
             wsManager.addMessage(ticketId, tabIdRef.current, data);
           }
-          
+
           // Call the message handler
           onMessageRef.current?.(data);
         } else {
@@ -333,14 +349,24 @@ export function useWebSocket(
         try {
           const data = JSON.parse(event.data);
           console.log('Parsed WebSocket message:', data);
-          
+
+          if (isEventEnvelope(data)) {
+            const translated = translateEventToChatResponse(data);
+            if (translated) {
+              setMessages(prev => [...prev, translated]);
+              wsManager.addMessage(ticketId, tabIdRef.current, translated);
+              onMessageRef.current?.(translated);
+            }
+            return;
+          }
+
           if (isChatResponse(data)) {
             // Add to messages array and cache (except pong messages)
             if (data.type !== 'pong') {
               setMessages(prev => [...prev, data]);
               wsManager.addMessage(ticketId, tabIdRef.current, data);
             }
-            
+
             // Call the message handler
             onMessageRef.current?.(data);
           } else {
@@ -409,4 +435,49 @@ export function useWebSocket(
     cleanup, // For explicit cleanup when needed
     clearMessages, // For clearing message history
   };
+}
+
+// translateEventToChatResponse adapts the new EventEnvelope to the
+// legacy ChatResponse shape so Phase 6 can roll out without breaking
+// the TicketChat render path. Non-message events map to status rows;
+// user input that originated from a different surface (Slack, CLI)
+// renders with its source prefix.
+function translateEventToChatResponse(env: EventEnvelope): ChatResponse | null {
+  const timestamp = env.timestamp ? new Date(env.timestamp).getTime() : Date.now();
+  switch (env.event) {
+    case 'session_message_added': {
+      const m = env.message;
+      if (!m) return null;
+      const isTrace = m.type === 'trace';
+      return {
+        type: isTrace ? 'trace' : 'message',
+        content: m.content,
+        timestamp,
+        message_id: m.id,
+        user: m.author
+          ? { id: m.author.user_id, name: m.author.display_name }
+          : undefined,
+      };
+    }
+    case 'session_created':
+      return {
+        type: 'status',
+        content: 'Session started.',
+        timestamp,
+      };
+    case 'turn_started':
+      return {
+        type: 'status',
+        content: 'Turn started.',
+        timestamp,
+      };
+    case 'turn_ended':
+      return {
+        type: 'status',
+        content: `Turn ${env.status ?? 'completed'}.`,
+        timestamp,
+      };
+    default:
+      return null;
+  }
 }

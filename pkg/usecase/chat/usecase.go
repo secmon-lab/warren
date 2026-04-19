@@ -106,7 +106,7 @@ func (u *UseCase) Execute(ctx context.Context, message string, chatCtx chatModel
 	logger.Debug("chat usecase execute: session created", "session_id", ssn.ID)
 
 	// Phase 2: Message routing setup
-	ctx = u.setupMessageRouting(ctx, ssn, target)
+	ctx = u.setupMessageRouting(ctx, ssn, target, &chatCtx)
 	logger.Debug("chat usecase execute: message routing set up")
 
 	// Phase 3: Session status tracking
@@ -166,12 +166,116 @@ func (u *UseCase) createSession(ctx context.Context, target *ticket.Ticket, mess
 	return ssn, ctx
 }
 
-// setupMessageRouting configures Slack/CLI message routing functions in the context.
-func (u *UseCase) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket) context.Context {
-	if u.slackService != nil && target.SlackThread != nil {
-		notifyFunc, traceFunc, warnFunc := u.setupSlackMessageFuncs(ctx, ssn, target)
-		ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
+// setupMessageRouting configures message routing handlers in the context.
+//
+// Three orthogonal concerns are composed here:
+//
+//   - Persistence: when chatCtx.Session is set (chat-session-redesign
+//     path), every Notify/Trace/Warn call produces a session.Message
+//     row bound to the current Turn so the Conversation timeline has
+//     the full AI transcript — not just the user input. The Slack
+//     code path already persisted via the legacy `ssn`; that path is
+//     preserved as a fallback when no redesign Session is available.
+//
+//   - Slack posting: for Slack-originated chats (slackService set +
+//     target.SlackThread), Notify posts a comment, Trace produces an
+//     updatable context block, Warn posts a comment. Untouched.
+//
+//   - Envelope fan-out: Web WebSocket handler registers an
+//     OnSessionEvent hook on chatCtx so the persistence step also
+//     publishes a `session_message_added` envelope to the bound
+//     client without the handler needing to observe individual
+//     msg.Notify calls.
+//
+// Handlers previously attached to ctx (CLI stdout, WebSocket
+// broadcast) are preserved by wrapping — the persistence layer runs
+// first, then the pre-existing display handler runs so the user still
+// sees output on their channel.
+func (u *UseCase) setupMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, chatCtx *chatModel.ChatContext) context.Context {
+	origNotify, origTrace, origWarn := msg.Funcs(ctx)
 
+	var slackThreadSvc interfaces.SlackThreadService
+	if u.slackService != nil && target.SlackThread != nil {
+		slackThreadSvc = u.slackService.NewThread(*target.SlackThread)
+	}
+
+	// Slack trace uses an updatable context block — the shared closure
+	// is reset per setupMessageRouting call.
+	var traceUpdate func(context.Context, string)
+
+	persist := func(ctx context.Context, mtype session.MessageType, content string) *session.Message {
+		// Prefer the chat-session-redesign Session when present.
+		if chatCtx != nil && chatCtx.Session != nil {
+			var tidPtr *types.TicketID
+			if target != nil && target.ID != "" {
+				tid := target.ID
+				tidPtr = &tid
+			}
+			m := session.NewMessageV2(ctx, chatCtx.Session.ID, tidPtr, chatCtx.CurrentTurnID, mtype, content, nil)
+			if err := u.repository.PutSessionMessage(ctx, m); err != nil {
+				errutil.Handle(ctx, err)
+				return nil
+			}
+			if chatCtx.OnSessionEvent != nil {
+				chatCtx.OnSessionEvent("session_message_added", m)
+			}
+			return m
+		}
+		// Legacy fallback: persist against the ssn created by
+		// createSession (Slack-only path before redesign wrapping).
+		m := session.NewMessage(ctx, ssn.ID, mtype, content)
+		if err := u.repository.PutSessionMessage(ctx, m); err != nil {
+			errutil.Handle(ctx, err)
+			return nil
+		}
+		return m
+	}
+
+	notifyFunc := func(ctx context.Context, m string) {
+		persist(ctx, session.MessageTypeResponse, m)
+		if slackThreadSvc != nil {
+			if err := slackThreadSvc.PostComment(ctx, m); err != nil {
+				errutil.Handle(ctx, err)
+			}
+		}
+		if origNotify != nil && slackThreadSvc == nil {
+			// Slack persists and posts itself — origNotify would be
+			// the outer CLI/WS handler for Web/CLI chats.
+			origNotify(ctx, m)
+		}
+	}
+
+	traceFunc := func(ctx context.Context, m string) {
+		persist(ctx, session.MessageTypeTrace, m)
+		if slackThreadSvc != nil {
+			if traceUpdate == nil {
+				traceUpdate = slackThreadSvc.NewUpdatableMessage(ctx, m)
+			} else {
+				traceUpdate(ctx, m)
+			}
+			return
+		}
+		if origTrace != nil {
+			origTrace(ctx, m)
+		}
+	}
+
+	warnFunc := func(ctx context.Context, m string) {
+		persist(ctx, session.MessageTypeWarning, m)
+		if slackThreadSvc != nil {
+			if err := slackThreadSvc.PostComment(ctx, m); err != nil {
+				errutil.Handle(ctx, err)
+			}
+			return
+		}
+		if origWarn != nil {
+			origWarn(ctx, m)
+		}
+	}
+
+	ctx = msg.With(ctx, notifyFunc, traceFunc, warnFunc)
+
+	if slackThreadSvc != nil {
 		// Post a brief status indicator as a context block immediately
 		verbs := []string{
 			"Investigating", "Analyzing", "Processing", "Inspecting",
@@ -181,54 +285,12 @@ func (u *UseCase) setupMessageRouting(ctx context.Context, ssn *session.Session,
 			"Decoding", "Interpreting", "Triaging", "Resolving",
 		}
 		verb := verbs[rand.IntN(len(verbs))] // #nosec G404 -- not security-sensitive, just picking a random UI verb
-		threadSvc := u.slackService.NewThread(*target.SlackThread)
-		if err := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ...", verb)); err != nil {
+		if err := slackThreadSvc.PostContextBlock(ctx, fmt.Sprintf("%s ...", verb)); err != nil {
 			logging.From(ctx).Error("failed to post status", "error", err)
 		}
 	}
 
 	return ctx
-}
-
-// setupSlackMessageFuncs creates Slack message routing functions for notify, trace, and warn.
-func (u *UseCase) setupSlackMessageFuncs(_ context.Context, sess *session.Session, target *ticket.Ticket) (msg.NotifyFunc, msg.TraceFunc, msg.WarnFunc) {
-	threadSvc := u.slackService.NewThread(*target.SlackThread)
-
-	notifyFunc := func(ctx context.Context, message string) {
-		m := session.NewMessage(ctx, sess.ID, session.MessageTypeResponse, message)
-		if err := u.repository.PutSessionMessage(ctx, m); err != nil {
-			errutil.Handle(ctx, err)
-		}
-		if err := threadSvc.PostComment(ctx, message); err != nil {
-			errutil.Handle(ctx, err)
-		}
-	}
-
-	var traceUpdateFunc func(context.Context, string)
-	traceFunc := func(ctx context.Context, message string) {
-		m := session.NewMessage(ctx, sess.ID, session.MessageTypeTrace, message)
-		if err := u.repository.PutSessionMessage(ctx, m); err != nil {
-			errutil.Handle(ctx, err)
-		}
-
-		if traceUpdateFunc == nil {
-			traceUpdateFunc = threadSvc.NewUpdatableMessage(ctx, message)
-		} else {
-			traceUpdateFunc(ctx, message)
-		}
-	}
-
-	warnFunc := func(ctx context.Context, message string) {
-		m := session.NewMessage(ctx, sess.ID, session.MessageTypeWarning, message)
-		if err := u.repository.PutSessionMessage(ctx, m); err != nil {
-			errutil.Handle(ctx, err)
-		}
-		if err := threadSvc.PostComment(ctx, message); err != nil {
-			errutil.Handle(ctx, err)
-		}
-	}
-
-	return notifyFunc, traceFunc, warnFunc
 }
 
 // setupStatusCheck embeds a session abort check function in the context.

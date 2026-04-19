@@ -13,11 +13,11 @@ You are an intent resolver for a security operations system. Your task is to:
 {{ .Context.Alert.Data }}
 {{ end }}
 
-{{ if .Context.Thread.Comments }}
+{{ if .Context.Thread.SessionMessages }}
 ## Thread Conversation
-{{ range .Context.Thread.Comments }}
-*{{ .User.Name }}* ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
-{{ .Comment }}
+{{ range .Context.Thread.SessionMessages }}
+{{ if .Author }}*{{ .Author.DisplayName }}*{{ else }}*agent*{{ end }} [{{ .Type }}] ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
+{{ .Content }}
 {{ end }}
 {{ end }}
 

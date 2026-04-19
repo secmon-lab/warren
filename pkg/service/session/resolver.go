@@ -85,6 +85,26 @@ func (r *Resolver) ResolveSlackSession(
 	return newSess, true, nil
 }
 
+// LookupSlackSession returns the Session bound to (ticketID, thread) if
+// one exists, or (nil, false, nil) when not. **Never creates** a new
+// Session — used by dry-run migration paths that must not mutate state.
+func (r *Resolver) LookupSlackSession(
+	ctx context.Context,
+	ticketID *types.TicketID,
+	thread slackModel.Thread,
+) (*sessModel.Session, bool, error) {
+	id := deriveSlackSessionID(ticketID, thread)
+	existing, err := r.repo.GetSession(ctx, id)
+	if err != nil {
+		return nil, false, goerr.Wrap(err, "failed to look up Slack session",
+			goerr.V("session_id", id))
+	}
+	if existing == nil {
+		return nil, false, nil
+	}
+	return existing, true, nil
+}
+
 // CreateFreshSession creates a new Session with a random ID. This is the
 // Web/CLI path: each invocation is independent, so no deterministic lookup
 // is needed. ticketID is required for Web/CLI flows.

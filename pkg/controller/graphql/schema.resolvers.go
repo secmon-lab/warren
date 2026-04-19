@@ -139,41 +139,6 @@ func (r *alertResolver) TagObjects(ctx context.Context, obj *alert.Alert) ([]*gr
 	return tagObjects, nil
 }
 
-// ID is the resolver for the id field.
-func (r *commentResolver) ID(ctx context.Context, obj *ticket.Comment) (string, error) {
-	return string(obj.ID), nil
-}
-
-// Content is the resolver for the content field.
-func (r *commentResolver) Content(ctx context.Context, obj *ticket.Comment) (string, error) {
-	if r.mrkdwnConv != nil {
-		converted := r.mrkdwnConv.ConvertToMarkdown(ctx, obj.Comment)
-		return converted, nil
-	}
-	return obj.Comment, nil
-}
-
-// User is the resolver for the user field.
-func (r *commentResolver) User(ctx context.Context, obj *ticket.Comment) (*graphql1.User, error) {
-	if obj.User == nil {
-		return nil, nil
-	}
-	return &graphql1.User{
-		ID:   obj.User.ID,
-		Name: obj.User.Name,
-	}, nil
-}
-
-// CreatedAt is the resolver for the createdAt field.
-func (r *commentResolver) CreatedAt(ctx context.Context, obj *ticket.Comment) (string, error) {
-	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
-}
-
-// UpdatedAt is the resolver for the updatedAt field.
-func (r *commentResolver) UpdatedAt(ctx context.Context, obj *ticket.Comment) (string, error) {
-	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
-}
-
 // Severity is the resolver for the severity field.
 func (r *findingResolver) Severity(ctx context.Context, obj *ticket.Finding) (string, error) {
 	return string(obj.Severity), nil
@@ -867,47 +832,6 @@ func (r *queryResolver) SimilarTicketsForAlert(ctx context.Context, alertID stri
 
 	return &graphql1.TicketsResponse{
 		Tickets:    tickets,
-		TotalCount: totalCount,
-	}, nil
-}
-
-// TicketComments is the resolver for the ticketComments field.
-func (r *queryResolver) TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error) {
-	// Set default values for offset and limit
-	var offsetVal, limitVal int
-	if offset != nil {
-		offsetVal = *offset
-	}
-	if limit != nil {
-		limitVal = *limit
-		// Restrict limit to allowed values: 20, 50, 100
-		if limitVal != 20 && limitVal != 50 && limitVal != 100 {
-			limitVal = defaultCommentsLimit
-		}
-	} else {
-		limitVal = defaultCommentsLimit
-	}
-
-	// Get paginated comments sorted by timestamp descending (newest first)
-	comments, err := r.repo.GetTicketCommentsPaginated(ctx, types.TicketID(ticketID), offsetVal, limitVal)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket comments")
-	}
-
-	// Get total count for pagination
-	totalCount, err := r.repo.CountTicketComments(ctx, types.TicketID(ticketID))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to count ticket comments")
-	}
-
-	// Convert []ticket.Comment to []*ticket.Comment
-	commentPtrs := make([]*ticket.Comment, len(comments))
-	for i := range comments {
-		commentPtrs[i] = &comments[i]
-	}
-
-	return &graphql1.CommentsResponse{
-		Comments:   commentPtrs,
 		TotalCount: totalCount,
 	}, nil
 }
@@ -1690,29 +1614,9 @@ func (r *ticketResolver) AlertsPaginated(ctx context.Context, obj *ticket.Ticket
 	}, nil
 }
 
-// Comments is the resolver for the comments field.
-func (r *ticketResolver) Comments(ctx context.Context, obj *ticket.Ticket) ([]*ticket.Comment, error) {
-	comments, err := r.repo.GetTicketComments(ctx, obj.ID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket comments")
-	}
-
-	// Convert []ticket.Comment to []*ticket.Comment
-	commentPtrs := make([]*ticket.Comment, len(comments))
-	for i := range comments {
-		commentPtrs[i] = &comments[i]
-	}
-	return commentPtrs, nil
-}
-
 // AlertsCount is the resolver for the alertsCount field.
 func (r *ticketResolver) AlertsCount(ctx context.Context, obj *ticket.Ticket) (int, error) {
 	return len(obj.AlertIDs), nil
-}
-
-// CommentsCount is the resolver for the commentsCount field.
-func (r *ticketResolver) CommentsCount(ctx context.Context, obj *ticket.Ticket) (int, error) {
-	return r.repo.CountTicketComments(ctx, obj.ID)
 }
 
 // Conclusion is the resolver for the conclusion field.
@@ -1812,9 +1716,6 @@ func (r *Resolver) Activity() ActivityResolver { return &activityResolver{r} }
 // Alert returns AlertResolver implementation.
 func (r *Resolver) Alert() AlertResolver { return &alertResolver{r} }
 
-// Comment returns CommentResolver implementation.
-func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
-
 // Finding returns FindingResolver implementation.
 func (r *Resolver) Finding() FindingResolver { return &findingResolver{r} }
 
@@ -1846,7 +1747,6 @@ func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
 
 type activityResolver struct{ *Resolver }
 type alertResolver struct{ *Resolver }
-type commentResolver struct{ *Resolver }
 type findingResolver struct{ *Resolver }
 type knowledgeResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }
@@ -1856,3 +1756,4 @@ type reprocessBatchJobResolver struct{ *Resolver }
 type reprocessJobResolver struct{ *Resolver }
 type sessionResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
+

@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	websocket_model "github.com/secmon-lab/warren/pkg/domain/model/websocket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/usecase"
@@ -208,11 +209,29 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 	client := h.hub.NewClientWithTabID(conn, ticketID, userID, tabID)
 	h.hub.Register(client)
 
+	// chat-session-redesign Phase 3+: bind one Web Session per
+	// WebSocket connection so every Turn produced by this client
+	// shares gollem working memory. When EnsureWebSession fails we
+	// still accept messages (they run without a Session, producing
+	// orphan rows) so a transient Firestore hiccup does not close the
+	// user's chat; the error is surfaced via logs.
+	if h.useCases != nil {
+		sess, sessErr := h.useCases.EnsureWebSession(ctx, ticketID, types.UserID(userID))
+		if sessErr != nil {
+			logger.Warn("failed to ensure web session; continuing without persistent Session",
+				"error", sessErr, "ticket_id", ticketID, "user_id", userID)
+		} else if sess != nil {
+			client.AttachSession(sess.ID)
+			h.publishEnvelope(client, NewSessionCreatedEvent(sess))
+		}
+	}
+
 	logger.Debug("Starting WebSocket client goroutines",
 		"ticket_id", ticketID,
 		"user_id", userID,
 		"tab_id", tabID,
-		"client_id", client.clientID)
+		"client_id", client.clientID,
+		"session_id", client.SessionID())
 
 	// Start client goroutines
 	go h.writePump(client)
@@ -459,7 +478,29 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 			// Setup context with WebSocket-specific message handlers
 			asyncCtx = msg.With(asyncCtx, notifyFunc, traceFunc, warnFunc)
 
-			if err := h.useCases.ChatFromWebSocket(asyncCtx, client.ticketID, message.Content); err != nil {
+			// Resolve the Session bound to this WebSocket connection,
+			// then load the corresponding Session record so
+			// executeChatTurn can create a Turn scoped to it.
+			var sess = h.resolveClientSession(asyncCtx, client)
+
+			onEvent := func(ev usecase.ChatTurnEvent) {
+				switch ev.Kind {
+				case "turn_started":
+					if ev.Turn != nil {
+						h.publishEnvelope(client, NewTurnStartedEvent(ev.Turn))
+					}
+				case "turn_ended":
+					if ev.Turn != nil {
+						h.publishEnvelope(client, NewTurnEndedEvent(ev.Turn))
+					}
+				case "session_message_added":
+					if ev.Message != nil {
+						h.publishEnvelope(client, NewSessionMessageAddedEvent(ev.Message))
+					}
+				}
+			}
+
+			if err := h.useCases.ChatFromWebSocket(asyncCtx, client.ticketID, message.Content, sess, onEvent); err != nil {
 				logger.Error("failed to process chat message",
 					"error", err,
 					"ticket_id", client.ticketID,
@@ -480,6 +521,47 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 	}
 
 	return nil
+}
+
+// resolveClientSession returns the Session document bound to the
+// current client, or nil if no Session was attached (e.g.
+// EnsureWebSession failed at connect time). Loaded fresh from the
+// repository on every message so a concurrent update (migration job,
+// cross-instance write) is picked up.
+func (h *Handler) resolveClientSession(ctx context.Context, client *Client) *sessModel.Session {
+	if client == nil || client.SessionID() == "" || h.repository == nil {
+		return nil
+	}
+	sess, err := h.repository.GetSession(ctx, client.SessionID())
+	if err != nil {
+		logging.From(ctx).Warn("failed to load client session",
+			"error", err, "session_id", client.SessionID())
+		return nil
+	}
+	return sess
+}
+
+// publishEnvelope serializes a chat-session-redesign Envelope and
+// sends it to a single client. Failures are logged and swallowed so a
+// broken write does not break the chat flow.
+func (h *Handler) publishEnvelope(client *Client, env Envelope) {
+	if client == nil {
+		return
+	}
+	data, err := env.Marshal()
+	if err != nil {
+		logging.From(client.ctx).Warn("failed to marshal envelope",
+			"error", err, "event", env.Event)
+		return
+	}
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	select {
+	case client.send <- data:
+	default:
+		// Client's send channel is full — drop the event rather than
+		// block the caller.
+	}
 }
 
 // sendErrorToClient sends an error message to a specific client

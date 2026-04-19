@@ -19,6 +19,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/dryrun"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 	"github.com/urfave/cli/v3"
 )
 
@@ -206,7 +207,12 @@ func runSingleQuery(ctx context.Context, uc *usecase.UseCases, ticket *ticket.Ti
 	// Setup message handlers for CLI output
 	ctx = setupCLIMessageHandlers(ctx)
 
-	if err := uc.ChatFromCLI(ctx, ticket, query); err != nil {
+	sess, err := uc.EnsureCLISession(ctx, ticket.ID, types.UserID(user.FromContext(ctx)))
+	if err != nil {
+		return goerr.Wrap(err, "failed to create CLI session")
+	}
+
+	if err := uc.ChatFromCLI(ctx, ticket, query, sess); err != nil {
 		return goerr.Wrap(err, "failed to process query")
 	}
 
@@ -227,6 +233,14 @@ func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticke
 
 	// Setup message handlers for CLI output
 	ctx = setupCLIMessageHandlers(ctx)
+
+	// One Session per CLI launch (interactive mode runs many Turns
+	// against the same Session so subsequent inputs reuse gollem
+	// working memory from the prior Turn).
+	sess, err := uc.EnsureCLISession(ctx, ticket.ID, types.UserID(user.FromContext(ctx)))
+	if err != nil {
+		return goerr.Wrap(err, "failed to create CLI session")
+	}
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -252,7 +266,7 @@ func runInteractiveMode(ctx context.Context, uc *usecase.UseCases, ticket *ticke
 			break
 		}
 
-		if err := uc.ChatFromCLI(ctx, ticket, message); err != nil {
+		if err := uc.ChatFromCLI(ctx, ticket, message, sess); err != nil {
 			fmt.Printf("❌ Error: %s\n", err.Error())
 			logger.Error("Chat error", "error", err)
 		}

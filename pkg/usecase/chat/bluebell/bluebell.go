@@ -232,7 +232,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 		resolvedIntent:   resolvedIntent,
 		lang:             lang.From(ctx),
 		requesterID:      string(types.UserID(user.FromContext(ctx))),
-		threadComments:   chatCtx.ThreadComments,
+		sessionMessages:  chatCtx.SessionMessages,
 		slackHistory:     chatCtx.SlackHistory,
 		knowledgeService: c.knowledgeService,
 	}
@@ -278,7 +278,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 	// Direct response (no tasks)
 	if len(planResult.Tasks) == 0 {
 		if !ticketless {
-			return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+			return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 		}
 		return nil
 	}
@@ -409,7 +409,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 
 	if !ticketless {
 		logger.Debug("bluebell executeBluebell: completed, saving history")
-		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+		return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 	}
 	return nil
 }
@@ -516,13 +516,19 @@ func (c *BluebellChat) saveLatestHistory(ctx context.Context, planSession gollem
 	}
 }
 
-// saveSessionHistory extracts history from a gollem Session and saves it.
-func (c *BluebellChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) error {
+// saveSessionHistory writes gollem working memory into the
+// Session-scoped storage slot. When chatCtx.Session is absent, working
+// memory is discarded for this turn (post-confinement: no ticket-scoped
+// fallback).
+func (c *BluebellChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, chatCtx chatModel.ChatContext, storageSvc *storage.Service) error {
 	newHistory, err := planSession.History()
 	if err != nil {
 		return goerr.Wrap(err, "failed to get history from planning session")
 	}
-	return chat.SaveHistory(ctx, c.repository, c.storageClient, storageSvc, ticketID, newHistory)
+	if chatCtx.Session == nil {
+		return nil
+	}
+	return chat.SaveSessionHistory(ctx, chatCtx.Session.ID, storageSvc, newHistory)
 }
 
 // checkAborted checks if the context has been cancelled.

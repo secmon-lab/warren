@@ -6,9 +6,7 @@ export interface Ticket {
   summary: string;
   assignee?: User;
   alerts?: Alert[]; // Optional because it's not always fetched from GraphQL
-  comments: Comment[];
   alertsCount: number;
-  commentsCount: number;
   conclusion?: string;
   reason?: string;
   finding?: Finding;
@@ -20,19 +18,6 @@ export interface Ticket {
   isTest: boolean;
   tags?: string[];
   tagObjects?: { id: string; name: string }[];
-}
-
-export interface Comment {
-  id: string;
-  content: string;
-  user?: User;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CommentsResponse {
-  comments: Comment[];
-  totalCount: number;
 }
 
 export type { AlertStatus } from "@/lib/graphql/generated";
@@ -151,13 +136,25 @@ export interface Session {
   updatedAt: string;
 }
 
-export type SessionMessageType = "trace" | "plan" | "response";
+// chat-session-redesign Phase 3+: new "user" / "warning" message types
+// joined the original trace/plan/response trio.
+export type SessionMessageType = "trace" | "plan" | "response" | "user" | "warning";
+
+export interface MessageAuthor {
+  userID: string;
+  displayName: string;
+  slackUserID?: string;
+  email?: string;
+}
 
 export interface SessionMessage {
   id: string;
   sessionID: string;
+  turnID?: string | null;
+  ticketID?: string | null;
   type: SessionMessageType;
   content: string;
+  author?: MessageAuthor | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -2,6 +2,7 @@ package firestore
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"time"
 
@@ -270,6 +271,19 @@ func (r *Firestore) SearchSessionMessages(ctx context.Context, ticketID types.Ti
 	return out, nil
 }
 
+// GetTicketSessionMessages returns Messages across every Session
+// bound to ticketID, ordered by CreatedAt ASC so Conversation UI and
+// agent tools get a stable timeline regardless of Session enumeration
+// order.
+//
+// Note on pagination: sorting is done in-memory after collecting every
+// matching Session's messages. This is deliberate — exposing a
+// cross-Session CreatedAt index on the `messages` collection would
+// require a composite index on (TicketIDs array-contains, CreatedAt)
+// and the Firestore/fireconf config we ship does NOT create one. If
+// per-ticket message counts grow past a few thousand, revisit this
+// with a direct messages-collection query backed by a new index rather
+// than papering over it here.
 func (r *Firestore) GetTicketSessionMessages(ctx context.Context, ticketID types.TicketID, source *session.SessionSource, msgType *session.MessageType, limit, offset int) ([]*session.Message, error) {
 	sess, err := r.GetSessionsByTicket(ctx, ticketID)
 	if err != nil {
@@ -291,6 +305,8 @@ func (r *Firestore) GetTicketSessionMessages(ctx context.Context, ticketID types
 			out = append(out, m)
 		}
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.Before(out[j].CreatedAt) })
+
 	if offset < 0 {
 		offset = 0
 	}

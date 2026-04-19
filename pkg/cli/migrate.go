@@ -19,10 +19,20 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// migrateRuntime bundles the infrastructure handles the migration jobs
+// need. Phase 7 jobs that touch Cloud Storage (history-scope,
+// cleanup-legacy) consult Storage; the index/backfill jobs ignore it.
+type migrateRuntime struct {
+	projectID  string
+	databaseID string
+	storage    *config.Storage
+	dryRun     bool
+}
+
 type migrationJob struct {
 	Name        string
 	Description string
-	Run         func(ctx context.Context, projectID, databaseID string, dryRun bool) error
+	Run         func(ctx context.Context, rt *migrateRuntime) error
 }
 
 const defaultMigrationJob = "index"
@@ -80,6 +90,7 @@ func findMigrationJob(name string) (*migrationJob, bool) {
 
 func cmdMigrate() *cli.Command {
 	var cfg config.Firestore
+	var storageCfg config.Storage
 	var dryRun bool
 	var listJobs bool
 	var jobNames []string
@@ -88,7 +99,7 @@ func cmdMigrate() *cli.Command {
 		Name:    "migrate",
 		Aliases: []string{"m"},
 		Usage:   "Migrate Firestore indexes and configurations",
-		Flags: append(cfg.Flags(),
+		Flags: append(append(cfg.Flags(), storageCfg.Flags()...),
 			&cli.BoolFlag{
 				Name:        "dry-run",
 				Usage:       "Show what would be changed without applying",
@@ -112,7 +123,7 @@ func cmdMigrate() *cli.Command {
 				printMigrationJobs()
 				return nil
 			}
-			return runMigrate(ctx, &cfg, dryRun, jobNames)
+			return runMigrate(ctx, &cfg, &storageCfg, dryRun, jobNames)
 		},
 	}
 }
@@ -150,7 +161,7 @@ func wrapText(text string, width int) []string {
 	return lines
 }
 
-func runMigrate(ctx context.Context, cfg *config.Firestore, dryRun bool, jobNames []string) error {
+func runMigrate(ctx context.Context, cfg *config.Firestore, storageCfg *config.Storage, dryRun bool, jobNames []string) error {
 	logger := logging.From(ctx)
 
 	// Default to index migration when no jobs specified
@@ -186,11 +197,18 @@ func runMigrate(ctx context.Context, cfg *config.Firestore, dryRun bool, jobName
 		"jobs", jobNames,
 	)
 
+	rt := &migrateRuntime{
+		projectID:  projectID,
+		databaseID: databaseID,
+		storage:    storageCfg,
+		dryRun:     dryRun,
+	}
+
 	// Run migration jobs
 	for _, name := range jobNames {
 		job, _ := findMigrationJob(name) // already validated above
 		logger.Info("Running migration job", "job", job.Name)
-		if err := job.Run(ctx, projectID, databaseID, dryRun); err != nil {
+		if err := job.Run(ctx, rt); err != nil {
 			return goerr.Wrap(err, "migration job failed",
 				goerr.V("job", job.Name))
 		}
@@ -200,8 +218,9 @@ func runMigrate(ctx context.Context, cfg *config.Firestore, dryRun bool, jobName
 	return nil
 }
 
-func migrateIndexes(ctx context.Context, projectID, databaseID string, dryRun bool) error {
+func migrateIndexes(ctx context.Context, rt *migrateRuntime) error {
 	logger := logging.From(ctx)
+	projectID, databaseID, dryRun := rt.projectID, rt.databaseID, rt.dryRun
 
 	indexConfig := defineFirestoreIndexes()
 
@@ -290,8 +309,9 @@ func waitForIndexesReady(ctx context.Context, projectID, databaseID string, cfg 
 	}
 }
 
-func backfillAlertStatus(ctx context.Context, projectID, databaseID string, dryRun bool) error {
+func backfillAlertStatus(ctx context.Context, rt *migrateRuntime) error {
 	logger := logging.From(ctx)
+	projectID, databaseID, dryRun := rt.projectID, rt.databaseID, rt.dryRun
 	logger.Info("Starting alert status backfill")
 
 	db, err := firestore.NewClientWithDatabase(ctx, projectID, databaseID)

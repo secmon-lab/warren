@@ -76,21 +76,6 @@ export type ArchiveAllResolvedResult = {
   archivedCount: Scalars['Int']['output'];
 };
 
-export type Comment = {
-  __typename?: 'Comment';
-  content: Scalars['String']['output'];
-  createdAt: Scalars['String']['output'];
-  id: Scalars['ID']['output'];
-  updatedAt: Scalars['String']['output'];
-  user?: Maybe<User>;
-};
-
-export type CommentsResponse = {
-  __typename?: 'CommentsResponse';
-  comments: Array<Comment>;
-  totalCount: Scalars['Int']['output'];
-};
-
 export type CreateKnowledgeInput = {
   category: Scalars['String']['input'];
   claim: Scalars['String']['input'];
@@ -193,6 +178,14 @@ export type KnowledgeTag = {
   id: Scalars['ID']['output'];
   name: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
+};
+
+export type MessageAuthor = {
+  __typename?: 'MessageAuthor';
+  displayName: Scalars['String']['output'];
+  email?: Maybe<Scalars['String']['output']>;
+  slackUserID?: Maybe<Scalars['String']['output']>;
+  userID: Scalars['String']['output'];
 };
 
 export type Mutation = {
@@ -408,7 +401,7 @@ export type Query = {
   similarTicketsForAlert: TicketsResponse;
   tags: Array<TagMetadata>;
   ticket?: Maybe<Ticket>;
-  ticketComments: CommentsResponse;
+  ticketSessionMessages: Array<SessionMessage>;
   ticketSessions: Array<Session>;
   tickets: TicketsResponse;
   unboundAlerts: AlertsResponse;
@@ -518,10 +511,12 @@ export type QueryTicketArgs = {
 };
 
 
-export type QueryTicketCommentsArgs = {
+export type QueryTicketSessionMessagesArgs = {
   limit?: InputMaybe<Scalars['Int']['input']>;
   offset?: InputMaybe<Scalars['Int']['input']>;
+  source?: InputMaybe<Scalars['String']['input']>;
   ticketId: Scalars['ID']['input'];
+  type?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -605,10 +600,13 @@ export type Session = {
 
 export type SessionMessage = {
   __typename?: 'SessionMessage';
+  author?: Maybe<MessageAuthor>;
   content: Scalars['String']['output'];
   createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
   sessionID: Scalars['ID']['output'];
+  ticketID?: Maybe<Scalars['ID']['output']>;
+  turnID?: Maybe<Scalars['ID']['output']>;
   type: Scalars['String']['output'];
   updatedAt: Scalars['String']['output'];
 };
@@ -640,8 +638,6 @@ export type Ticket = {
   alertsPaginated: AlertsResponse;
   archivedAt?: Maybe<Scalars['String']['output']>;
   assignee?: Maybe<User>;
-  comments: Array<Comment>;
-  commentsCount: Scalars['Int']['output'];
   conclusion?: Maybe<Scalars['String']['output']>;
   createdAt: Scalars['String']['output'];
   description: Scalars['String']['output'];
@@ -709,14 +705,14 @@ export type GetTicketsQueryVariables = Exact<{
 }>;
 
 
-export type GetTicketsQuery = { __typename?: 'Query', tickets: { __typename?: 'TicketsResponse', totalCount: number, tickets: Array<{ __typename?: 'Ticket', id: string, status: string, title: string, description: string, conclusion?: string | null, reason?: string | null, isTest: boolean, createdAt: string, updatedAt: string, alertsCount: number, commentsCount: number, tags: Array<string>, assignee?: { __typename?: 'User', id: string, name: string } | null, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }> }> } };
+export type GetTicketsQuery = { __typename?: 'Query', tickets: { __typename?: 'TicketsResponse', totalCount: number, tickets: Array<{ __typename?: 'Ticket', id: string, status: string, title: string, description: string, conclusion?: string | null, reason?: string | null, isTest: boolean, createdAt: string, updatedAt: string, alertsCount: number, tags: Array<string>, assignee?: { __typename?: 'User', id: string, name: string } | null, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }> }> } };
 
 export type GetTicketQueryVariables = Exact<{
   id: Scalars['ID']['input'];
 }>;
 
 
-export type GetTicketQuery = { __typename?: 'Query', ticket?: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, summary: string, conclusion?: string | null, reason?: string | null, isTest: boolean, slackLink?: string | null, createdAt: string, updatedAt: string, alertsCount: number, tags: Array<string>, finding?: { __typename?: 'Finding', severity: string, summary: string, reason: string, recommendation: string } | null, assignee?: { __typename?: 'User', id: string, name: string } | null, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }>, comments: Array<{ __typename?: 'Comment', id: string, content: string, createdAt: string, updatedAt: string, user?: { __typename?: 'User', id: string, name: string } | null }> } | null };
+export type GetTicketQuery = { __typename?: 'Query', ticket?: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, summary: string, conclusion?: string | null, reason?: string | null, isTest: boolean, slackLink?: string | null, createdAt: string, updatedAt: string, alertsCount: number, tags: Array<string>, finding?: { __typename?: 'Finding', severity: string, summary: string, reason: string, recommendation: string } | null, assignee?: { __typename?: 'User', id: string, name: string } | null, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }> } | null };
 
 export type GetTicketAlertsQueryVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -756,14 +752,16 @@ export type GetActivitiesQueryVariables = Exact<{
 
 export type GetActivitiesQuery = { __typename?: 'Query', activities: { __typename?: 'ActivitiesResponse', totalCount: number, activities: Array<{ __typename?: 'Activity', id: string, type: string, userID?: string | null, alertID?: string | null, ticketID?: string | null, commentID?: string | null, createdAt: string, metadata?: string | null, user?: { __typename?: 'User', id: string, name: string } | null, alert?: { __typename?: 'Alert', id: string, title: string, description?: string | null } | null, ticket?: { __typename?: 'Ticket', id: string, title: string, description: string } | null }> } };
 
-export type GetTicketCommentsQueryVariables = Exact<{
+export type GetTicketSessionMessagesQueryVariables = Exact<{
   ticketId: Scalars['ID']['input'];
-  offset?: InputMaybe<Scalars['Int']['input']>;
+  source?: InputMaybe<Scalars['String']['input']>;
+  type?: InputMaybe<Scalars['String']['input']>;
   limit?: InputMaybe<Scalars['Int']['input']>;
+  offset?: InputMaybe<Scalars['Int']['input']>;
 }>;
 
 
-export type GetTicketCommentsQuery = { __typename?: 'Query', ticketComments: { __typename?: 'CommentsResponse', totalCount: number, comments: Array<{ __typename?: 'Comment', id: string, content: string, createdAt: string, updatedAt: string, user?: { __typename?: 'User', id: string, name: string } | null }> } };
+export type GetTicketSessionMessagesQuery = { __typename?: 'Query', ticketSessionMessages: Array<{ __typename?: 'SessionMessage', id: string, sessionID: string, turnID?: string | null, ticketID?: string | null, type: string, content: string, createdAt: string, updatedAt: string, author?: { __typename?: 'MessageAuthor', userID: string, displayName: string, slackUserID?: string | null } | null }> };
 
 export type ResolveTicketMutationVariables = Exact<{
   id: Scalars['ID']['input'];
@@ -823,7 +821,7 @@ export type UpdateTicketMutationVariables = Exact<{
 }>;
 
 
-export type UpdateTicketMutation = { __typename?: 'Mutation', updateTicket: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, summary: string, conclusion?: string | null, reason?: string | null, isTest: boolean, slackLink?: string | null, createdAt: string, updatedAt: string, tags: Array<string>, finding?: { __typename?: 'Finding', severity: string, summary: string, reason: string, recommendation: string } | null, assignee?: { __typename?: 'User', id: string, name: string } | null, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }>, alerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, data: string, createdAt: string, tags: Array<string>, attributes: Array<{ __typename?: 'AlertAttribute', key: string, value: string, link?: string | null, auto: boolean }>, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }> }>, comments: Array<{ __typename?: 'Comment', id: string, content: string, createdAt: string, updatedAt: string, user?: { __typename?: 'User', id: string, name: string } | null }> } };
+export type UpdateTicketMutation = { __typename?: 'Mutation', updateTicket: { __typename?: 'Ticket', id: string, status: string, title: string, description: string, summary: string, conclusion?: string | null, reason?: string | null, isTest: boolean, slackLink?: string | null, createdAt: string, updatedAt: string, tags: Array<string>, finding?: { __typename?: 'Finding', severity: string, summary: string, reason: string, recommendation: string } | null, assignee?: { __typename?: 'User', id: string, name: string } | null, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }>, alerts: Array<{ __typename?: 'Alert', id: string, title: string, description?: string | null, schema: string, data: string, createdAt: string, tags: Array<string>, attributes: Array<{ __typename?: 'AlertAttribute', key: string, value: string, link?: string | null, auto: boolean }>, tagObjects: Array<{ __typename?: 'TagObject', id: string, name: string }> }> } };
 
 export type CreateTicketMutationVariables = Exact<{
   title: Scalars['String']['input'];
@@ -1131,7 +1129,7 @@ export type GetReprocessBatchJobQueryVariables = Exact<{
 export type GetReprocessBatchJobQuery = { __typename?: 'Query', reprocessBatchJob?: { __typename?: 'ReprocessBatchJob', id: string, status: ReprocessJobStatus, totalCount: number, completedCount: number, failedCount: number, createdAt: string, updatedAt: string } | null };
 
 
-export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"assigneeID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"commentsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"assigneeID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
 
 /**
  * __useGetTicketsQuery__
@@ -1172,7 +1170,7 @@ export type GetTicketsQueryHookResult = ReturnType<typeof useGetTicketsQuery>;
 export type GetTicketsLazyQueryHookResult = ReturnType<typeof useGetTicketsLazyQuery>;
 export type GetTicketsSuspenseQueryHookResult = ReturnType<typeof useGetTicketsSuspenseQuery>;
 export type GetTicketsQueryResult = Apollo.QueryResult<GetTicketsQuery, GetTicketsQueryVariables>;
-export const GetTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ticket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"finding"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"severity"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"recommendation"}}]}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"slackLink"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"comments"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]}}]} as unknown as DocumentNode;
+export const GetTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ticket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"finding"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"severity"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"recommendation"}}]}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"slackLink"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]} as unknown as DocumentNode;
 
 /**
  * __useGetTicketQuery__
@@ -1398,45 +1396,47 @@ export type GetActivitiesQueryHookResult = ReturnType<typeof useGetActivitiesQue
 export type GetActivitiesLazyQueryHookResult = ReturnType<typeof useGetActivitiesLazyQuery>;
 export type GetActivitiesSuspenseQueryHookResult = ReturnType<typeof useGetActivitiesSuspenseQuery>;
 export type GetActivitiesQueryResult = Apollo.QueryResult<GetActivitiesQuery, GetActivitiesQueryVariables>;
-export const GetTicketCommentsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTicketComments"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ticketComments"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ticketId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"comments"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
+export const GetTicketSessionMessagesDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTicketSessionMessages"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"source"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"type"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"ticketSessionMessages"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ticketId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ticketId"}}},{"kind":"Argument","name":{"kind":"Name","value":"source"},"value":{"kind":"Variable","name":{"kind":"Name","value":"source"}}},{"kind":"Argument","name":{"kind":"Name","value":"type"},"value":{"kind":"Variable","name":{"kind":"Name","value":"type"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sessionID"}},{"kind":"Field","name":{"kind":"Name","value":"turnID"}},{"kind":"Field","name":{"kind":"Name","value":"ticketID"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"author"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"userID"}},{"kind":"Field","name":{"kind":"Name","value":"displayName"}},{"kind":"Field","name":{"kind":"Name","value":"slackUserID"}}]}}]}}]}}]} as unknown as DocumentNode;
 
 /**
- * __useGetTicketCommentsQuery__
+ * __useGetTicketSessionMessagesQuery__
  *
- * To run a query within a React component, call `useGetTicketCommentsQuery` and pass it any options that fit your needs.
- * When your component renders, `useGetTicketCommentsQuery` returns an object from Apollo Client that contains loading, error, and data properties
+ * To run a query within a React component, call `useGetTicketSessionMessagesQuery` and pass it any options that fit your needs.
+ * When your component renders, `useGetTicketSessionMessagesQuery` returns an object from Apollo Client that contains loading, error, and data properties
  * you can use to render your UI.
  *
  * @param baseOptions options that will be passed into the query, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options;
  *
  * @example
- * const { data, loading, error } = useGetTicketCommentsQuery({
+ * const { data, loading, error } = useGetTicketSessionMessagesQuery({
  *   variables: {
  *      ticketId: // value for 'ticketId'
- *      offset: // value for 'offset'
+ *      source: // value for 'source'
+ *      type: // value for 'type'
  *      limit: // value for 'limit'
+ *      offset: // value for 'offset'
  *   },
  * });
  */
-export function useGetTicketCommentsQuery(baseOptions: Apollo.QueryHookOptions<GetTicketCommentsQuery, GetTicketCommentsQueryVariables> & ({ variables: GetTicketCommentsQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
+export function useGetTicketSessionMessagesQuery(baseOptions: Apollo.QueryHookOptions<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables> & ({ variables: GetTicketSessionMessagesQueryVariables; skip?: boolean; } | { skip: boolean; }) ) {
         const options = {...defaultOptions, ...baseOptions}
-        return Apollo.useQuery<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>(GetTicketCommentsDocument, options);
+        return Apollo.useQuery<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>(GetTicketSessionMessagesDocument, options);
       }
-export function useGetTicketCommentsLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>) {
+export function useGetTicketSessionMessagesLazyQuery(baseOptions?: Apollo.LazyQueryHookOptions<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>) {
           const options = {...defaultOptions, ...baseOptions}
-          return Apollo.useLazyQuery<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>(GetTicketCommentsDocument, options);
+          return Apollo.useLazyQuery<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>(GetTicketSessionMessagesDocument, options);
         }
 // @ts-ignore
-export function useGetTicketCommentsSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>;
-export function useGetTicketCommentsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketCommentsQuery | undefined, GetTicketCommentsQueryVariables>;
-export function useGetTicketCommentsSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>) {
+export function useGetTicketSessionMessagesSuspenseQuery(baseOptions?: Apollo.SuspenseQueryHookOptions<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>;
+export function useGetTicketSessionMessagesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>): Apollo.UseSuspenseQueryResult<GetTicketSessionMessagesQuery | undefined, GetTicketSessionMessagesQueryVariables>;
+export function useGetTicketSessionMessagesSuspenseQuery(baseOptions?: Apollo.SkipToken | Apollo.SuspenseQueryHookOptions<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>) {
           const options = baseOptions === Apollo.skipToken ? baseOptions : {...defaultOptions, ...baseOptions}
-          return Apollo.useSuspenseQuery<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>(GetTicketCommentsDocument, options);
+          return Apollo.useSuspenseQuery<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>(GetTicketSessionMessagesDocument, options);
         }
-export type GetTicketCommentsQueryHookResult = ReturnType<typeof useGetTicketCommentsQuery>;
-export type GetTicketCommentsLazyQueryHookResult = ReturnType<typeof useGetTicketCommentsLazyQuery>;
-export type GetTicketCommentsSuspenseQueryHookResult = ReturnType<typeof useGetTicketCommentsSuspenseQuery>;
-export type GetTicketCommentsQueryResult = Apollo.QueryResult<GetTicketCommentsQuery, GetTicketCommentsQueryVariables>;
+export type GetTicketSessionMessagesQueryHookResult = ReturnType<typeof useGetTicketSessionMessagesQuery>;
+export type GetTicketSessionMessagesLazyQueryHookResult = ReturnType<typeof useGetTicketSessionMessagesLazyQuery>;
+export type GetTicketSessionMessagesSuspenseQueryHookResult = ReturnType<typeof useGetTicketSessionMessagesSuspenseQuery>;
+export type GetTicketSessionMessagesQueryResult = Apollo.QueryResult<GetTicketSessionMessagesQuery, GetTicketSessionMessagesQueryVariables>;
 export const ResolveTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ResolveTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"conclusion"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"reason"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resolveTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"conclusion"},"value":{"kind":"Variable","name":{"kind":"Name","value":"conclusion"}}},{"kind":"Argument","name":{"kind":"Name","value":"reason"},"value":{"kind":"Variable","name":{"kind":"Name","value":"reason"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"resolvedAt"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]} as unknown as DocumentNode;
 export type ResolveTicketMutationFn = Apollo.MutationFunction<ResolveTicketMutation, ResolveTicketMutationVariables>;
 
@@ -1629,7 +1629,7 @@ export function useUpdateTicketConclusionMutation(baseOptions?: Apollo.MutationH
 export type UpdateTicketConclusionMutationHookResult = ReturnType<typeof useUpdateTicketConclusionMutation>;
 export type UpdateTicketConclusionMutationResult = Apollo.MutationResult<UpdateTicketConclusionMutation>;
 export type UpdateTicketConclusionMutationOptions = Apollo.BaseMutationOptions<UpdateTicketConclusionMutation, UpdateTicketConclusionMutationVariables>;
-export const UpdateTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"description"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}},{"kind":"Argument","name":{"kind":"Name","value":"description"},"value":{"kind":"Variable","name":{"kind":"Name","value":"description"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"finding"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"severity"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"recommendation"}}]}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"slackLink"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"attributes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"value"}},{"kind":"Field","name":{"kind":"Name","value":"link"}},{"kind":"Field","name":{"kind":"Name","value":"auto"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"comments"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"content"}},{"kind":"Field","name":{"kind":"Name","value":"user"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]}}]} as unknown as DocumentNode;
+export const UpdateTicketDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"UpdateTicket"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"description"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"updateTicket"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}},{"kind":"Argument","name":{"kind":"Name","value":"description"},"value":{"kind":"Variable","name":{"kind":"Name","value":"description"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"finding"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"severity"}},{"kind":"Field","name":{"kind":"Name","value":"summary"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"recommendation"}}]}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"slackLink"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"alerts"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"schema"}},{"kind":"Field","name":{"kind":"Name","value":"data"}},{"kind":"Field","name":{"kind":"Name","value":"attributes"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"key"}},{"kind":"Field","name":{"kind":"Name","value":"value"}},{"kind":"Field","name":{"kind":"Name","value":"link"}},{"kind":"Field","name":{"kind":"Name","value":"auto"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]}}]} as unknown as DocumentNode;
 export type UpdateTicketMutationFn = Apollo.MutationFunction<UpdateTicketMutation, UpdateTicketMutationVariables>;
 
 /**

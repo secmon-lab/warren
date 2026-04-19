@@ -84,7 +84,7 @@ import {
 import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 import { EditTicketModal } from "@/components/EditTicketModal";
 import { SimilarTickets } from "@/components/SimilarTickets";
-import { TicketComments } from "@/components/TicketComments";
+import { TicketConversation } from "@/components/TicketConversation";
 import { SalvageModal } from "@/components/SalvageModal";
 import { TicketChat } from "@/components/TicketChat";
 import { SessionsList } from "@/components/SessionsList";
@@ -536,8 +536,12 @@ export default function TicketDetailPage() {
             onEditConclusion={handleEditConclusion}
           />
 
-          {/* Comments Section */}
-          <TicketComments ticketId={ticket.id} />
+          {/* chat-session-redesign Phase 6: unified Conversation card
+              replaces the legacy Comments list. Slack thread comments
+              written before the Phase 7 migration are rendered through
+              the same SessionMessage timeline (the migration copies
+              them as type=user messages). */}
+          <TicketConversation ticketId={ticket.id} />
 
           {/* Chat Section */}
           {!isChatOpen ? (

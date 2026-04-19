@@ -38,57 +38,17 @@ func WithPrefix(prefix string) Option {
 	}
 }
 
-func pathToHistory(prefix string, ticketID types.TicketID, historyID types.HistoryID) string {
-	return fmt.Sprintf("%s%s/ticket/%s/history/%s.json", prefix, StorageSchemaVersion, ticketID, historyID)
-}
-
 func pathToLatestHistory(prefix string, ticketID types.TicketID) string {
 	return fmt.Sprintf("%s%s/ticket/%s/latest.json", prefix, StorageSchemaVersion, ticketID)
 }
 
-func (s *Service) PutHistory(ctx context.Context, ticketID types.TicketID, historyID types.HistoryID, history *gollem.History) error {
-	path := pathToHistory(s.prefix, ticketID, historyID)
-
-	w := s.storageClient.PutObject(ctx, path)
-
-	if err := json.NewEncoder(w).Encode(history); err != nil {
-		return goerr.Wrap(err, "failed to save history",
-			goerr.V("path", path),
-			goerr.V("ticket_id", ticketID),
-			goerr.V("history_id", historyID))
+// DeleteLatestHistory removes the legacy ticket-scoped latest.json.
+// Idempotent; missing files are not treated as errors.
+func (s *Service) DeleteLatestHistory(ctx context.Context, ticketID types.TicketID) error {
+	if s.storageClient == nil {
+		return nil
 	}
-
-	if err := w.Close(); err != nil {
-		return goerr.Wrap(err, "failed to close history",
-			goerr.V("path", path),
-			goerr.V("ticket_id", ticketID),
-			goerr.V("history_id", historyID))
-	}
-
-	return nil
-}
-
-func (s *Service) GetHistory(ctx context.Context, ticketID types.TicketID, historyID types.HistoryID) (*gollem.History, error) {
-	path := pathToHistory(s.prefix, ticketID, historyID)
-
-	r, err := s.storageClient.GetObject(ctx, path)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get history",
-			goerr.V("path", path),
-			goerr.V("ticket_id", ticketID),
-			goerr.V("history_id", historyID))
-	}
-	defer safe.Close(ctx, r)
-
-	var history gollem.History
-	if err := json.NewDecoder(r).Decode(&history); err != nil {
-		return nil, goerr.Wrap(err, "failed to unmarshal history",
-			goerr.V("path", path),
-			goerr.V("ticket_id", ticketID),
-			goerr.V("history_id", historyID))
-	}
-
-	return &history, nil
+	return s.storageClient.DeleteObject(ctx, pathToLatestHistory(s.prefix, ticketID))
 }
 
 // PutLatestHistory saves the history as the latest snapshot for the given ticket.

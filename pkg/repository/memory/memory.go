@@ -28,9 +28,7 @@ type Memory struct {
 
 	alerts         map[types.AlertID]*alert.Alert
 	lists          map[types.AlertListID]*alert.List
-	histories      map[types.TicketID][]*ticket.History
 	tickets        map[types.TicketID]*ticket.Ticket
-	ticketComments map[types.TicketID][]ticket.Comment
 	tokens         map[auth.TokenID]*auth.Token
 	activities     map[types.ActivityID]*activity.Activity
 	tagsV2         map[string]*tag.Tag // New ID-based tags
@@ -70,9 +68,7 @@ func New() *Memory {
 	return &Memory{
 		alerts:         make(map[types.AlertID]*alert.Alert),
 		lists:          make(map[types.AlertListID]*alert.List),
-		histories:      make(map[types.TicketID][]*ticket.History),
 		tickets:        make(map[types.TicketID]*ticket.Ticket),
-		ticketComments: make(map[types.TicketID][]ticket.Comment),
 		tokens:         make(map[auth.TokenID]*auth.Token),
 		activities:     make(map[types.ActivityID]*activity.Activity),
 		tagsV2:         make(map[string]*tag.Tag),

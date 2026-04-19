@@ -13,18 +13,75 @@
 package usecase_test
 
 import (
+	"bytes"
 	"context"
+	"flag"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/m-mizutani/gt"
+	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
+	"github.com/secmon-lab/warren/pkg/service/notifier/chatnotifier"
 	slackSvc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/slack/testutil"
 	"github.com/secmon-lab/warren/pkg/usecase"
 )
+
+// updateSlackGoldenFlag controls whether this file's snapshot assertions
+// rewrite the fixture instead of comparing. The flag is declared here (not
+// in a shared util) so the fixture-management concern lives with the tests
+// that actually use it.
+//
+// Run `go test ./pkg/usecase -run TestSlackGolden -update-slack-golden` to
+// regenerate all fixtures after an intentional Slack behavior change.
+var updateSlackGoldenFlag = flag.Bool(
+	"update-slack-golden",
+	false,
+	"rewrite Slack snapshot fixtures under testdata/slack_golden with the current recorder output",
+)
+
+// assertRecordedCallsMatchSnapshot compares the recorded Slack API call
+// stream against the JSON fixture at path (relative to the package
+// directory). When -update-slack-golden is set, or when the fixture
+// does not yet exist, the fixture is written from `got` instead; in
+// the latter case the test fails once to force review.
+func assertRecordedCallsMatchSnapshot(t *testing.T, path string, got []byte) {
+	t.Helper()
+
+	if *updateSlackGoldenFlag {
+		writeSlackSnapshot(t, path, got)
+		return
+	}
+
+	want, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		writeSlackSnapshot(t, path, got)
+		t.Fatalf("slack snapshot %s did not exist; wrote initial contents (review and rerun)", path)
+	}
+	gt.NoError(t, err).Required()
+
+	if !bytes.Equal(bytes.TrimRight(want, "\n"), bytes.TrimRight(got, "\n")) {
+		t.Errorf("slack snapshot mismatch: %s\n--- want\n%s\n--- got\n%s\n(rerun with -update-slack-golden to accept)",
+			path, string(want), string(got))
+	}
+}
+
+func writeSlackSnapshot(t *testing.T, path string, data []byte) {
+	t.Helper()
+	gt.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755)).Required()
+	gt.NoError(t, os.WriteFile(path, data, 0o644)).Required()
+}
+
+// slackSnapshotPath joins the testdata prefix so individual tests do not
+// have to repeat it.
+func slackSnapshotPath(name string) string {
+	return filepath.Join("testdata", "slack_golden", name)
+}
 
 // TestSlackGolden_ThreadService_Reply exercises the basic Reply path used by
 // msg.Notify handlers in the existing Slack chat pipeline. This is the
@@ -51,7 +108,7 @@ func TestSlackGolden_ThreadService_Reply(t *testing.T) {
 	ctx := context.Background()
 	thread.Reply(ctx, "*hello* from warren")
 
-	testutil.AssertGolden(t, "thread_service/reply_simple.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/reply_simple.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_ThreadService_PostContextBlock captures how the existing
@@ -74,7 +131,7 @@ func TestSlackGolden_ThreadService_PostContextBlock(t *testing.T) {
 	err = thread.PostContextBlock(ctx, "Investigating ...")
 	gt.NoError(t, err)
 
-	testutil.AssertGolden(t, "thread_service/post_context_block.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/post_context_block.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_ThreadService_PostComment captures how a regular comment is
@@ -96,7 +153,7 @@ func TestSlackGolden_ThreadService_PostComment(t *testing.T) {
 	err = thread.PostComment(ctx, "final analysis result")
 	gt.NoError(t, err)
 
-	testutil.AssertGolden(t, "thread_service/post_comment.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/post_comment.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_ThreadService_UpdatableTraceChain captures the trace-message
@@ -121,7 +178,93 @@ func TestSlackGolden_ThreadService_UpdatableTraceChain(t *testing.T) {
 	updater(ctx, "step 1 complete")
 	updater(ctx, "step 2 complete")
 
-	testutil.AssertGolden(t, "thread_service/updatable_trace_chain.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/updatable_trace_chain.json"), rec.CallsJSON())
+}
+
+// TestSlackGolden_ThreadService_TraceAccumulateThenOverflow captures the
+// NewTraceMessage flow end-to-end: initial Post, two short appends that
+// update the same message in place, then a large append that overflows
+// the 1900-byte soft limit and triggers a fresh Post for the overflow
+// chunk. This is the exact path SlackChatNotifier.Trace takes in
+// production, and the fixture guards against accidental changes to:
+//
+//   - when NewTraceMessage emits its initial PostMessageContext (should
+//     happen during construction when initialMessage != "")
+//   - how appends become UpdateMessageContext calls bound to the same
+//     timestamp
+//   - at what byte threshold a new PostMessageContext is emitted
+//   - the single-element context block layout on overflow
+func TestSlackGolden_ThreadService_TraceAccumulateThenOverflow(t *testing.T) {
+	rec := testutil.NewRecorder()
+	client := testutil.NewSlackClientMock(rec)
+
+	svc, err := slackSvc.New(client, "C_DEFAULT")
+	gt.NoError(t, err).Required()
+	rec.Reset()
+
+	thread := svc.NewThread(slackModel.Thread{
+		ChannelID: "C_TICKET",
+		ThreadID:  "1700000000.000000",
+	})
+
+	ctx := context.Background()
+	tracer := thread.NewTraceMessage(ctx, "trace start")
+	tracer(ctx, "step a")
+	tracer(ctx, "step b")
+	// Deterministic overflow payload: 1900 is the soft limit, so a
+	// single 1950-byte string guarantees the overflow branch fires on
+	// the next append regardless of prior accumulation.
+	big := make([]byte, 1950)
+	for i := range big {
+		big[i] = 'x'
+	}
+	tracer(ctx, string(big))
+
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/trace_accumulate_then_overflow.json"), rec.CallsJSON())
+}
+
+// TestSlackGolden_ChatNotifier_SlackTraceChain exercises
+// SlackChatNotifier.Trace from the chat-session-redesign notifier path
+// end-to-end: the Session+Turn are created, the notifier is bound to a
+// real slackSvc.ThreadService, and two Trace() calls plus one Notify()
+// are invoked. The captured API stream validates:
+//
+//   - first Trace() emits the initial PostMessageContext (trace context
+//     block with the initial text)
+//   - second Trace() emits an UpdateMessageContext binding to the same
+//     timestamp with accumulated text
+//   - Notify() emits a plain PostMessageContext for the final response
+//     comment, NOT a context block update
+//
+// This is the canonical AI trace+response flow that ships to Slack.
+func TestSlackGolden_ChatNotifier_SlackTraceChain(t *testing.T) {
+	ctx := context.Background()
+
+	rec := testutil.NewRecorder()
+	client := testutil.NewSlackClientMock(rec)
+	svc, err := slackSvc.New(client, "C_DEFAULT")
+	gt.NoError(t, err).Required()
+	rec.Reset()
+
+	thread := svc.NewThread(slackModel.Thread{
+		ChannelID: "C_TICKET",
+		ThreadID:  "1700000000.000000",
+	})
+
+	tid := types.TicketID("TCKT_NOTIFIER_0001")
+	sess := &sessModel.Session{
+		ID:          types.SessionID("sid_notifier"),
+		TicketIDPtr: &tid,
+		Source:      sessModel.SessionSourceSlack,
+	}
+	repo := repository.NewMemory()
+
+	n := chatnotifier.NewSlackChatNotifier(repo, thread, sess, nil)
+	gt.NoError(t, n.Trace(ctx, "analyzing alert fingerprint"))
+	gt.NoError(t, n.Trace(ctx, "checking VirusTotal"))
+	gt.NoError(t, n.Notify(ctx, "final summary: alert is a true positive"))
+
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("chatnotifier/slack_trace_chain.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_Service_Construction records the API calls performed during
@@ -134,7 +277,7 @@ func TestSlackGolden_Service_Construction(t *testing.T) {
 	_, err := slackSvc.New(client, "C_DEFAULT")
 	gt.NoError(t, err).Required()
 
-	testutil.AssertGolden(t, "service/construction.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("service/construction.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_HandleSlackMessage_UserMessageSaved captures the case where a
@@ -178,7 +321,7 @@ func TestSlackGolden_HandleSlackMessage_UserMessageSaved(t *testing.T) {
 	)
 	gt.NoError(t, uc.HandleSlackMessage(ctx, msg))
 
-	testutil.AssertGolden(t, "handle_slack_message/user_message_saved.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("handle_slack_message/user_message_saved.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_HandleSlackMessage_BotMessageSkipped captures the short-
@@ -210,7 +353,7 @@ func TestSlackGolden_HandleSlackMessage_BotMessageSkipped(t *testing.T) {
 	)
 	gt.NoError(t, uc.HandleSlackMessage(ctx, msg))
 
-	testutil.AssertGolden(t, "handle_slack_message/bot_message_skipped.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("handle_slack_message/bot_message_skipped.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_ThreadService_PostFinding captures the PostFinding path
@@ -236,7 +379,7 @@ func TestSlackGolden_ThreadService_PostFinding(t *testing.T) {
 	}
 	gt.NoError(t, thread.PostFinding(context.Background(), finding))
 
-	testutil.AssertGolden(t, "thread_service/post_finding.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/post_finding.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_ThreadService_PostSessionActions captures the session
@@ -268,7 +411,7 @@ func TestSlackGolden_ThreadService_PostSessionActions(t *testing.T) {
 		"",
 	))
 
-	testutil.AssertGolden(t, "thread_service/post_session_actions.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/post_session_actions.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_ThreadService_PostResolveDetails captures the "ticket
@@ -294,7 +437,7 @@ func TestSlackGolden_ThreadService_PostResolveDetails(t *testing.T) {
 	}
 	gt.NoError(t, thread.PostResolveDetails(context.Background(), t1))
 
-	testutil.AssertGolden(t, "thread_service/post_resolve_details.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/post_resolve_details.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_ThreadService_PostLinkToTicket captures the "ticket created"
@@ -316,7 +459,7 @@ func TestSlackGolden_ThreadService_PostLinkToTicket(t *testing.T) {
 		"Suspicious login pattern",
 	))
 
-	testutil.AssertGolden(t, "thread_service/post_link_to_ticket.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("thread_service/post_link_to_ticket.json"), rec.CallsJSON())
 }
 
 // TestSlackGolden_HandleSlackMessage_NoTicketForThread captures the case where
@@ -347,5 +490,5 @@ func TestSlackGolden_HandleSlackMessage_NoTicketForThread(t *testing.T) {
 	)
 	gt.NoError(t, uc.HandleSlackMessage(ctx, msg))
 
-	testutil.AssertGolden(t, "handle_slack_message/no_ticket_for_thread.json", rec.CallsJSON())
+	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("handle_slack_message/no_ticket_for_thread.json"), rec.CallsJSON())
 }

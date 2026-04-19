@@ -45,13 +45,11 @@ type Repository interface {
 	GetTicketsBySpan(ctx context.Context, begin, end time.Time) ([]*ticket.Ticket, error)
 	GetTicketsByStatusAndSpan(ctx context.Context, status types.TicketStatus, begin, end time.Time) ([]*ticket.Ticket, error)
 
-	// For comment management
-	PutTicketComment(ctx context.Context, comment ticket.Comment) error
-	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
-	GetTicketCommentsPaginated(ctx context.Context, ticketID types.TicketID, offset, limit int) ([]ticket.Comment, error)
-	CountTicketComments(ctx context.Context, ticketID types.TicketID) (int, error)
-	GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
-	PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
+	// chat-session-redesign Phase 7 (confinement): the pre-redesign
+	// ticket.Comment subcollection is accessed only by the migration
+	// package via raw Firestore reads (see pkg/usecase/migration). The
+	// main application reads and writes Session.Message exclusively, so
+	// the Repository interface no longer surfaces Comment CRUD.
 
 	BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
 	UnbindAlertFromTicket(ctx context.Context, alertID types.AlertID) error
@@ -71,8 +69,12 @@ type Repository interface {
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 	FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)
 
-	GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
-	PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
+	// chat-session-redesign Phase 7 (confinement): the legacy
+	// Firestore history record sub-collection (pre-redesign
+	// GetLatestHistory / PutHistory) has been removed from the
+	// Repository interface. Session-scoped working memory lives at
+	// `sessions/{sid}/history.json` in Cloud Storage and is reached
+	// via chat.LoadSessionHistory / SaveSessionHistory.
 
 	// For list management
 	GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error)

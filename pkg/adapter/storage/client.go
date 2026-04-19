@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"io"
 
 	"cloud.google.com/go/storage"
@@ -44,6 +45,20 @@ func (x *Client) GetObject(ctx context.Context, object string) (io.ReadCloser, e
 	}
 
 	return rc, nil
+}
+
+func (x *Client) DeleteObject(ctx context.Context, object string) error {
+	err := x.client.Bucket(x.bucket).Object(object).Delete(ctx)
+	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotExist) {
+			return nil
+		}
+		return goerr.Wrap(err, "failed to delete object",
+			goerr.V("bucket", x.bucket),
+			goerr.V("object", object),
+		)
+	}
+	return nil
 }
 
 func (x *Client) Close(ctx context.Context) {

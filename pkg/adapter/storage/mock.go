@@ -50,4 +50,9 @@ func (m *Mock) GetObject(ctx context.Context, object string) (io.ReadCloser, err
 	return io.NopCloser(strings.NewReader(v)), nil
 }
 
+func (m *Mock) DeleteObject(_ context.Context, object string) error {
+	delete(m.data, object)
+	return nil
+}
+
 func (m *Mock) Close(_ context.Context) {}

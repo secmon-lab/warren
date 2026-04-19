@@ -12,9 +12,7 @@ type Ticket {
   assignee: User
   alerts: [Alert!]!
   alertsPaginated(offset: Int, limit: Int): AlertsResponse!
-  comments: [Comment!]!
   alertsCount: Int!
-  commentsCount: Int!
   conclusion: String
   reason: String
   finding: Finding
@@ -32,14 +30,6 @@ type User {
   id: ID!
   name: String!
   icon: String
-}
-
-type Comment {
-  id: ID!
-  content: String!
-  user: User
-  createdAt: String!
-  updatedAt: String!
 }
 
 enum AlertStatus {
@@ -77,11 +67,6 @@ type Finding {
 
 type TicketsResponse {
   tickets: [Ticket!]!
-  totalCount: Int!
-}
-
-type CommentsResponse {
-  comments: [Comment!]!
   totalCount: Int!
 }
 
@@ -142,7 +127,6 @@ type Query {
     offset: Int
     limit: Int
   ): TicketsResponse!
-  ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts(offset: Int, limit: Int, status: AlertStatus): AlertsResponse!
   unboundAlerts(

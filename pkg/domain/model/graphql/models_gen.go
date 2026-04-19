@@ -47,11 +47,6 @@ type ArchiveAllResolvedResult struct {
 	ArchivedCount int `json:"archivedCount"`
 }
 
-type CommentsResponse struct {
-	Comments   []*ticket.Comment `json:"comments"`
-	TotalCount int               `json:"totalCount"`
-}
-
 type CreateKnowledgeInput struct {
 	Category string   `json:"category"`
 	Title    string   `json:"title"`

@@ -18,7 +18,6 @@ export const GET_TICKETS = gql`
         createdAt
         updatedAt
         alertsCount
-        commentsCount
         tags
         tagObjects {
           id
@@ -59,16 +58,6 @@ export const GET_TICKET = gql`
       tagObjects {
         id
         name
-      }
-      comments {
-        id
-        content
-        user {
-          id
-          name
-        }
-        createdAt
-        updatedAt
       }
     }
   }
@@ -231,20 +220,37 @@ export const GET_ACTIVITIES = gql`
   }
 `;
 
-export const GET_TICKET_COMMENTS = gql`
-  query GetTicketComments($ticketId: ID!, $offset: Int, $limit: Int) {
-    ticketComments(ticketId: $ticketId, offset: $offset, limit: $limit) {
-      comments {
-        id
-        content
-        user {
-          id
-          name
-        }
-        createdAt
-        updatedAt
+// chat-session-redesign Phase 6: timeline of SessionMessage rows for a
+// ticket. source / type are optional filters matching the
+// `warren_get_ticket_session_messages` base tool surface.
+export const GET_TICKET_SESSION_MESSAGES = gql`
+  query GetTicketSessionMessages(
+    $ticketId: ID!
+    $source: String
+    $type: String
+    $limit: Int
+    $offset: Int
+  ) {
+    ticketSessionMessages(
+      ticketId: $ticketId
+      source: $source
+      type: $type
+      limit: $limit
+      offset: $offset
+    ) {
+      id
+      sessionID
+      turnID
+      ticketID
+      type
+      content
+      createdAt
+      updatedAt
+      author {
+        userID
+        displayName
+        slackUserID
       }
-      totalCount
     }
   }
 `;
@@ -431,16 +437,6 @@ export const UPDATE_TICKET = gql`
           id
           name
         }
-      }
-      comments {
-        id
-        content
-        user {
-          id
-          name
-        }
-        createdAt
-        updatedAt
       }
     }
   }

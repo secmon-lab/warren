@@ -185,7 +185,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 		userPrompt:       c.userSystemPrompt,
 		lang:             lang.From(ctx),
 		requesterID:      string(types.UserID(user.FromContext(ctx))),
-		threadComments:   chatCtx.ThreadComments,
+		sessionMessages:  chatCtx.SessionMessages,
 		slackHistory:     chatCtx.SlackHistory,
 		knowledgeService: c.knowledgeService,
 	}
@@ -251,7 +251,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 	// Direct response (no tasks)
 	if len(planResult.Tasks) == 0 {
 		if !ticketless {
-			return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+			return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 		}
 		return nil
 	}
@@ -395,7 +395,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 
 	if !ticketless {
 		logger.Debug("aster executeAster: completed, saving history")
-		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+		return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 	}
 	return nil
 }
@@ -503,13 +503,22 @@ func (c *AsterChat) saveLatestHistory(ctx context.Context, planSession gollem.Se
 	}
 }
 
-// saveSessionHistory extracts history from a gollem Session and saves it via the shared SaveHistory function.
-func (c *AsterChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) error {
+// saveSessionHistory extracts history from a gollem Session and saves it.
+//
+// saveSessionHistory writes gollem working memory into the
+// Session-scoped storage slot. When chatCtx.Session is absent (e.g.
+// the resolver failed), working memory is discarded for this turn —
+// there is no longer a ticket-scoped fallback (see
+// chat-session-redesign Phase 7 confinement).
+func (c *AsterChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, chatCtx chatModel.ChatContext, storageSvc *storage.Service) error {
 	newHistory, err := planSession.History()
 	if err != nil {
 		return goerr.Wrap(err, "failed to get history from planning session")
 	}
-	return chat.SaveHistory(ctx, c.repository, c.storageClient, storageSvc, ticketID, newHistory)
+	if chatCtx.Session == nil {
+		return nil
+	}
+	return chat.SaveSessionHistory(ctx, chatCtx.Session.ID, storageSvc, newHistory)
 }
 
 // checkAborted checks if the context has been cancelled (e.g. by the session

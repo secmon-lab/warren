@@ -4,65 +4,85 @@ import (
 	"context"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
+	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 )
 
 // CommentToMessageJob rewrites every existing ticket.Comment as a
 // type=user session.Message attached to the corresponding Slack Session.
+// The legacy Comment row is NOT deleted — cleanup happens in
+// CleanupLegacyJob once application code no longer reads Comments.
 //
-// The original Comment row is NOT deleted by this job — cleanup happens
-// in the CleanupLegacyJob once the application code no longer reads
-// Comments. Idempotence is achieved by stamping each generated Message's
-// Content-derived identifier into the Session tree and checking for it
-// on re-run.
+// Idempotence: each generated Message carries a SessionID derived
+// deterministically from (ticket_id, slack_thread), so re-running the
+// job inside the same (session, content, author, created_at) tuple
+// yields the same logical Message. To keep the job side-effect-free on
+// exact re-runs, the body skips writing a Message when a Message with
+// the same content already exists on the target Session under that
+// author and timestamp.
 type CommentToMessageJob struct {
-	repo     interfaces.Repository
-	resolver SessionResolverClient
+	source     CommentSource
+	resolver   CommentResolverClient
+	writer     MessageWriter
+	readMessages SessionMessageReader
 }
 
-// SessionResolverClient is the minimal surface the job needs from the
-// chat-session-redesign session.Resolver. An interface keeps the job
-// testable with a small fake.
-type SessionResolverClient interface {
-	ResolveSlackSession(ctx context.Context, ticketID *types.TicketID, thread threadRef, userID types.UserID) (*sessModel.Session, bool, error)
+// LegacyCommentStore abstracts the pre-redesign Comment subcollection so
+// migration jobs can operate against either a raw Firestore client
+// (production, see pkg/cli/migrate_chat_session.go) or the memory
+// repository's internal comment map (tests) without pulling Comment CRUD
+// back onto the main Repository interface.
+//
+// Methods on this interface are intentionally the **only** code path
+// that reads or writes `ticket.Comment`. Application code must never
+// hold a LegacyCommentStore; it is scoped to the migration package.
+type LegacyCommentStore interface {
+	ListTicketsWithComments(ctx context.Context) ([]*ticket.Ticket, error)
+	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
+	DeleteTicketComment(ctx context.Context, ticketID types.TicketID, commentID types.CommentID) error
 }
 
-// threadRef is an alias so the interface signature does not reach into
-// pkg/domain/model/slack in an awkward way. The production wrapper
-// converts a slack.Thread into threadRef transparently.
-type threadRef = slackThreadLike
-
-// slackThreadLike is the shape the migration job cares about from a
-// Slack thread reference.
-type slackThreadLike = struct {
-	TeamID    string
-	ChannelID string
-	ThreadID  string
-}
-
-// CommentSource abstracts the Comment read path so the job does not need
-// to know whether it is running against memory or Firestore.
+// CommentSource is the read-only subset of LegacyCommentStore used by
+// comment-to-message. Kept as a distinct interface so cleanup-legacy's
+// additional destructive surface does not leak into the read path.
 type CommentSource interface {
-	ListAllTickets(ctx context.Context) ([]*ticket.Ticket, error)
-	ListTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
+	ListTicketsWithComments(ctx context.Context) ([]*ticket.Ticket, error)
+	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
 }
 
-// MessageWriter abstracts the Message write path; implementations call
-// Repository.PutSessionMessage with a pre-built Message.
+// CommentResolverClient is the minimal surface the job needs from the
+// chat-session-redesign session.Resolver.
+//
+// LookupSlackSession is used in dry-run so the scan does not create
+// brand-new Session documents just to produce a preview count — this
+// keeps `--dry-run` true to its name.
+type CommentResolverClient interface {
+	ResolveSlackSession(ctx context.Context, ticketID *types.TicketID, thread slackModel.Thread, userID types.UserID) (*sessModel.Session, bool, error)
+	LookupSlackSession(ctx context.Context, ticketID *types.TicketID, thread slackModel.Thread) (*sessModel.Session, bool, error)
+}
+
+// MessageWriter abstracts the Message write path.
 type MessageWriter interface {
 	PutSessionMessage(ctx context.Context, msg *sessModel.Message) error
 }
 
-// NewCommentToMessageJob constructs the job. Passing a dedicated
-// CommentSource / MessageWriter rather than the full Repository keeps
-// migration logic unit-testable without the entire interface surface.
-func NewCommentToMessageJob(repo interfaces.Repository, resolver SessionResolverClient, source CommentSource, writer MessageWriter) *CommentToMessageJob {
+// SessionMessageReader lets the job check for existing Messages to
+// enforce idempotence.
+type SessionMessageReader interface {
+	GetSessionMessages(ctx context.Context, sessionID types.SessionID) ([]*sessModel.Message, error)
+}
+
+// NewCommentToMessageJob constructs the job. All dependencies are
+// required at the interface level (callers pass the same Repository
+// value behind each interface in production).
+func NewCommentToMessageJob(source CommentSource, resolver CommentResolverClient, writer MessageWriter, reader SessionMessageReader) *CommentToMessageJob {
 	return &CommentToMessageJob{
-		repo:     repo,
-		resolver: resolver,
+		source:       source,
+		resolver:     resolver,
+		writer:       writer,
+		readMessages: reader,
 	}
 }
 
@@ -72,18 +92,146 @@ func (j *CommentToMessageJob) Description() string {
 	return "Rewrite ticket.Comment rows as session.Message(type=user) attached to the owning Slack Session. Idempotent; original Comment rows are not deleted (see cleanup-legacy)."
 }
 
-// Run scans every Ticket, resolves its Slack Session (or creates one if
-// a legacy Comment predates any Session), and emits one Message per
-// Comment. The job returns a Result summarizing counts; errors on an
-// individual Comment are counted but do not abort the job.
-//
-// This method body is a placeholder: the concrete implementation
-// requires ListAllTickets / ListTicketComments which are not yet present
-// on the Repository interface. Phase 7 full wiring will add those
-// helpers and fill in the body. Keeping the Job skeleton in place lets
-// the CLI registration and the rest of the migration machinery land
-// cleanly now.
+// Run scans every Ticket with Slack comments, resolves its Slack
+// Session, and emits one Message per Comment. Errors on an individual
+// Comment are counted but do not abort the whole job.
 func (j *CommentToMessageJob) Run(ctx context.Context, opts Options) (*Result, error) {
-	return nil, goerr.New("comment-to-message: not yet implemented",
-		goerr.V("note", "Phase 7 full wiring pending; see chat-session-redesign spec"))
+	if j.source == nil || j.resolver == nil || j.writer == nil || j.readMessages == nil {
+		return nil, goerr.New("comment-to-message: dependencies not wired")
+	}
+	tickets, err := j.source.ListTicketsWithComments(ctx)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to list tickets with comments")
+	}
+
+	result := &Result{JobName: j.Name()}
+
+	for _, t := range tickets {
+		if t == nil {
+			continue
+		}
+		comments, err := j.source.GetTicketComments(ctx, t.ID)
+		if err != nil {
+			result.Errors++
+			continue
+		}
+		if len(comments) == 0 {
+			continue
+		}
+		if t.SlackThread == nil {
+			// No Slack thread context; the Session cannot be
+			// resolved deterministically, so these Comments will
+			// have to be migrated manually or dropped by
+			// cleanup-legacy. Count and move on.
+			result.Scanned += len(comments)
+			result.Skipped += len(comments)
+			continue
+		}
+
+		tid := t.ID
+
+		// Dry-run: never create a Session document, only look up the
+		// existing one (if any) to compute a deterministic preview.
+		var sess *sessModel.Session
+		var existing []*sessModel.Message
+		if opts.DryRun {
+			found, ok, err := j.resolver.LookupSlackSession(ctx, &tid, *t.SlackThread)
+			if err != nil {
+				result.Errors += len(comments)
+				continue
+			}
+			if ok {
+				sess = found
+				existing, err = j.readMessages.GetSessionMessages(ctx, sess.ID)
+				if err != nil {
+					result.Errors += len(comments)
+					continue
+				}
+			}
+			// When the Session does not yet exist, every comment is a
+			// fresh write; `existing` stays nil.
+		} else {
+			resolved, _, err := j.resolver.ResolveSlackSession(ctx, &tid, *t.SlackThread, "")
+			if err != nil {
+				result.Errors += len(comments)
+				continue
+			}
+			sess = resolved
+			existing, err = j.readMessages.GetSessionMessages(ctx, sess.ID)
+			if err != nil {
+				result.Errors += len(comments)
+				continue
+			}
+		}
+
+		existingKey := make(map[string]bool, len(existing))
+		for _, m := range existing {
+			if m.Type != sessModel.MessageTypeUser {
+				continue
+			}
+			authorID := ""
+			if m.Author != nil {
+				if m.Author.SlackUserID != nil {
+					authorID = *m.Author.SlackUserID
+				} else {
+					authorID = string(m.Author.UserID)
+				}
+			}
+			existingKey[commentKey(authorID, m.Content, m.CreatedAt.Format("2006-01-02T15:04:05Z"))] = true
+		}
+
+		for _, c := range comments {
+			result.Scanned++
+			authorID := ""
+			if c.User != nil {
+				authorID = c.User.ID
+			}
+			key := commentKey(authorID, c.Comment, c.CreatedAt.Format("2006-01-02T15:04:05Z"))
+			if existingKey[key] {
+				result.Skipped++
+				continue
+			}
+			if opts.DryRun {
+				result.Migrated++
+				continue
+			}
+
+			tidCopy := t.ID
+			msg := &sessModel.Message{
+				ID:        types.NewMessageID(),
+				SessionID: sess.ID,
+				TicketID:  &tidCopy,
+				Type:      sessModel.MessageTypeUser,
+				Content:   c.Comment,
+				CreatedAt: c.CreatedAt,
+				UpdatedAt: c.CreatedAt,
+			}
+			if c.User != nil {
+				slackID := c.User.ID
+				display := c.User.Name
+				if display == "" {
+					display = c.User.ID
+				}
+				msg.Author = &sessModel.Author{
+					UserID:      types.UserID(c.User.ID),
+					DisplayName: display,
+					SlackUserID: &slackID,
+				}
+			}
+			if err := j.writer.PutSessionMessage(ctx, msg); err != nil {
+				result.Errors++
+				continue
+			}
+			result.Migrated++
+		}
+	}
+	return result, nil
+}
+
+// commentKey produces a stable identifier for a Comment based on the
+// fields that survive the Comment->Message translation. Includes the
+// author's Slack user ID so same-second same-content posts from
+// different users are preserved as distinct rows.
+func commentKey(authorID, content, createdAt string) string {
+	return createdAt + "|" + authorID + "|" + content
 }

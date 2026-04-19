@@ -25,6 +25,9 @@ type PolicyClient interface {
 type StorageClient interface {
 	PutObject(ctx context.Context, object string) io.WriteCloser
 	GetObject(ctx context.Context, object string) (io.ReadCloser, error)
+	// DeleteObject removes the object. Missing objects are not treated
+	// as errors so callers can use it for idempotent cleanup.
+	DeleteObject(ctx context.Context, object string) error
 	Close(ctx context.Context)
 }
 

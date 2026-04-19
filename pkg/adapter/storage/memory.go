@@ -43,6 +43,13 @@ func (m *MemoryClient) GetObject(ctx context.Context, object string) (io.ReadClo
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
+func (m *MemoryClient) DeleteObject(_ context.Context, object string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.objects, object)
+	return nil
+}
+
 func (m *MemoryClient) Close(ctx context.Context) {
 	// Nothing to do for development purposes
 }

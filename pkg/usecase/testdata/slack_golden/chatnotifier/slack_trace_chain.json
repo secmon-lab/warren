@@ -1,0 +1,71 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "block_id": "trace_context",
+          "elements": [
+            {
+              "text": "analyzing alert fingerprint",
+              "type": "mrkdwn"
+            }
+          ],
+          "type": "context"
+        }
+      ],
+      "channel": "C_TICKET",
+      "thread_ts": "1700000000.000000"
+    }
+  },
+  {
+    "seq": 1,
+    "method": "UpdateMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "block_id": "trace_context",
+          "elements": [
+            {
+              "text": "analyzing alert fingerprint\nanalyzing alert fingerprint",
+              "type": "mrkdwn"
+            }
+          ],
+          "type": "context"
+        }
+      ],
+      "channel": "C_TICKET",
+      "timestamp": "1700000000.000001"
+    }
+  },
+  {
+    "seq": 2,
+    "method": "UpdateMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "block_id": "trace_context",
+          "elements": [
+            {
+              "text": "analyzing alert fingerprint\nanalyzing alert fingerprint\nchecking VirusTotal",
+              "type": "mrkdwn"
+            }
+          ],
+          "type": "context"
+        }
+      ],
+      "channel": "C_TICKET",
+      "timestamp": "1700000000.000001"
+    }
+  },
+  {
+    "seq": 3,
+    "method": "PostMessageContext",
+    "args": {
+      "channel": "C_TICKET",
+      "text": "final summary: alert is a true positive",
+      "thread_ts": "1700000000.000000"
+    }
+  }
+]

@@ -8,7 +8,6 @@ import (
 	"io"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
@@ -17,12 +16,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
-	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
-	storage_svc "github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/secmon-lab/warren/pkg/utils/authctx"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -150,46 +146,23 @@ func TestHandlePrompt(t *testing.T) {
 	gt.NoError(t, mockRepo.BatchPutAlerts(ctx, alerts))
 
 	ticketID := types.NewTicketID()
-	err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID, AlertIDs: []types.AlertID{alerts[0].ID, alerts[1].ID}}, "Analyze the security alerts and provide a summary")
+	err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID, AlertIDs: []types.AlertID{alerts[0].ID, alerts[1].ID}}, "Analyze the security alerts and provide a summary", nil)
 	gt.NoError(t, err)
 
-	latestHistory, err := mockRepo.GetLatestHistory(ctx, ticketID)
-	gt.NoError(t, err)
-	// History may not be saved due to plan mode session limitations
-	if latestHistory == nil {
-		// Skip history verification for plan mode
-		return
-	}
-
-	storageSvc := storage_svc.New(mockStorage)
-	history, err := storageSvc.GetHistory(ctx, ticketID, latestHistory.ID)
-	if err != nil {
-		// History might not be saved in storage during testing
-		t.Logf("History not found in storage: %v", err)
-		return
-	}
-	// Basic history validation - just check it exists and has version
-	gt.V(t, history).NotNil()
-	gt.True(t, history.Version > 0)
-
-	// Skip detailed history verification as the Strategy pattern may produce different history structure
-	if false {
-		_ = history // Suppress unused variable warning
-		gt.A(t, []int{}).Length(2).At(0, func(t testing.TB, v int) {
-			// Skipped verification
-		})
-	}
-
-	err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "prompt:2")
+	// chat-session-redesign Phase 7 (confinement): legacy ticket-scoped
+	// history records were removed. A second ChatFromCLI call now
+	// produces a second Session so the "history reuse" assertion from
+	// the pre-redesign codebase no longer applies; verify only that
+	// repeat calls succeed and the LLM session count matches the new
+	// Plan & Execute strategy.
+	err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "prompt:2", nil)
 	gt.NoError(t, err)
 
-	latestHistory, err = mockRepo.GetLatestHistory(ctx, ticketID)
-	gt.NoError(t, err)
-	gt.NotNil(t, latestHistory)
-
-	// With Plan & Execute Strategy, session count is different from old Plan mode
-	// The strategy creates sessions for planning, task execution, and reflection
-	gt.Equal(t, newSessionCount, 4)
+	// Two ChatFromCLI invocations with the mock LLM returning an empty
+	// plan take the "direct response" path, producing one LLM session
+	// per invocation (post-confinement: there is no longer a legacy
+	// history reload that spawned extra sessions).
+	gt.Equal(t, newSessionCount, 2)
 }
 
 func TestChatAgentAuthorization(t *testing.T) {
@@ -259,7 +232,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		gt.NoError(t, err)
 	})
 
@@ -287,7 +260,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -315,7 +288,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -374,7 +347,7 @@ func TestChatAgentAuthorization(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err := uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		// Should succeed without calling policy
 		gt.NoError(t, err)
 	})
@@ -391,6 +364,13 @@ func (m *mockTestWriter) Close() error {
 	return nil
 }
 
+// failingWriteCloser writes normally but fails on Close so storage
+// services (which buffer-then-flush) surface the failure on completion.
+type failingWriteCloser struct{}
+
+func (f *failingWriteCloser) Write(p []byte) (int, error) { return len(p), nil }
+func (f *failingWriteCloser) Close() error                 { return goerr.New("storage write failure") }
+
 // TestChatErrorNotifications validates that error notifications are properly sent
 // This test focuses on verifying the notification mechanism is called correctly
 func TestChatErrorNotifications(t *testing.T) {
@@ -406,22 +386,13 @@ func TestChatErrorNotifications(t *testing.T) {
 	t.Run("History load failure triggers notification", func(t *testing.T) {
 		notifiedMessages = []string{} // Reset messages
 
-		// Create a history record to trigger storage lookup
-		historyRecord := &ticket.History{
-			ID:       types.NewHistoryID(),
-			TicketID: types.NewTicketID(),
-		}
-
-		// Setup mock repository that returns history record but storage fails
+		// chat-session-redesign Phase 7 (confinement): the legacy
+		// Repository history record + ticket-scoped storage lookup
+		// path has been removed. Simulate a Session-scoped history
+		// read failure via the storage mock below.
 		mockRepo := &mock.RepositoryMock{
-			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
-				return historyRecord, nil
-			},
 			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 				return alert.Alerts{}, nil
-			},
-			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
-				return nil
 			},
 		}
 
@@ -506,7 +477,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		// This should not return an error, but should send notification about history loading failure
-		err := uc.ChatFromCLI(ctx, targetTicket, "test query")
+		err := uc.ChatFromCLI(ctx, targetTicket, "test query", nil)
 		gt.NoError(t, err)
 
 		// Assert notification was sent about history loading failure
@@ -519,9 +490,6 @@ func TestChatErrorNotifications(t *testing.T) {
 		notifiedMessages = []string{} // Reset messages
 
 		mockRepo := &mock.RepositoryMock{
-			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
-				return nil, nil // No history
-			},
 			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 				return alert.Alerts{}, nil
 			},
@@ -570,7 +538,7 @@ func TestChatErrorNotifications(t *testing.T) {
 		}
 
 		// This should return an error due to plan creation failure
-		err := uc.ChatFromCLI(ctx, targetTicket, "test query")
+		err := uc.ChatFromCLI(ctx, targetTicket, "test query", nil)
 		gt.Error(t, err)
 		gt.S(t, err.Error()).Contains("failed to generate plan")
 
@@ -583,21 +551,18 @@ func TestChatErrorNotifications(t *testing.T) {
 		notifiedMessages = []string{} // Reset messages
 
 		mockRepo := &mock.RepositoryMock{
-			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
-				return nil, nil // No history
-			},
 			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 				return alert.Alerts{}, nil
 			},
-			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
-				return goerr.New("database write failure")
-			},
 		}
 
-		// Mock storage that fails to save history
+		// Phase 4/5 confinement: ChatFromCLI routes into Session-scoped
+		// storage. Make the writer fail on Close so
+		// storageSvc.PutSessionHistory returns an error and ChatFromCLI
+		// surfaces it.
 		mockStorage := &mock.StorageClientMock{
 			PutObjectFunc: func(ctx context.Context, object string) io.WriteCloser {
-				return &mockTestWriter{}
+				return &failingWriteCloser{}
 			},
 		}
 
@@ -670,8 +635,14 @@ func TestChatErrorNotifications(t *testing.T) {
 			AlertIDs: []types.AlertID{},
 		}
 
+		// Create a fresh CLI Session so executeChatTurn takes the
+		// Session-scoped history save path where the failingWriteCloser
+		// actually surfaces the write failure.
+		sess, sessErr := uc.EnsureCLISession(ctx, targetTicket.ID, "u-test")
+		gt.NoError(t, sessErr).Required()
+
 		// This should return an error due to history save failure
-		err := uc.ChatFromCLI(ctx, targetTicket, "test query")
+		err := uc.ChatFromCLI(ctx, targetTicket, "test query", sess)
 		gt.Error(t, err)
 
 		// Check if there are any error notifications about saving
@@ -737,7 +708,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		gt.NoError(t, err)
 	})
 
@@ -758,7 +729,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -815,7 +786,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.ChatFromCLI(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.ChatFromCLI(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		gt.NoError(t, err)
 	})
 
@@ -842,7 +813,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.ChatFromCLI(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.ChatFromCLI(ctxWithUser, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -862,7 +833,7 @@ func TestChatAgentAuthorizationWithPolicyFiles(t *testing.T) {
 		)
 
 		ticketID := types.NewTicketID()
-		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message")
+		err = uc.ChatFromCLI(ctx, &ticket.Ticket{ID: ticketID}, "test message", nil)
 		// Authorization failure sends notification but returns nil
 		gt.NoError(t, err)
 	})
@@ -975,205 +946,3 @@ func TestAuthorizeAgentRequest(t *testing.T) {
 	})
 }
 
-func TestCollectThreadComments(t *testing.T) {
-	ctx := t.Context()
-
-	t.Run("collects comments between previous and current session", func(t *testing.T) {
-		mockRepo := repository.NewMemory()
-		uc := usecase.New(usecase.WithRepository(mockRepo))
-
-		ticketID := types.NewTicketID()
-
-		// Create a previous completed session
-		prevSession := &session.Session{
-			ID:        types.NewSessionID(),
-			TicketID:  ticketID,
-			Status:    types.SessionStatusCompleted,
-			CreatedAt: time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutSession(ctx, prevSession))
-
-		// Create the current session
-		currentSession := &session.Session{
-			ID:        types.NewSessionID(),
-			TicketID:  ticketID,
-			Status:    types.SessionStatusRunning,
-			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutSession(ctx, currentSession))
-
-		// Comment before previous session (should be excluded)
-		oldComment := ticket.Comment{
-			ID:        types.NewCommentID(),
-			TicketID:  ticketID,
-			Comment:   "old comment",
-			User:      &slack.User{ID: "U001", Name: "Alice"},
-			CreatedAt: time.Date(2025, 1, 15, 9, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutTicketComment(ctx, oldComment))
-
-		// Comment between sessions (should be included)
-		midComment := ticket.Comment{
-			ID:        types.NewCommentID(),
-			TicketID:  ticketID,
-			Comment:   "mid comment",
-			User:      &slack.User{ID: "U002", Name: "Bob"},
-			CreatedAt: time.Date(2025, 1, 15, 10, 30, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutTicketComment(ctx, midComment))
-
-		// Comment after current session (should be excluded)
-		futureComment := ticket.Comment{
-			ID:        types.NewCommentID(),
-			TicketID:  ticketID,
-			Comment:   "future comment",
-			User:      &slack.User{ID: "U003", Name: "Charlie"},
-			CreatedAt: time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutTicketComment(ctx, futureComment))
-
-		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
-		gt.A(t, result).Length(1)
-		gt.V(t, result[0].Comment).Equal("mid comment")
-		gt.V(t, result[0].User.Name).Equal("Bob")
-	})
-
-	t.Run("first session includes all comments before current session", func(t *testing.T) {
-		mockRepo := repository.NewMemory()
-		uc := usecase.New(usecase.WithRepository(mockRepo))
-
-		ticketID := types.NewTicketID()
-
-		// Create only the current session (no previous session)
-		currentSession := &session.Session{
-			ID:        types.NewSessionID(),
-			TicketID:  ticketID,
-			Status:    types.SessionStatusRunning,
-			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutSession(ctx, currentSession))
-
-		// Comments before current session (all should be included)
-		comment1 := ticket.Comment{
-			ID:        types.NewCommentID(),
-			TicketID:  ticketID,
-			Comment:   "first comment",
-			User:      &slack.User{ID: "U001", Name: "Alice"},
-			CreatedAt: time.Date(2025, 1, 15, 9, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutTicketComment(ctx, comment1))
-
-		comment2 := ticket.Comment{
-			ID:        types.NewCommentID(),
-			TicketID:  ticketID,
-			Comment:   "second comment",
-			User:      &slack.User{ID: "U002", Name: "Bob"},
-			CreatedAt: time.Date(2025, 1, 15, 10, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutTicketComment(ctx, comment2))
-
-		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
-		gt.A(t, result).Length(2)
-		// Should be in chronological order (ASC)
-		gt.V(t, result[0].Comment).Equal("first comment")
-		gt.V(t, result[1].Comment).Equal("second comment")
-	})
-
-	t.Run("returns empty when no comments exist", func(t *testing.T) {
-		mockRepo := repository.NewMemory()
-		uc := usecase.New(usecase.WithRepository(mockRepo))
-
-		ticketID := types.NewTicketID()
-		currentSession := &session.Session{
-			ID:        types.NewSessionID(),
-			TicketID:  ticketID,
-			Status:    types.SessionStatusRunning,
-			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutSession(ctx, currentSession))
-
-		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
-		gt.A(t, result).Length(0)
-	})
-
-	t.Run("graceful degradation on session fetch failure", func(t *testing.T) {
-		mockRepo := &mock.RepositoryMock{
-			GetSessionsByTicketFunc: func(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
-				return nil, goerr.New("database error")
-			},
-		}
-		uc := usecase.New(usecase.WithRepository(mockRepo))
-
-		ticketID := types.NewTicketID()
-		currentSession := &session.Session{
-			ID:        types.NewSessionID(),
-			TicketID:  ticketID,
-			Status:    types.SessionStatusRunning,
-			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
-		}
-
-		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
-		gt.V(t, result).Nil()
-	})
-
-	t.Run("graceful degradation on comment fetch failure", func(t *testing.T) {
-		mockRepo := &mock.RepositoryMock{
-			GetSessionsByTicketFunc: func(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error) {
-				return []*session.Session{}, nil
-			},
-			GetTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
-				return nil, goerr.New("database error")
-			},
-		}
-		uc := usecase.New(usecase.WithRepository(mockRepo))
-
-		ticketID := types.NewTicketID()
-		currentSession := &session.Session{
-			ID:        types.NewSessionID(),
-			TicketID:  ticketID,
-			Status:    types.SessionStatusRunning,
-			CreatedAt: time.Date(2025, 1, 15, 11, 0, 0, 0, time.UTC),
-		}
-
-		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
-		gt.V(t, result).Nil()
-	})
-
-	t.Run("limits to 50 comments", func(t *testing.T) {
-		mockRepo := repository.NewMemory()
-		uc := usecase.New(usecase.WithRepository(mockRepo))
-
-		ticketID := types.NewTicketID()
-
-		currentSession := &session.Session{
-			ID:        types.NewSessionID(),
-			TicketID:  ticketID,
-			Status:    types.SessionStatusRunning,
-			CreatedAt: time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC),
-			UpdatedAt: time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC),
-		}
-		gt.NoError(t, mockRepo.PutSession(ctx, currentSession))
-
-		// Create 60 comments
-		for i := range 60 {
-			comment := ticket.Comment{
-				ID:        types.NewCommentID(),
-				TicketID:  ticketID,
-				Comment:   fmt.Sprintf("comment %d", i),
-				User:      &slack.User{ID: "U001", Name: "Alice"},
-				CreatedAt: time.Date(2025, 1, 15, 10, i, 0, 0, time.UTC),
-			}
-			gt.NoError(t, mockRepo.PutTicketComment(ctx, comment))
-		}
-
-		result := uc.CollectThreadComments(ctx, ticketID, currentSession)
-		gt.A(t, result).Length(50)
-		// Should keep the most recent 50 (comments 10-59)
-		gt.V(t, result[0].Comment).Equal("comment 10")
-		gt.V(t, result[49].Comment).Equal("comment 59")
-	})
-}
