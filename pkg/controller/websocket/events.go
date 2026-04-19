@@ -22,25 +22,47 @@ import (
 type EventKind string
 
 const (
-	EventKindSessionMessageAdded EventKind = "session_message_added"
-	EventKindSessionCreated      EventKind = "session_created"
-	EventKindTurnStarted         EventKind = "turn_started"
-	EventKindTurnEnded           EventKind = "turn_ended"
+	EventKindSessionMessageAdded   EventKind = "session_message_added"
+	EventKindSessionMessageUpdated EventKind = "session_message_updated"
+	EventKindSessionCreated        EventKind = "session_created"
+	EventKindTurnStarted           EventKind = "turn_started"
+	EventKindTurnEnded             EventKind = "turn_ended"
+	EventKindHITLRequestPending    EventKind = "hitl_request_pending"
+	EventKindHITLRequestResolved   EventKind = "hitl_request_resolved"
 )
 
 // Envelope is the common wire shape for redesign events. Only the
 // fields relevant to the event kind are populated; all others are
 // omitted to keep payloads compact.
 type Envelope struct {
-	Event     EventKind            `json:"event"`
-	Timestamp time.Time            `json:"timestamp"`
-	SessionID types.SessionID      `json:"session_id,omitempty"`
-	TurnID    *types.TurnID        `json:"turn_id,omitempty"`
-	Message   *MessageView         `json:"message,omitempty"`
-	Session   *SessionView         `json:"session,omitempty"`
-	Turn      *TurnView            `json:"turn,omitempty"`
-	Status    session.TurnStatus   `json:"status,omitempty"`
-	Intent    string               `json:"intent,omitempty"`
+	Event     EventKind          `json:"event"`
+	Timestamp time.Time          `json:"timestamp"`
+	SessionID types.SessionID    `json:"session_id,omitempty"`
+	TurnID    *types.TurnID      `json:"turn_id,omitempty"`
+	Message   *MessageView       `json:"message,omitempty"`
+	Session   *SessionView       `json:"session,omitempty"`
+	Turn      *TurnView          `json:"turn,omitempty"`
+	Status    session.TurnStatus `json:"status,omitempty"`
+	Intent    string             `json:"intent,omitempty"`
+	HITL      *HITLView          `json:"hitl,omitempty"`
+}
+
+// HITLView is the wire shape for an in-flight HITL request emitted by
+// hitl_request_pending / hitl_request_resolved events. The Web UI uses
+// this to render approval/question UI and to clear it once the request
+// resolves.
+type HITLView struct {
+	ID        string         `json:"id"`
+	SessionID string         `json:"session_id"`
+	Type      string         `json:"type"`
+	Status    string         `json:"status"`
+	UserID    string         `json:"user_id,omitempty"`
+	Payload   map[string]any `json:"payload,omitempty"`
+	Response  map[string]any `json:"response,omitempty"`
+	// MessageID optionally binds the HITL prompt to an existing Web
+	// progress message so the UI can render approval UI in-place
+	// instead of floating it above the timeline.
+	MessageID string `json:"message_id,omitempty"`
 }
 
 // MessageView is the wire shape for SessionMessage. Uses strings for
@@ -104,6 +126,46 @@ func NewSessionMessageAddedEvent(m *session.Message) Envelope {
 		env.Message.TurnID = &tid
 	}
 	return env
+}
+
+// NewSessionMessageUpdatedEvent builds the envelope for a Message whose
+// content was replaced in-place (updatable trace / HITL target). The
+// MessageView carries the *current* content; prior revisions live on
+// the persisted Message and are not shipped over the wire to keep
+// events small.
+func NewSessionMessageUpdatedEvent(m *session.Message) Envelope {
+	env := NewSessionMessageAddedEvent(m)
+	env.Event = EventKindSessionMessageUpdated
+	// Use UpdatedAt so ordering against later additions stays correct.
+	if !m.UpdatedAt.IsZero() {
+		env.Timestamp = m.UpdatedAt
+	}
+	return env
+}
+
+// NewHITLRequestPendingEvent builds the envelope emitted when a
+// Web-facing HITL request enters pending state. messageID optionally
+// binds the prompt to an existing progress message so the UI can
+// render approval UI in-place.
+func NewHITLRequestPendingEvent(sessionID types.SessionID, view *HITLView) Envelope {
+	return Envelope{
+		Event:     EventKindHITLRequestPending,
+		Timestamp: time.Now(),
+		SessionID: sessionID,
+		HITL:      view,
+	}
+}
+
+// NewHITLRequestResolvedEvent builds the envelope emitted when a HITL
+// request transitions out of pending state. The Web UI uses this to
+// clear the approval/question prompt.
+func NewHITLRequestResolvedEvent(sessionID types.SessionID, view *HITLView) Envelope {
+	return Envelope{
+		Event:     EventKindHITLRequestResolved,
+		Timestamp: time.Now(),
+		SessionID: sessionID,
+		HITL:      view,
+	}
 }
 
 // NewSessionCreatedEvent builds the envelope for a newly created Session.

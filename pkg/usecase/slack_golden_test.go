@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
+	hitlModel "github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -491,4 +492,105 @@ func TestSlackGolden_HandleSlackMessage_NoTicketForThread(t *testing.T) {
 	gt.NoError(t, uc.HandleSlackMessage(ctx, msg))
 
 	assertRecordedCallsMatchSnapshot(t, slackSnapshotPath("handle_slack_message/no_ticket_for_thread.json"), rec.CallsJSON())
+}
+
+// ---------------------------------------------------------------------------
+// HITL presenter golden fixtures.
+//
+// The chat-session-redesign work refactors HITL rendering so that Web/CLI
+// sessions never touch Slack. Slack's presenter path must stay byte-identical
+// to the pre-refactor behavior — Slack is the only HITL-capable transport
+// today, and any drift in block structure breaks live interactive approvals.
+//
+// These fixtures capture the exact Slack API calls produced by:
+//
+//   - UpdatableBlockMessage construction (initial PostMessageContext)
+//   - HITLPresenter.Present for a tool_approval request (UpdateMessageContext
+//     carrying the approval blocks built by BuildToolApprovalBlocks)
+//   - QuestionPresenter.Present for a question request (UpdateMessageContext
+//     carrying the question blocks built by BuildQuestionBlocks)
+//
+// If the refactor changes any of these bytes the tests fail and
+// -update-slack-golden must be used consciously to accept the change.
+// ---------------------------------------------------------------------------
+
+// TestSlackGolden_HITL_ToolApprovalPresenter freezes the Slack wire format
+// for a tool approval HITL request: the initial UpdatableBlockMessage post
+// plus the Present() update with approval buttons.
+func TestSlackGolden_HITL_ToolApprovalPresenter(t *testing.T) {
+	rec := testutil.NewRecorder()
+	client := testutil.NewSlackClientMock(rec)
+
+	svc, err := slackSvc.New(client, "C_DEFAULT")
+	gt.NoError(t, err).Required()
+	rec.Reset()
+
+	thread := svc.NewThread(slackModel.Thread{
+		ChannelID: "C_TICKET",
+		ThreadID:  "1700000000.000000",
+	}).(*slackSvc.ThreadService)
+
+	ctx := context.Background()
+	ubm := thread.NewUpdatableBlockMessage(ctx, "⏳ *[Fetch evidence]*\n\nWaiting...")
+
+	presenter := slackSvc.NewHITLPresenter(ubm, "Fetch evidence", "U12345")
+
+	req := &hitlModel.Request{
+		ID:        types.HITLRequestID("HITL_FIXED_0001"),
+		SessionID: types.SessionID("SSN_FIXED_0001"),
+		Type:      hitlModel.RequestTypeToolApproval,
+		Payload: hitlModel.NewToolApprovalPayload("web_fetch", map[string]any{
+			"url": "https://example.com/evidence",
+		}),
+		Status: hitlModel.StatusPending,
+		UserID: "U12345",
+	}
+
+	gt.NoError(t, presenter.Present(ctx, req)).Required()
+
+	assertRecordedCallsMatchSnapshot(t,
+		slackSnapshotPath("hitl/tool_approval_presenter.json"),
+		rec.CallsJSON(),
+	)
+}
+
+// TestSlackGolden_HITL_QuestionPresenter freezes the Slack wire format for a
+// question HITL request: the initial UpdatableBlockMessage post plus the
+// Present() update with radio-button options and submit button.
+func TestSlackGolden_HITL_QuestionPresenter(t *testing.T) {
+	rec := testutil.NewRecorder()
+	client := testutil.NewSlackClientMock(rec)
+
+	svc, err := slackSvc.New(client, "C_DEFAULT")
+	gt.NoError(t, err).Required()
+	rec.Reset()
+
+	thread := svc.NewThread(slackModel.Thread{
+		ChannelID: "C_TICKET",
+		ThreadID:  "1700000000.000000",
+	}).(*slackSvc.ThreadService)
+
+	ctx := context.Background()
+	ubm := thread.NewUpdatableBlockMessage(ctx, "❓ *Question*\n\nIs 10.0.0.5 an internal IP?")
+
+	presenter := slackSvc.NewQuestionPresenter(ubm, "Correlating ...", "U12345")
+
+	req := &hitlModel.Request{
+		ID:        types.HITLRequestID("HITL_FIXED_0002"),
+		SessionID: types.SessionID("SSN_FIXED_0002"),
+		Type:      hitlModel.RequestTypeQuestion,
+		Payload: hitlModel.NewQuestionPayload(
+			"Is 10.0.0.5 an internal IP?",
+			[]string{"Yes, VPN GW", "No", "None of the above"},
+		),
+		Status: hitlModel.StatusPending,
+		UserID: "U12345",
+	}
+
+	gt.NoError(t, presenter.Present(ctx, req)).Required()
+
+	assertRecordedCallsMatchSnapshot(t,
+		slackSnapshotPath("hitl/question_presenter.json"),
+		rec.CallsJSON(),
+	)
 }

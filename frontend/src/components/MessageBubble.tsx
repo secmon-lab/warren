@@ -24,7 +24,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <span className="font-medium">
             {message.author?.displayName || label}
           </span>
-          {formatRelativeTime(message.createdAt) && (
+          {/* Timestamp on user messages only: AI-produced bubbles
+              inherit the exchange's timestamp from the preceding
+              user message (and the Progress panel), so repeating
+              per-message times was just noise. */}
+          {isUser && formatRelativeTime(message.createdAt) && (
             <>
               <span className="mx-1">·</span>
               <span>{formatRelativeTime(message.createdAt)}</span>

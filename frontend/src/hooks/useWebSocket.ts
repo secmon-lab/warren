@@ -482,6 +482,13 @@ function translateEventToChatResponse(env: EventEnvelope): ChatResponse | null {
     case 'session_message_added': {
       const m = env.message;
       if (!m) return null;
+      // user-typed Session Messages are already echoed locally by
+      // the sender's WebChatPane immediately on send. Emitting the
+      // envelope back as a 'message' would double-render the same
+      // text on the sender's screen. Suppress it here; other
+      // surfaces (e.g. persisted refetch) will still pick it up
+      // via the ticketSessionMessages query.
+      if (m.type === 'user') return null;
       const isTrace = m.type === 'trace';
       return {
         type: isTrace ? 'trace' : 'message',

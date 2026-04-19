@@ -53,6 +53,45 @@ type Message struct {
 
 	// Author is required for Type=user and nil otherwise.
 	Author *Author `firestore:"author,omitempty" json:"author,omitempty"`
+
+	// Revisions carries the historical content of an updatable Message.
+	// The current Content field is always the latest revision; Revisions
+	// is the chronologically-ordered list of prior values (oldest first).
+	// Empty for messages that have never been updated in-place.
+	//
+	// Updatable messages are used by Web/CLI Sessions so that live task
+	// progress and HITL prompts can replace the current display row
+	// while preserving the full trace for later review. Slack Sessions
+	// keep their own update history in the Slack thread and do not
+	// populate this field.
+	Revisions []MessageRevision `firestore:"revisions,omitempty" json:"revisions,omitempty"`
+}
+
+// MessageRevision records a single historical value of a Message.Content.
+// Revisions are append-only: when Message.Content is replaced, the prior
+// Content+UpdatedAt pair is pushed onto the Revisions slice before the
+// new value is written.
+type MessageRevision struct {
+	Content   string    `firestore:"content" json:"content"`
+	CreatedAt time.Time `firestore:"created_at" json:"created_at"`
+}
+
+// AppendRevision pushes the Message's current Content onto the Revisions
+// slice and replaces Content with newContent. UpdatedAt is bumped to now.
+// This is the single write path used by Web/CLI updatable messages so
+// that the persisted history stays consistent across concurrent updates
+// to the same Message.
+func (m *Message) AppendRevision(ctx context.Context, newContent string) {
+	if m == nil {
+		return
+	}
+	now := clock.Now(ctx)
+	m.Revisions = append(m.Revisions, MessageRevision{
+		Content:   m.Content,
+		CreatedAt: m.UpdatedAt,
+	})
+	m.Content = newContent
+	m.UpdatedAt = now
 }
 
 // NewMessage creates a new session message using the legacy signature.

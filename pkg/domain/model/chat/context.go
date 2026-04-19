@@ -3,6 +3,7 @@ package chat
 import (
 	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
@@ -44,11 +45,21 @@ type ChatContext struct {
 	CurrentTurnID *types.TurnID
 
 	// OnSessionEvent is invoked whenever the chat pipeline persists
-	// an AI-produced session.Message, so the WebSocket handler can
-	// publish the matching Envelope to the bound client. nil for
-	// callers that do not publish events (CLI, Slack) — the
+	// or updates an AI-produced session.Message, so the WebSocket
+	// handler can publish the matching Envelope to the bound client.
+	// kind is one of "session_message_added" / "session_message_updated".
+	// nil for callers that do not publish events (CLI, Slack) — the
 	// persistence itself still happens.
 	OnSessionEvent func(kind string, m *session.Message)
+
+	// OnHITLEvent is invoked when the chat pipeline enters or leaves a
+	// HITL pending state from a transport that renders HITL in the
+	// WebSocket stream (Web UI). kind is "pending" or "resolved".
+	// messageID optionally ties the prompt to an existing progress
+	// Message so the UI can render approval/question UI in-place on
+	// that row. nil for transports that present HITL out-of-band
+	// (Slack uses in-thread blocks; CLI default-denies).
+	OnHITLEvent func(kind string, req *hitl.Request, messageID string)
 }
 
 // IsTicketless returns true if the chat has no associated ticket.

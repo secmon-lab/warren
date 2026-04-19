@@ -1,0 +1,114 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "block_id": "context_messages",
+          "elements": [
+            {
+              "text": "❓ *Question*\n\nIs 10.0.0.5 an internal IP?",
+              "type": "mrkdwn"
+            }
+          ],
+          "type": "context"
+        }
+      ],
+      "channel": "C_TICKET",
+      "thread_ts": "1700000000.000000"
+    }
+  },
+  {
+    "seq": 1,
+    "method": "UpdateMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "text": {
+            "text": "⏳ Question *[Correlating ...]*\n\n\u003e ❓ \u003c@U12345\u003e Is 10.0.0.5 an internal IP?",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        },
+        {
+          "block_id": "hitl_answer_block",
+          "element": {
+            "action_id": "hitl_answer_input",
+            "options": [
+              {
+                "text": {
+                  "emoji": false,
+                  "text": "Yes, VPN GW",
+                  "type": "plain_text"
+                },
+                "value": "Yes, VPN GW"
+              },
+              {
+                "text": {
+                  "emoji": false,
+                  "text": "No",
+                  "type": "plain_text"
+                },
+                "value": "No"
+              },
+              {
+                "text": {
+                  "emoji": false,
+                  "text": "None of the above",
+                  "type": "plain_text"
+                },
+                "value": "None of the above"
+              }
+            ],
+            "type": "radio_buttons"
+          },
+          "label": {
+            "emoji": false,
+            "text": "Select an answer",
+            "type": "plain_text"
+          },
+          "type": "input"
+        },
+        {
+          "block_id": "hitl_comment_block",
+          "element": {
+            "action_id": "hitl_comment_input",
+            "placeholder": {
+              "emoji": false,
+              "text": "Enter comment...",
+              "type": "plain_text"
+            },
+            "type": "plain_text_input"
+          },
+          "label": {
+            "emoji": false,
+            "text": "Additional comment (optional)",
+            "type": "plain_text"
+          },
+          "optional": true,
+          "type": "input"
+        },
+        {
+          "block_id": "hitl_actions",
+          "elements": [
+            {
+              "action_id": "hitl_submit_answer",
+              "style": "primary",
+              "text": {
+                "emoji": false,
+                "text": "Submit 📨",
+                "type": "plain_text"
+              },
+              "type": "button",
+              "value": "HITL_FIXED_0002"
+            }
+          ],
+          "type": "actions"
+        }
+      ],
+      "channel": "C_TICKET",
+      "timestamp": "1700000000.000001"
+    }
+  }
+]

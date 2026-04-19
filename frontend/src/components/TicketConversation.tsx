@@ -97,12 +97,19 @@ export function TicketConversation({ ticketId }: TicketConversationProps) {
     (selected.mode === "new" ||
       (selected.mode === "existing" && selected.source !== "slack"));
 
+  const [wsStatus, setWsStatus] = useState<
+    "connecting" | "connected" | "disconnected" | "error"
+  >("disconnected");
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="h-5 w-5" />
-          Conversation ({allMessages.length})
+        <CardTitle className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MessageSquare className="h-5 w-5" />
+            Conversation ({allMessages.length})
+          </div>
+          {wsEnabled && <ConnectionBadge status={wsStatus} />}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -111,7 +118,7 @@ export function TicketConversation({ ticketId }: TicketConversationProps) {
             Error loading conversation: {messagesError.message}
           </div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 h-[640px]">
+        <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4 h-[960px]">
           <div className="border-r md:pr-4 overflow-y-auto">
             <SessionSidebar
               sessions={sessions}
@@ -131,6 +138,7 @@ export function TicketConversation({ ticketId }: TicketConversationProps) {
                 sessionIdForResume={wsSessionID}
                 persistedMessages={persistedForSelected}
                 messagesLoading={messagesLoading}
+                onStatusChange={setWsStatus}
                 onTurnCompleted={() => {
                   refetchSessions();
                   refetchMessages();
@@ -287,6 +295,7 @@ interface WebChatPaneProps {
   messagesLoading: boolean;
   onTurnCompleted: () => void;
   onSessionCreated: () => void;
+  onStatusChange: (s: "connecting" | "connected" | "disconnected" | "error") => void;
 }
 
 function WebChatPane({
@@ -296,6 +305,7 @@ function WebChatPane({
   messagesLoading,
   onTurnCompleted,
   onSessionCreated,
+  onStatusChange,
 }: WebChatPaneProps) {
   const [message, setMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -310,6 +320,7 @@ function WebChatPane({
   const { status, sendMessage } = useWebSocket(
     ticketId,
     {
+      onStatusChange: onStatusChange,
       onMessage: (m) => {
         // Every message received while a Turn is active becomes a
         // synthetic SessionMessage row so it renders with the same
@@ -384,11 +395,12 @@ function WebChatPane({
     }
   };
 
+  // `status` is referenced here only to gate the send button; the
+  // header-level ConnectionBadge uses the parent-held copy fed via
+  // onStatusChange.
+  void status;
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center justify-end mb-2">
-        <ConnectionBadge status={status} />
-      </div>
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto pr-1 min-h-0">
