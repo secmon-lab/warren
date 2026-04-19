@@ -107,7 +107,14 @@ export function TicketConversation({ ticketId }: TicketConversationProps) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          {/* role=heading so screen readers (and the E2E page-object
+              getByRole('heading', { name: /^Conversation/ })) treat
+              this as a proper section header. CardTitle itself is a
+              plain div in shadcn/ui, so we stamp the role here. */}
+          <div
+            role="heading"
+            aria-level={2}
+            className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
             Conversation ({allMessages.length})
           </div>
