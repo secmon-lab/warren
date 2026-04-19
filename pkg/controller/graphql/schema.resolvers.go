@@ -1158,18 +1158,28 @@ func (r *queryResolver) AvailableTagColorNames(ctx context.Context) ([]string, e
 }
 
 // TicketSessions is the resolver for the ticketSessions field.
+//
+// Sessions without a Source value are unmigrated legacy rows from
+// pre-Phase-2 Warren (the runtime wrote one UUID Session per @warren
+// mention on a thread; the redesign uses a single deterministic
+// Session per thread). The session-source-backfill +
+// session-consolidate migrations bring these rows into the new model,
+// but the Conversation sidebar filters them out regardless of whether
+// the migrations have been run — showing them would surface a dozen
+// near-duplicate entries per thread.
 func (r *queryResolver) TicketSessions(ctx context.Context, ticketID string) ([]*graphql1.Session, error) {
 	sessions, err := r.repo.GetSessionsByTicket(ctx, types.TicketID(ticketID))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get sessions by ticket", goerr.V("ticketID", ticketID))
 	}
 
-	// Convert to GraphQL model
-	result := make([]*graphql1.Session, len(sessions))
-	for i, s := range sessions {
-		result[i] = toGraphQLSession(s)
+	result := make([]*graphql1.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if !s.Source.Valid() {
+			continue
+		}
+		result = append(result, toGraphQLSession(s))
 	}
-
 	return result, nil
 }
 

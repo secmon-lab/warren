@@ -77,6 +77,11 @@ var migrationJobs = []migrationJob{
 		Description: "Remove legacy ticket_comments, old history files, and deprecated Session fields (chat-session-redesign Phase 7). DESTRUCTIVE; --dry-run first. Placeholder.",
 		Run:         runCleanupLegacy,
 	},
+	{
+		Name:        "session-consolidate",
+		Description: "Delete legacy UUID Session rows that duplicate the canonical slack_<hash> Session per (Ticket, Thread). Keeps rows that still carry messages so operators can investigate anomalies.",
+		Run:         runSessionConsolidate,
+	},
 }
 
 func findMigrationJob(name string) (*migrationJob, bool) {

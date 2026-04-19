@@ -212,6 +212,30 @@ func runSessionSourceBackfill(ctx context.Context, rt *migrateRuntime) error {
 	return nil
 }
 
+func runSessionConsolidate(ctx context.Context, rt *migrateRuntime) error {
+	logger := logging.From(ctx)
+	repo, cleanup, err := openFirestoreRepository(ctx, rt.projectID, rt.databaseID)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+
+	resolver := session.NewResolver(repo)
+	job := migration.NewSessionConsolidateJob(repo, resolver)
+	result, err := job.Run(ctx, migration.Options{DryRun: rt.dryRun})
+	if err != nil {
+		return err
+	}
+	logger.Info("session-consolidate complete",
+		"scanned", result.Scanned,
+		"migrated", result.Migrated,
+		"skipped", result.Skipped,
+		"errors", result.Errors,
+		"details", result.Details,
+	)
+	return nil
+}
+
 func runCommentToMessage(ctx context.Context, rt *migrateRuntime) error {
 	logger := logging.From(ctx)
 	repo, cleanup, err := openFirestoreRepository(ctx, rt.projectID, rt.databaseID)
