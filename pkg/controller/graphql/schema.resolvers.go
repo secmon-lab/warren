@@ -1756,4 +1756,3 @@ type reprocessBatchJobResolver struct{ *Resolver }
 type reprocessJobResolver struct{ *Resolver }
 type sessionResolver struct{ *Resolver }
 type ticketResolver struct{ *Resolver }
-

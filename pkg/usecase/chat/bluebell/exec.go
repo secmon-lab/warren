@@ -374,7 +374,7 @@ func (c *BluebellChat) setupTaskMessageRouting(ctx context.Context, ssn *session
 			emoji = "✅"
 		}
 		prefixed := fmt.Sprintf("%s *[%s]*\n\n> %s", emoji, escaped, escapeSlackMrkdwn(message))
-		m := session.NewMessage(ctx, ssn.ID, session.MessageTypeTrace, prefixed)
+		m := session.NewMessageV2(ctx, ssn.ID, nil, nil, session.MessageTypeTrace, prefixed, nil)
 		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
 			errutil.Handle(ctx, err)
 		}

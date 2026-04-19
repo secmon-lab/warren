@@ -6,9 +6,6 @@ const (
 	// Constants for similar tickets pagination
 	defaultSimilarTicketsLimit  = 5
 	maxSimilarTicketsCandidates = 1000 // Fixed large number of candidates to fetch
-
-	// Constants for comments pagination
-	defaultCommentsLimit = 20
 )
 
 func cosineSimilarity(a, b []float32) float32 {

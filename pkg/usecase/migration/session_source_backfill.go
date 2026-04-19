@@ -57,9 +57,10 @@ func (j *SessionSourceBackfillJob) Run(ctx context.Context, opts Options) (*Resu
 
 		if opts.DryRun {
 			result.Migrated++
-			if inferred == sessModel.SessionSourceSlack {
+			switch inferred {
+			case sessModel.SessionSourceSlack:
 				slackCount++
-			} else if inferred == sessModel.SessionSourceWeb {
+			case sessModel.SessionSourceWeb:
 				webCount++
 			}
 			continue
@@ -78,9 +79,10 @@ func (j *SessionSourceBackfillJob) Run(ctx context.Context, opts Options) (*Resu
 			continue
 		}
 		result.Migrated++
-		if inferred == sessModel.SessionSourceSlack {
+		switch inferred {
+		case sessModel.SessionSourceSlack:
 			slackCount++
-		} else if inferred == sessModel.SessionSourceWeb {
+		case sessModel.SessionSourceWeb:
 			webCount++
 		}
 	}

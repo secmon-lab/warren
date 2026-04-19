@@ -100,8 +100,24 @@ func (u *UseCase) Execute(ctx context.Context, message string, chatCtx chatModel
 		"request_id", request_id.FromContext(ctx),
 	)
 
-	// Phase 1: Warren session setup
-	ssn, ctx := u.createSession(ctx, target, message)
+	// Phase 1: Warren session setup.
+	//
+	// chat-session-redesign: when the caller has already resolved a
+	// Session (ChatFromSlack / ChatFromWebSocket / ChatFromCLI always
+	// do after Phase 3+), reuse it instead of creating a second
+	// Session. This keeps the conversation against a single Session
+	// ID and avoids duplicate rows in the `sessions` collection.
+	var ssn *session.Session
+	if chatCtx.Session != nil {
+		ssn = chatCtx.Session
+		logger := logging.From(ctx).With("session_id", ssn.ID, "request_id", request_id.FromContext(ctx))
+		ctx = logging.With(ctx, logger)
+		if target.SlackThread != nil {
+			ctx = slackctx.WithThread(ctx, *target.SlackThread)
+		}
+	} else {
+		ssn, ctx = u.createSession(ctx, target, message)
+	}
 	logger = logging.From(ctx)
 	logger.Debug("chat usecase execute: session created", "session_id", ssn.ID)
 
@@ -151,7 +167,11 @@ func (u *UseCase) createSession(ctx context.Context, target *ticket.Ticket, mess
 	userID := types.UserID(user.FromContext(ctx))
 	slackURL := slackctx.SlackURL(ctx)
 
-	ssn := session.NewSession(ctx, target.ID, userID, message, slackURL)
+	// Legacy fallback constructor — only reached when callers have
+	// not been migrated to resolve a Session before calling Execute.
+	// New code paths always set chatCtx.Session and skip createSession
+	// entirely.
+	ssn := session.NewSession(ctx, target.ID, userID, message, slackURL) //nolint:staticcheck // legacy fallback
 	if err := u.repository.PutSession(ctx, ssn); err != nil {
 		logging.From(ctx).Error("failed to save session", "error", err)
 	}
@@ -223,7 +243,7 @@ func (u *UseCase) setupMessageRouting(ctx context.Context, ssn *session.Session,
 		}
 		// Legacy fallback: persist against the ssn created by
 		// createSession (Slack-only path before redesign wrapping).
-		m := session.NewMessage(ctx, ssn.ID, mtype, content)
+		m := session.NewMessage(ctx, ssn.ID, mtype, content) //nolint:staticcheck // legacy fallback
 		if err := u.repository.PutSessionMessage(ctx, m); err != nil {
 			errutil.Handle(ctx, err)
 			return nil
