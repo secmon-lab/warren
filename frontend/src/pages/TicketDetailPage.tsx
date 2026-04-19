@@ -86,7 +86,6 @@ import { EditTicketModal } from "@/components/EditTicketModal";
 import { SimilarTickets } from "@/components/SimilarTickets";
 import { TicketConversation } from "@/components/TicketConversation";
 import { SalvageModal } from "@/components/SalvageModal";
-import { SessionsList } from "@/components/SessionsList";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -899,9 +898,6 @@ export default function TicketDetailPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Sessions */}
-          <SessionsList ticketId={ticket.id} />
 
           {/* Similar Tickets */}
           <SimilarTickets ticketId={ticket.id} />
