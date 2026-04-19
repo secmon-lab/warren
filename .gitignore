@@ -45,3 +45,4 @@ frontend/dist/*
 
 # Frontend dependencies
 frontend/node_modules
+.claude/scheduled_tasks.lock
