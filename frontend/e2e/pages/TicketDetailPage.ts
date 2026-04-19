@@ -35,19 +35,7 @@ export class TicketDetailPage extends BasePage {
     return this.page.getByRole("heading", { name: /^Conversation/ });
   }
 
-  get conversationSlackToggle() {
-    return this.page.getByRole("button", { name: "Slack", exact: true });
-  }
-
-  get conversationWebToggle() {
-    return this.page.getByRole("button", { name: "Web", exact: true });
-  }
-
-  get conversationCliToggle() {
-    return this.page.getByRole("button", { name: "CLI", exact: true });
-  }
-
-  get conversationAllSessionsLink() {
-    return this.page.getByRole("button", { name: "All sessions" });
+  get conversationNewChatButton() {
+    return this.page.getByRole("button", { name: "New Chat" });
   }
 }

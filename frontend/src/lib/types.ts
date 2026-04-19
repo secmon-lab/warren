@@ -127,6 +127,9 @@ export interface Session {
   id: string;
   ticketID: string;
   status: SessionStatus;
+  // chat-session-redesign: Source channel the Session originated from.
+  // "" for pre-redesign sessions that have not been backfilled yet.
+  source: "slack" | "web" | "cli" | "";
   userID?: string;
   user?: User;
   query?: string;

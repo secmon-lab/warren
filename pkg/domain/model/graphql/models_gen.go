@@ -164,6 +164,7 @@ type Session struct {
 	Intent    *string `json:"intent,omitempty"`
 	CreatedAt string  `json:"createdAt"`
 	UpdatedAt string  `json:"updatedAt"`
+	Source    string  `json:"source"`
 }
 
 type SessionMessage struct {

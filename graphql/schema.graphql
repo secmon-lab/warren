@@ -189,6 +189,9 @@ type Session {
   intent: String
   createdAt: String!
   updatedAt: String!
+  # chat-session-redesign: source channel (slack/web/cli). Empty when
+  # a pre-redesign Session has not been backfilled yet.
+  source: String!
 }
 
 type SessionMessage {

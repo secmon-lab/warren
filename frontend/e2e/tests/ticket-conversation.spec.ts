@@ -1,23 +1,21 @@
-// chat-session-redesign Phase 6: E2E coverage for the new
-// TicketConversation card on the ticket detail page.
-//
-// Scope: structural — verify the card renders, the Source toggle is
-// present, the "All sessions" entry is active by default, and the
-// empty-state copy shows up when no SessionMessages exist for the
-// freshly-created ticket.
+// chat-session-redesign Phase 6 (revised): Conversation card on the
+// ticket detail page is the unified Slack/Web/CLI surface. Each ticket
+// detail page renders one card with the sessions sidebar + message
+// pane. Tests exercise structural invariants only — actual WebSocket
+// streaming and Turn creation are covered by Go integration tests.
 import { test, expect } from "../fixtures";
 import { TicketDetailPage } from "../pages/TicketDetailPage";
 import { createTicketViaAPI } from "../helpers/api";
 
 test.describe("Ticket Conversation (Phase 6)", () => {
-  test("renders conversation card with source toggle on ticket detail", async ({
+  test("renders unified conversation card with sidebar + New Chat", async ({
     authenticatedPage: page,
   }) => {
     const suffix = Date.now().toString();
     const ticket = await createTicketViaAPI(
       page,
       `ConversationTest-${suffix}`,
-      "Phase 6 conversation card E2E",
+      "Phase 6 unified conversation E2E",
     );
 
     const detail = new TicketDetailPage(page);
@@ -26,44 +24,11 @@ test.describe("Ticket Conversation (Phase 6)", () => {
     await expect(detail.ticketTitle).toBeVisible();
     await expect(detail.conversationHeading).toBeVisible();
 
-    // All three source toggles must be present.
-    await expect(detail.conversationSlackToggle).toBeVisible();
-    await expect(detail.conversationWebToggle).toBeVisible();
-    await expect(detail.conversationCliToggle).toBeVisible();
+    // The "New Chat" sidebar action is always present.
+    await expect(detail.conversationNewChatButton).toBeVisible();
 
-    // The "All sessions" shortcut sits in the side pane even when the
-    // list is empty, so it is a stable structural assertion.
-    await expect(detail.conversationAllSessionsLink).toBeVisible();
-
-    // Fresh ticket has no SessionMessages yet — confirm the
-    // empty-state copy rendered by ConversationMainPane.
-    await expect(page.getByText("No messages yet.")).toBeVisible();
-  });
-
-  test("switches between source toggles without reloading the page", async ({
-    authenticatedPage: page,
-  }) => {
-    const suffix = Date.now().toString();
-    const ticket = await createTicketViaAPI(
-      page,
-      `ConversationToggleTest-${suffix}`,
-      "Phase 6 conversation source toggle E2E",
-    );
-
-    const detail = new TicketDetailPage(page);
-    await detail.goto(ticket.id);
-
-    await expect(detail.conversationSlackToggle).toBeVisible();
-
-    // Toggling Web and CLI should not raise errors or unmount the
-    // conversation card. The heading stays rendered throughout.
-    await detail.conversationWebToggle.click();
-    await expect(detail.conversationHeading).toBeVisible();
-
-    await detail.conversationCliToggle.click();
-    await expect(detail.conversationHeading).toBeVisible();
-
-    await detail.conversationSlackToggle.click();
-    await expect(detail.conversationHeading).toBeVisible();
+    // A freshly created ticket has no Slack/Web/CLI sessions yet —
+    // the sidebar renders the empty-state message.
+    await expect(page.getByText("No sessions yet.")).toBeVisible();
   });
 });

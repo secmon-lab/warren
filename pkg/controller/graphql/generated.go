@@ -283,6 +283,7 @@ type ComplexityRoot struct {
 		Intent    func(childComplexity int) int
 		Query     func(childComplexity int) int
 		SlackURL  func(childComplexity int) int
+		Source    func(childComplexity int) int
 		Status    func(childComplexity int) int
 		TicketID  func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
@@ -1781,6 +1782,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Session.SlackURL(childComplexity), true
+	case "Session.source":
+		if e.ComplexityRoot.Session.Source == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Session.Source(childComplexity), true
 	case "Session.status":
 		if e.ComplexityRoot.Session.Status == nil {
 			break
@@ -2354,6 +2361,9 @@ type Session {
   intent: String
   createdAt: String!
   updatedAt: String!
+  # chat-session-redesign: source channel (slack/web/cli). Empty when
+  # a pre-redesign Session has not been backfilled yet.
+  source: String!
 }
 
 type SessionMessage {
@@ -8817,6 +8827,8 @@ func (ec *executionContext) fieldContext_Query_ticketSessions(ctx context.Contex
 				return ec.fieldContext_Session_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Session_updatedAt(ctx, field)
+			case "source":
+				return ec.fieldContext_Session_source(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Session", field.Name)
 		},
@@ -8880,6 +8892,8 @@ func (ec *executionContext) fieldContext_Query_session(ctx context.Context, fiel
 				return ec.fieldContext_Session_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Session_updatedAt(ctx, field)
+			case "source":
+				return ec.fieldContext_Session_source(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Session", field.Name)
 		},
@@ -10542,6 +10556,35 @@ func (ec *executionContext) _Session_updatedAt(ctx context.Context, field graphq
 }
 
 func (ec *executionContext) fieldContext_Session_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Session_source(ctx context.Context, field graphql.CollectedField, obj *graphql1.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_source,
+		func(ctx context.Context) (any, error) {
+			return obj.Source, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_source(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Session",
 		Field:      field,
@@ -16482,6 +16525,11 @@ func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, 
 			}
 		case "updatedAt":
 			out.Values[i] = ec._Session_updatedAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
+		case "source":
+			out.Values[i] = ec._Session_source(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}

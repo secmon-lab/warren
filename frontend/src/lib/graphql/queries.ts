@@ -862,6 +862,7 @@ export const GET_TICKET_SESSIONS = gql`
       id
       ticketID
       status
+      source
       userID
       user {
         id

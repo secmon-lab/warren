@@ -38,7 +38,8 @@ function getOrCreateTabId(ticketId: string): string {
 
 export function useWebSocket(
   ticketId: string,
-  options: UseWebSocketOptions = {}
+  options: UseWebSocketOptions = {},
+  sessionId?: string
 ) {
   const {
     onMessage,
@@ -125,7 +126,11 @@ export function useWebSocket(
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     // Include tab ID in the URL as a query parameter
-    const url = `${protocol}//${host}/ws/chat/ticket/${ticketId}?tab=${tabIdRef.current}`;
+    // Append session_id when caller wants to resume a specific Session
+    // (chat-session-redesign: backend binds that Session to the
+    // connection instead of creating a fresh Web one).
+    const sessionParam = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : "";
+    const url = `${protocol}//${host}/ws/chat/ticket/${ticketId}?tab=${tabIdRef.current}${sessionParam}`;
 
     console.log('Creating new WebSocket connection to:', url);
     console.log('User:', user);

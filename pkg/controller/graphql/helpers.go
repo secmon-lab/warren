@@ -67,6 +67,7 @@ func toGraphQLSession(s *session.Session) *graphql1.Session {
 		Intent:    intent,
 		CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		Source:    string(s.Source),
 	}
 }
 

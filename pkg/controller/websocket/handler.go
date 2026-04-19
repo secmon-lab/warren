@@ -209,20 +209,43 @@ func (h *Handler) HandleTicketChat(w http.ResponseWriter, r *http.Request) {
 	client := h.hub.NewClientWithTabID(conn, ticketID, userID, tabID)
 	h.hub.Register(client)
 
-	// chat-session-redesign Phase 3+: bind one Web Session per
-	// WebSocket connection so every Turn produced by this client
-	// shares gollem working memory. When EnsureWebSession fails we
-	// still accept messages (they run without a Session, producing
-	// orphan rows) so a transient Firestore hiccup does not close the
-	// user's chat; the error is surfaced via logs.
+	// chat-session-redesign Phase 3+: bind one Session per WebSocket
+	// connection so every Turn produced by this client shares gollem
+	// working memory. Two modes:
+	//   - `?session_id=<id>`: resume an existing Session (Web or CLI
+	//     session previously created in this ticket). The handler
+	//     verifies the Session belongs to this ticket before binding.
+	//   - no query param: create a fresh Web Session.
 	if h.useCases != nil {
-		sess, sessErr := h.useCases.EnsureWebSession(ctx, ticketID, types.UserID(userID))
-		if sessErr != nil {
-			logger.Warn("failed to ensure web session; continuing without persistent Session",
-				"error", sessErr, "ticket_id", ticketID, "user_id", userID)
-		} else if sess != nil {
+		resumeID := types.SessionID(r.URL.Query().Get("session_id"))
+		var sess *sessModel.Session
+		var sessErr error
+		if resumeID != "" {
+			sess, sessErr = h.repository.GetSession(ctx, resumeID)
+			if sessErr != nil {
+				logger.Warn("failed to look up web session for resume",
+					"error", sessErr, "session_id", resumeID)
+				sess = nil
+			} else if sess != nil {
+				effectiveTID := sess.TicketIDOrNil()
+				if effectiveTID == nil || *effectiveTID != ticketID {
+					logger.Warn("session does not belong to the ticket; ignoring resume",
+						"session_id", resumeID, "ticket_id", ticketID)
+					sess = nil
+				}
+			}
+		}
+		if sess == nil {
+			sess, sessErr = h.useCases.EnsureWebSession(ctx, ticketID, types.UserID(userID))
+			if sessErr != nil {
+				logger.Warn("failed to ensure web session; continuing without persistent Session",
+					"error", sessErr, "ticket_id", ticketID, "user_id", userID)
+			} else if sess != nil {
+				h.publishEnvelope(client, NewSessionCreatedEvent(sess))
+			}
+		}
+		if sess != nil {
 			client.AttachSession(sess.ID)
-			h.publishEnvelope(client, NewSessionCreatedEvent(sess))
 		}
 	}
 
