@@ -141,32 +141,8 @@ func toGraphQLSession(s *session.Session) *graphql1.Session {
 		Intent:    intent,
 		CreatedAt: s.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		UpdatedAt: s.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		Source:    string(inferSessionSource(s)),
+		Source:    string(s.Source),
 	}
-}
-
-// inferSessionSource returns s.Source when set, otherwise falls back to
-// the same heuristic the session-source-backfill migration job uses:
-// a non-empty SlackURL or a ChannelRef with a SlackThread is treated
-// as a Slack session; anything else becomes Web. This auto-heals the
-// UI for Sessions written before Source was introduced (legacy
-// pre-Phase-2 rows) without requiring the backfill job to have run.
-// The persisted row is not mutated — this is a read-time projection
-// only.
-func inferSessionSource(s *session.Session) session.SessionSource {
-	if s == nil {
-		return ""
-	}
-	if s.Source.Valid() {
-		return s.Source
-	}
-	if s.SlackURL != "" {
-		return session.SessionSourceSlack
-	}
-	if s.ChannelRef != nil && s.ChannelRef.SlackThread != nil {
-		return session.SessionSourceSlack
-	}
-	return session.SessionSourceWeb
 }
 
 // authFromContext extracts the user ID from the context for knowledge operations.

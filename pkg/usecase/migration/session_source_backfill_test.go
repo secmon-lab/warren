@@ -32,24 +32,27 @@ func sessionsForEach(sessions []*sessModel.Session) migration.SessionForEach {
 	}
 }
 
-func TestSessionSourceBackfill_InfersFromSlackURL(t *testing.T) {
+func TestSessionSourceBackfill_ClassifiesEveryLegacyRowAsSlack(t *testing.T) {
 	ctx := context.Background()
 	repo := repository.NewMemory()
 
-	// Legacy Session with SlackURL present → slack
-	slackLike := &sessModel.Session{
+	// Legacy Session with SlackURL present.
+	slackWithURL := &sessModel.Session{
 		ID:       types.SessionID("sid_slack"),
 		TicketID: types.TicketID("tid_1"),
 		SlackURL: "https://slack.com/archives/C1/p123",
 	}
-	gt.NoError(t, repo.PutSession(ctx, slackLike))
+	gt.NoError(t, repo.PutSession(ctx, slackWithURL))
 
-	// Legacy Session without SlackURL → web
-	webLike := &sessModel.Session{
-		ID:       types.SessionID("sid_web"),
+	// Legacy Session without SlackURL — still Slack. Pre-redesign
+	// Warren had no Web or CLI Session code path, so every row whose
+	// Source is empty is, by construction, a Slack Session. The job
+	// must not re-infer a Web/CLI classification from column presence.
+	slackNoURL := &sessModel.Session{
+		ID:       types.SessionID("sid_no_url"),
 		TicketID: types.TicketID("tid_2"),
 	}
-	gt.NoError(t, repo.PutSession(ctx, webLike))
+	gt.NoError(t, repo.PutSession(ctx, slackNoURL))
 
 	job := migration.NewSessionSourceBackfillJob(repo, listAllFrom(repo))
 	res, err := job.Run(ctx, migration.Options{})
@@ -63,9 +66,9 @@ func TestSessionSourceBackfill_InfersFromSlackURL(t *testing.T) {
 	gt.V(t, after.Source).Equal(sessModel.SessionSourceSlack)
 	gt.V(t, after.TicketIDPtr != nil && *after.TicketIDPtr == "tid_1").Equal(true)
 
-	after2, err := repo.GetSession(ctx, "sid_web")
+	after2, err := repo.GetSession(ctx, "sid_no_url")
 	gt.NoError(t, err)
-	gt.V(t, after2.Source).Equal(sessModel.SessionSourceWeb)
+	gt.V(t, after2.Source).Equal(sessModel.SessionSourceSlack)
 }
 
 func TestSessionSourceBackfill_DryRunWritesNothing(t *testing.T) {
