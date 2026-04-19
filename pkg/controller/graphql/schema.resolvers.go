@@ -1198,6 +1198,7 @@ func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) (
 	for i, m := range messages {
 		result[i] = toGraphQLSessionMessage(m)
 		resolveAuthorDisplayName(ctx, r.slackService, result[i])
+		resolveMessageMentions(ctx, r.mrkdwnConv, result[i])
 	}
 
 	return result, nil
@@ -1244,6 +1245,7 @@ func (r *queryResolver) TicketSessionMessages(ctx context.Context, ticketID stri
 	for i, m := range msgs {
 		result[i] = toGraphQLSessionMessage(m)
 		resolveAuthorDisplayName(ctx, r.slackService, result[i])
+		resolveMessageMentions(ctx, r.mrkdwnConv, result[i])
 	}
 	return result, nil
 }

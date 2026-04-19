@@ -13,11 +13,33 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.type === "user";
   const label = messageTypeLabel(message.type);
   const Icon = messageTypeIcon(message.type);
+  // Prefer the author's Slack avatar when the message is a user post
+  // with a SlackUserID — matches Slack's own rendering so Conversation
+  // and Slack thread feel consistent. Web/CLI authors fall through to
+  // the generic silhouette icon.
+  const avatarURL =
+    isUser && message.author?.slackUserID
+      ? `/api/user/${message.author.slackUserID}/icon`
+      : null;
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : ""}`}>
-      <div className={`flex-shrink-0 rounded-full p-2 ${iconBgClass(message.type)}`}>
-        <Icon className="h-4 w-4" />
+      <div className={`flex-shrink-0 rounded-full overflow-hidden ${avatarURL ? "" : "p-2"} ${iconBgClass(message.type)}`}>
+        {avatarURL ? (
+          <img
+            src={avatarURL}
+            alt={message.author?.displayName || label}
+            className="h-8 w-8 object-cover rounded-full"
+            onError={(e) => {
+              // Fall back to the generic icon if the avatar URL
+              // returns an error (unauthenticated session, deleted
+              // user, Slack API failure, ...).
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        ) : (
+          <Icon className="h-4 w-4" />
+        )}
       </div>
       <div className={`flex-1 min-w-0 ${isUser ? "text-right" : ""}`}>
         <div className="text-xs text-muted-foreground mb-1">

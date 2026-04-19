@@ -89,6 +89,31 @@ func resolveAuthorDisplayName(ctx context.Context, svc *slackService.Service, ou
 	}
 }
 
+// resolveMessageMentions runs the message content through the mrkdwn
+// converter when it is present. This turns `<@USERID>` → `@displayName`
+// and `<#CHANNELID>` → `#channel-name` so the Web UI shows readable
+// text instead of raw Slack tokens. mrkdwnConv is nil when Slack is
+// not configured, in which case the content is left untouched.
+func resolveMessageMentions(ctx context.Context, conv mrkdwnConverter, out *graphql1.SessionMessage) {
+	if conv == nil || out == nil {
+		return
+	}
+	out.Content = conv.ConvertToMarkdown(ctx, out.Content)
+	for i, rev := range out.Revisions {
+		if rev == nil {
+			continue
+		}
+		out.Revisions[i].Content = conv.ConvertToMarkdown(ctx, rev.Content)
+	}
+}
+
+// mrkdwnConverter is the method subset of *mrkdwn.Converter we use.
+// Declared here (unexported) so callers can inject a fake in tests
+// without pulling the full Slack cache plumbing.
+type mrkdwnConverter interface {
+	ConvertToMarkdown(ctx context.Context, mrkdwn string) string
+}
+
 // toGraphQLSession converts a domain session.Session to a GraphQL Session
 func toGraphQLSession(s *session.Session) *graphql1.Session {
 	var userID, query, slackURL, intent *string
