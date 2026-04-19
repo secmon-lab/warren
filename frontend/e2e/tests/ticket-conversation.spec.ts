@@ -5,7 +5,11 @@
 // streaming and Turn creation are covered by Go integration tests.
 import { test, expect } from "../fixtures";
 import { TicketDetailPage } from "../pages/TicketDetailPage";
-import { archiveTicketViaAPI, createTicketViaAPI } from "../helpers/api";
+import {
+  archiveTicketViaAPI,
+  createTicketViaAPI,
+  resolveTicketViaAPI,
+} from "../helpers/api";
 
 test.describe("Ticket Conversation (Phase 6)", () => {
   test("renders unified conversation card with sidebar + New Chat", async ({
@@ -32,11 +36,20 @@ test.describe("Ticket Conversation (Phase 6)", () => {
       // the sidebar renders the empty-state message.
       await expect(page.getByText("No sessions yet.")).toBeVisible();
     } finally {
-      // Always archive the test ticket so subsequent spec files (e.g.
-      // ticket.spec) that assume an empty active-ticket list still
-      // pass. E2E tests share the same Firestore emulator across
-      // files, so cleanup has to be explicit.
-      await archiveTicketViaAPI(page, ticket.id);
+      // Always remove the test ticket from the active list so
+      // subsequent spec files (e.g. ticket.spec) that assume an
+      // empty active-ticket list still pass. E2E tests share the
+      // same Firestore emulator across files, so cleanup has to be
+      // explicit. archiveTicket rejects open tickets, so resolve
+      // first — both calls are non-fatal on cleanup.
+      try {
+        await resolveTicketViaAPI(page, ticket.id);
+        await archiveTicketViaAPI(page, ticket.id);
+      } catch {
+        // Cleanup failures should not mask a real test failure; the
+        // next run will see stale tickets and flag them via the
+        // empty-list assertions in ticket.spec.
+      }
     }
   });
 });
