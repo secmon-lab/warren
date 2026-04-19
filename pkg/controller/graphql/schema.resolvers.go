@@ -16,12 +16,15 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
+	hitlModel "github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 // User is the resolver for the user field.
@@ -496,6 +499,59 @@ func (r *mutationResolver) DeclineAlerts(ctx context.Context, ids []string) ([]*
 	}
 
 	return results, nil
+}
+
+// ResolveHITLRequest is the resolver for the resolveHITLRequest field.
+//
+// Persists the user's answer into the hitl.Request row keyed by id,
+// which unblocks the hitl.Service.RequestAndWait goroutine that the
+// agent pipeline is blocked on. The updated record is returned so the
+// caller can reflect RespondedAt / Status back in its UI without a
+// second round-trip.
+//
+// Multi-instance correctness: the Firestore row transition fans out
+// through the existing HITL watcher, so the resolution reaches the
+// waiting instance regardless of which node served this mutation.
+func (r *mutationResolver) ResolveHITLRequest(ctx context.Context, id string, approved bool, answer *string, comment *string) (*graphql1.HITLRequest, error) {
+	reqID := types.HITLRequestID(id)
+	existing, err := r.repo.GetHITLRequest(ctx, reqID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to load HITL request", goerr.V("id", id))
+	}
+	if existing == nil {
+		return nil, goerr.New("HITL request not found", goerr.V("id", id))
+	}
+	if existing.Status != hitlModel.StatusPending {
+		return nil, goerr.New("HITL request is not pending; cannot respond",
+			goerr.V("id", id), goerr.V("status", existing.Status))
+	}
+
+	respondedBy := string(types.UserID(user.FromContext(ctx)))
+	status := hitlModel.StatusDenied
+	if approved {
+		status = hitlModel.StatusApproved
+	}
+	response := map[string]any{}
+	if answer != nil {
+		response["answer"] = *answer
+	}
+	if comment != nil {
+		response["comment"] = *comment
+	}
+
+	svc := hitlService.New(r.repo)
+	if err := svc.Respond(ctx, reqID, status, respondedBy, response); err != nil {
+		return nil, goerr.Wrap(err, "failed to record HITL response", goerr.V("id", id))
+	}
+
+	updated, err := r.repo.GetHITLRequest(ctx, reqID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to reload HITL request", goerr.V("id", id))
+	}
+	if updated == nil {
+		return nil, goerr.New("HITL request disappeared after respond", goerr.V("id", id))
+	}
+	return hitlRequestToGraphQL(updated), nil
 }
 
 // RunDiagnosis is the resolver for the runDiagnosis field.

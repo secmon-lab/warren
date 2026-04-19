@@ -144,6 +144,18 @@ type ComplexityRoot struct {
 		Summary        func(childComplexity int) int
 	}
 
+	HITLRequest struct {
+		CreatedAt   func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Payload     func(childComplexity int) int
+		RespondedAt func(childComplexity int) int
+		Response    func(childComplexity int) int
+		SessionID   func(childComplexity int) int
+		Status      func(childComplexity int) int
+		Type        func(childComplexity int) int
+		UserID      func(childComplexity int) int
+	}
+
 	Knowledge struct {
 		Author    func(childComplexity int) int
 		AuthorID  func(childComplexity int) int
@@ -183,6 +195,11 @@ type ComplexityRoot struct {
 		UserID      func(childComplexity int) int
 	}
 
+	MessageRevision struct {
+		Content   func(childComplexity int) int
+		CreatedAt func(childComplexity int) int
+	}
+
 	Mutation struct {
 		ArchiveAllResolvedTickets     func(childComplexity int) int
 		ArchiveTicket                 func(childComplexity int, id string) int
@@ -204,6 +221,7 @@ type ComplexityRoot struct {
 		ReopenTicket                  func(childComplexity int, id string) int
 		ReprocessQueuedAlert          func(childComplexity int, id string) int
 		ReprocessQueuedAlertsByFilter func(childComplexity int, keyword *string) int
+		ResolveHITLRequest            func(childComplexity int, id string, approved bool, answer *string, comment *string) int
 		ResolveTicket                 func(childComplexity int, id string, conclusion string, reason string) int
 		RunDiagnosis                  func(childComplexity int) int
 		UnarchiveTicket               func(childComplexity int, id string) int
@@ -296,6 +314,7 @@ type ComplexityRoot struct {
 		Content   func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
 		ID        func(childComplexity int) int
+		Revisions func(childComplexity int) int
 		SessionID func(childComplexity int) int
 		TicketID  func(childComplexity int) int
 		TurnID    func(childComplexity int) int
@@ -393,6 +412,7 @@ type MutationResolver interface {
 	DeleteTag(ctx context.Context, id string) (bool, error)
 	UpdateTag(ctx context.Context, input graphql1.UpdateTagInput) (*graphql1.TagMetadata, error)
 	DeclineAlerts(ctx context.Context, ids []string) ([]*alert.Alert, error)
+	ResolveHITLRequest(ctx context.Context, id string, approved bool, answer *string, comment *string) (*graphql1.HITLRequest, error)
 	RunDiagnosis(ctx context.Context) (*graphql1.Diagnosis, error)
 	FixDiagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
 	ReprocessQueuedAlert(ctx context.Context, id string) (*alert.ReprocessJob, error)
@@ -878,6 +898,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Finding.Summary(childComplexity), true
 
+	case "HITLRequest.createdAt":
+		if e.ComplexityRoot.HITLRequest.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.CreatedAt(childComplexity), true
+	case "HITLRequest.id":
+		if e.ComplexityRoot.HITLRequest.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.ID(childComplexity), true
+	case "HITLRequest.payload":
+		if e.ComplexityRoot.HITLRequest.Payload == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.Payload(childComplexity), true
+	case "HITLRequest.respondedAt":
+		if e.ComplexityRoot.HITLRequest.RespondedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.RespondedAt(childComplexity), true
+	case "HITLRequest.response":
+		if e.ComplexityRoot.HITLRequest.Response == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.Response(childComplexity), true
+	case "HITLRequest.sessionID":
+		if e.ComplexityRoot.HITLRequest.SessionID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.SessionID(childComplexity), true
+	case "HITLRequest.status":
+		if e.ComplexityRoot.HITLRequest.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.Status(childComplexity), true
+	case "HITLRequest.type":
+		if e.ComplexityRoot.HITLRequest.Type == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.Type(childComplexity), true
+	case "HITLRequest.userID":
+		if e.ComplexityRoot.HITLRequest.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.UserID(childComplexity), true
+
 	case "Knowledge.author":
 		if e.ComplexityRoot.Knowledge.Author == nil {
 			break
@@ -1043,6 +1118,19 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.MessageAuthor.UserID(childComplexity), true
+
+	case "MessageRevision.content":
+		if e.ComplexityRoot.MessageRevision.Content == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageRevision.Content(childComplexity), true
+	case "MessageRevision.createdAt":
+		if e.ComplexityRoot.MessageRevision.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageRevision.CreatedAt(childComplexity), true
 
 	case "Mutation.archiveAllResolvedTickets":
 		if e.ComplexityRoot.Mutation.ArchiveAllResolvedTickets == nil {
@@ -1259,6 +1347,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ReprocessQueuedAlertsByFilter(childComplexity, args["keyword"].(*string)), true
+	case "Mutation.resolveHITLRequest":
+		if e.ComplexityRoot.Mutation.ResolveHITLRequest == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_resolveHITLRequest_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ResolveHITLRequest(childComplexity, args["id"].(string), args["approved"].(bool), args["answer"].(*string), args["comment"].(*string)), true
 	case "Mutation.resolveTicket":
 		if e.ComplexityRoot.Mutation.ResolveTicket == nil {
 			break
@@ -1843,6 +1942,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.SessionMessage.ID(childComplexity), true
+	case "SessionMessage.revisions":
+		if e.ComplexityRoot.SessionMessage.Revisions == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SessionMessage.Revisions(childComplexity), true
 	case "SessionMessage.sessionID":
 		if e.ComplexityRoot.SessionMessage.SessionID == nil {
 			break
@@ -2341,6 +2446,17 @@ type Mutation {
   deleteTag(id: ID!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
   declineAlerts(ids: [ID!]!): [Alert!]!
+
+  # chat-session-redesign: respond to a pending HITL request from the
+  # Web UI. approved=true means "approve" for tool_approval requests or
+  # "submit the selected answer" for question requests. answer/comment
+  # are optional. Returns the updated HITLRequest with Status populated.
+  resolveHITLRequest(
+    id: ID!
+    approved: Boolean!
+    answer: String
+    comment: String
+  ): HITLRequest!
 }
 
 input UpdateTagInput {
@@ -2376,6 +2492,34 @@ type SessionMessage {
   author: MessageAuthor
   createdAt: String!
   updatedAt: String!
+  # Revisions is the chronologically-ordered list of prior content
+  # values for updatable messages (e.g. task progress, HITL prompts).
+  # Empty for messages that have never been updated in-place.
+  revisions: [MessageRevision!]
+}
+
+type MessageRevision {
+  content: String!
+  createdAt: String!
+}
+
+# HITLRequest mirrors the domain hitl.Request model. The payload shape
+# is intentionally a JSON scalar (encoded as String) because it is
+# already transport-shape-specific (tool_approval vs question) and the
+# frontend renders both variants from the same envelope.
+type HITLRequest {
+  id: ID!
+  sessionID: ID!
+  type: String!
+  status: String!
+  userID: String
+  # Payload / response are serialized JSON strings so the frontend can
+  # parse them directly. Having the same wire shape as the
+  # hitl_request_pending envelope avoids a second translation layer.
+  payload: String
+  response: String
+  createdAt: String!
+  respondedAt: String
 }
 
 type MessageAuthor {
@@ -2835,6 +2979,32 @@ func (ec *executionContext) field_Mutation_reprocessQueuedAlertsByFilter_args(ct
 		return nil, err
 	}
 	args["keyword"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Mutation_resolveHITLRequest_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "approved", ec.unmarshalNBoolean2bool)
+	if err != nil {
+		return nil, err
+	}
+	args["approved"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "answer", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["answer"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "comment", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["comment"] = arg3
 	return args, nil
 }
 
@@ -5519,6 +5689,267 @@ func (ec *executionContext) fieldContext_Finding_recommendation(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _HITLRequest_id(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_sessionID(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_sessionID,
+		func(ctx context.Context) (any, error) {
+			return obj.SessionID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_sessionID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_type(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_type,
+		func(ctx context.Context) (any, error) {
+			return obj.Type, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_status(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_userID(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_userID,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_userID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_payload(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_payload,
+		func(ctx context.Context) (any, error) {
+			return obj.Payload, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_payload(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_response(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_response,
+		func(ctx context.Context) (any, error) {
+			return obj.Response, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_response(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_respondedAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_respondedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.RespondedAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_respondedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Knowledge_id(ctx context.Context, field graphql.CollectedField, obj *graphql1.Knowledge) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6320,6 +6751,64 @@ func (ec *executionContext) _MessageAuthor_email(ctx context.Context, field grap
 func (ec *executionContext) fieldContext_MessageAuthor_email(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageRevision_content(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageRevision) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageRevision_content,
+		func(ctx context.Context) (any, error) {
+			return obj.Content, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageRevision_content(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageRevision",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageRevision_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageRevision) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageRevision_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageRevision_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageRevision",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -7551,6 +8040,67 @@ func (ec *executionContext) fieldContext_Mutation_declineAlerts(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_declineAlerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_resolveHITLRequest(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_resolveHITLRequest,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ResolveHITLRequest(ctx, fc.Args["id"].(string), fc.Args["approved"].(bool), fc.Args["answer"].(*string), fc.Args["comment"].(*string))
+		},
+		nil,
+		ec.marshalNHITLRequest2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐHITLRequest,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_resolveHITLRequest(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_HITLRequest_id(ctx, field)
+			case "sessionID":
+				return ec.fieldContext_HITLRequest_sessionID(ctx, field)
+			case "type":
+				return ec.fieldContext_HITLRequest_type(ctx, field)
+			case "status":
+				return ec.fieldContext_HITLRequest_status(ctx, field)
+			case "userID":
+				return ec.fieldContext_HITLRequest_userID(ctx, field)
+			case "payload":
+				return ec.fieldContext_HITLRequest_payload(ctx, field)
+			case "response":
+				return ec.fieldContext_HITLRequest_response(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_HITLRequest_createdAt(ctx, field)
+			case "respondedAt":
+				return ec.fieldContext_HITLRequest_respondedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type HITLRequest", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_resolveHITLRequest_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8955,6 +9505,8 @@ func (ec *executionContext) fieldContext_Query_sessionMessages(ctx context.Conte
 				return ec.fieldContext_SessionMessage_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_SessionMessage_updatedAt(ctx, field)
+			case "revisions":
+				return ec.fieldContext_SessionMessage_revisions(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SessionMessage", field.Name)
 		},
@@ -9016,6 +9568,8 @@ func (ec *executionContext) fieldContext_Query_ticketSessionMessages(ctx context
 				return ec.fieldContext_SessionMessage_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_SessionMessage_updatedAt(ctx, field)
+			case "revisions":
+				return ec.fieldContext_SessionMessage_revisions(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SessionMessage", field.Name)
 		},
@@ -10863,6 +11417,41 @@ func (ec *executionContext) fieldContext_SessionMessage_updatedAt(_ context.Cont
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionMessage_revisions(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SessionMessage_revisions,
+		func(ctx context.Context) (any, error) {
+			return obj.Revisions, nil
+		},
+		nil,
+		ec.marshalOMessageRevision2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageRevisionᚄ,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_SessionMessage_revisions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionMessage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "content":
+				return ec.fieldContext_MessageRevision_content(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_MessageRevision_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MessageRevision", field.Name)
 		},
 	}
 	return fc, nil
@@ -14669,6 +15258,73 @@ func (ec *executionContext) _Finding(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
+var hITLRequestImplementors = []string{"HITLRequest"}
+
+func (ec *executionContext) _HITLRequest(ctx context.Context, sel ast.SelectionSet, obj *graphql1.HITLRequest) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hITLRequestImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HITLRequest")
+		case "id":
+			out.Values[i] = ec._HITLRequest_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sessionID":
+			out.Values[i] = ec._HITLRequest_sessionID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "type":
+			out.Values[i] = ec._HITLRequest_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._HITLRequest_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userID":
+			out.Values[i] = ec._HITLRequest_userID(ctx, field, obj)
+		case "payload":
+			out.Values[i] = ec._HITLRequest_payload(ctx, field, obj)
+		case "response":
+			out.Values[i] = ec._HITLRequest_response(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._HITLRequest_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "respondedAt":
+			out.Values[i] = ec._HITLRequest_respondedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var knowledgeImplementors = []string{"Knowledge"}
 
 func (ec *executionContext) _Knowledge(ctx context.Context, sel ast.SelectionSet, obj *graphql1.Knowledge) graphql.Marshaler {
@@ -14962,6 +15618,50 @@ func (ec *executionContext) _MessageAuthor(ctx context.Context, sel ast.Selectio
 	return out
 }
 
+var messageRevisionImplementors = []string{"MessageRevision"}
+
+func (ec *executionContext) _MessageRevision(ctx context.Context, sel ast.SelectionSet, obj *graphql1.MessageRevision) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageRevisionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageRevision")
+		case "content":
+			out.Values[i] = ec._MessageRevision_content(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._MessageRevision_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -15096,6 +15796,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "declineAlerts":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_declineAlerts(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "resolveHITLRequest":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_resolveHITLRequest(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -16603,6 +17310,8 @@ func (ec *executionContext) _SessionMessage(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "revisions":
+			out.Values[i] = ec._SessionMessage_revisions(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -17977,6 +18686,20 @@ func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.S
 	return res
 }
 
+func (ec *executionContext) marshalNHITLRequest2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐHITLRequest(ctx context.Context, sel ast.SelectionSet, v graphql1.HITLRequest) graphql.Marshaler {
+	return ec._HITLRequest(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNHITLRequest2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐHITLRequest(ctx context.Context, sel ast.SelectionSet, v *graphql1.HITLRequest) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._HITLRequest(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
 	res, err := graphql.UnmarshalID(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -18123,6 +18846,16 @@ func (ec *executionContext) marshalNKnowledgeTag2ᚖgithubᚗcomᚋsecmonᚑlab�
 		return graphql.Null
 	}
 	return ec._KnowledgeTag(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMessageRevision2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageRevision(ctx context.Context, sel ast.SelectionSet, v *graphql1.MessageRevision) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MessageRevision(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNQueuedAlert2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐQueuedAlertᚄ(ctx context.Context, sel ast.SelectionSet, v []*alert.QueuedAlert) graphql.Marshaler {
@@ -18740,6 +19473,25 @@ func (ec *executionContext) marshalOMessageAuthor2ᚖgithubᚗcomᚋsecmonᚑlab
 		return graphql.Null
 	}
 	return ec._MessageAuthor(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOMessageRevision2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageRevisionᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.MessageRevision) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNMessageRevision2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageRevision(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOReprocessBatchJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessBatchJob(ctx context.Context, sel ast.SelectionSet, v *alert.ReprocessBatchJob) graphql.Marshaler {

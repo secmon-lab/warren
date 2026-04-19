@@ -11,16 +11,17 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
-	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/llm"
-	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/tool/base"
 	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
+	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -31,19 +32,20 @@ import (
 // executePhase runs all tasks in parallel and waits for all to complete.
 // All task messages are posted upfront as "waiting" before any execution begins.
 // Each task's result context block is posted immediately upon completion.
-func (c *BluebellChat) executePhase(ctx context.Context, tasks []TaskPlan, target *ticket.Ticket, ssn *session.Session) []*TaskResult {
+func (c *BluebellChat) executePhase(ctx context.Context, tasks []TaskPlan, chatCtx *chatModel.ChatContext, ssn *session.Session) []*TaskResult {
 	results := make([]*TaskResult, len(tasks))
 
-	// Pre-create all task message routings (posts "waiting" messages to Slack)
+	// Pre-create all task progress handles (posts the "waiting"
+	// display row through the active transport sink).
 	type taskRouting struct {
-		ctx               context.Context
-		markCompleted     func()
-		updatableBlockMsg *slackService.UpdatableBlockMessage
+		ctx           context.Context
+		markCompleted func()
+		progress      chat.ProgressHandle
 	}
 	routings := make([]taskRouting, len(tasks))
 	for i, task := range tasks {
-		taskCtx, markCompleted, ubm := c.setupTaskMessageRouting(ctx, ssn, target, task.Title)
-		routings[i] = taskRouting{ctx: taskCtx, markCompleted: markCompleted, updatableBlockMsg: ubm}
+		taskCtx, markCompleted, progress := c.setupTaskMessageRouting(ctx, ssn, chatCtx, task.Title)
+		routings[i] = taskRouting{ctx: taskCtx, markCompleted: markCompleted, progress: progress}
 	}
 
 	var wg sync.WaitGroup
@@ -51,9 +53,9 @@ func (c *BluebellChat) executePhase(ctx context.Context, tasks []TaskPlan, targe
 		wg.Add(1)
 		go func(idx int, t TaskPlan, r taskRouting) {
 			defer wg.Done()
-			results[idx] = c.executeTask(ctx, t, target, ssn, r.ctx, r.markCompleted, r.updatableBlockMsg)
-			// Post result context block immediately upon task completion
-			c.postTaskResult(ctx, t, results[idx], target)
+			results[idx] = c.executeTask(ctx, t, chatCtx, ssn, r.ctx, r.markCompleted, r.progress)
+			// Post result block immediately upon task completion
+			c.postTaskResult(ctx, t, results[idx], chatCtx)
 		}(i, task, routings[i])
 	}
 
@@ -62,15 +64,17 @@ func (c *BluebellChat) executePhase(ctx context.Context, tasks []TaskPlan, targe
 	return results
 }
 
-// postTaskResult posts a single task result context block to Slack.
-func (c *BluebellChat) postTaskResult(ctx context.Context, task TaskPlan, result *TaskResult, target *ticket.Ticket) {
-	if c.slackService == nil || target.SlackThread == nil {
-		return
-	}
+// postTaskResult posts a single task result block through the active
+// transport sink (Slack section block / Web persisted response /
+// CLI stdout line).
+func (c *BluebellChat) postTaskResult(ctx context.Context, task TaskPlan, result *TaskResult, chatCtx *chatModel.ChatContext) {
 	if result == nil {
 		return
 	}
-	threadSvc := c.slackService.NewThread(*target.SlackThread)
+	sink := chat.ResolveSink(chatCtx, c.slackService, c.repository)
+	if sink == nil {
+		return
+	}
 	escaped := escapeSlackMrkdwn(task.Title)
 	var blockText string
 	if result.Result == "" {
@@ -84,24 +88,25 @@ func (c *BluebellChat) postTaskResult(ctx context.Context, task TaskPlan, result
 		}
 		blockText = prefix + truncateResult(escapeSlackMrkdwn(result.Result), maxResultLen)
 	}
-	if err := threadSvc.PostSectionBlock(ctx, blockText); err != nil {
-		logging.From(ctx).Error("failed to post task completion section block", "error", err)
+	if err := sink.PostSectionBlock(ctx, blockText); err != nil {
+		logging.From(ctx).Error("failed to post task completion block", "error", err)
 	}
 }
 
-// postDivider posts a divider to the Slack thread if available.
-func (c *BluebellChat) postDivider(ctx context.Context, target *ticket.Ticket) {
-	if c.slackService == nil || target.SlackThread == nil {
+// postDivider posts a divider through the active transport sink.
+func (c *BluebellChat) postDivider(ctx context.Context, chatCtx *chatModel.ChatContext) {
+	sink := chat.ResolveSink(chatCtx, c.slackService, c.repository)
+	if sink == nil {
 		return
 	}
-	threadSvc := c.slackService.NewThread(*target.SlackThread)
-	if err := threadSvc.PostDivider(ctx); err != nil {
+	if err := sink.PostDivider(ctx); err != nil {
 		logging.From(ctx).Error("failed to post divider", "error", err)
 	}
 }
 
 // executeTask executes a single task with its own agent and trace context.
-func (c *BluebellChat) executeTask(ctx context.Context, task TaskPlan, target *ticket.Ticket, ssn *session.Session, taskCtx context.Context, markCompleted func(), updatableBlockMsg *slackService.UpdatableBlockMessage) *TaskResult {
+func (c *BluebellChat) executeTask(ctx context.Context, task TaskPlan, chatCtx *chatModel.ChatContext, ssn *session.Session, taskCtx context.Context, markCompleted func(), progress chat.ProgressHandle) *TaskResult {
+	target := chatCtx.Ticket
 	logger := logging.From(ctx)
 	result := &TaskResult{
 		TaskID: task.ID,
@@ -200,16 +205,23 @@ func (c *BluebellChat) executeTask(ctx context.Context, task TaskPlan, target *t
 			approvalSet[t] = true
 		}
 		hitlSvc := hitlService.New(c.repository)
-		var presenter hitlService.Presenter
-		if updatableBlockMsg != nil {
-			presenter = buildHITLPresenter(updatableBlockMsg, task.Title, user.FromContext(ctx))
-		}
+		// Presenter built from ProgressHandle: Slack/Web/CLI render
+		// HITL UI on the same display row as task progress (CLI
+		// default-denies via PresentHITL error).
+		presenter := chat.NewProgressHandlePresenter(progress, task.Title, user.FromContext(ctx))
 
 		var slackThread *slackModel.Thread
 		if target.SlackThread != nil {
 			slackThread = target.SlackThread
 		}
 
+		var onResolved func(*hitl.Request)
+		if chatCtx != nil && chatCtx.OnHITLEvent != nil {
+			msgID := chat.ProgressMessageID(progress)
+			onResolved = func(r *hitl.Request) {
+				chatCtx.OnHITLEvent("resolved", r, msgID)
+			}
+		}
 		agentOpts = append(agentOpts, gollem.WithToolMiddleware(newHITLMiddleware(hitlConfig{
 			requireApproval: approvalSet,
 			service:         hitlSvc,
@@ -217,6 +229,7 @@ func (c *BluebellChat) executeTask(ctx context.Context, task TaskPlan, target *t
 			userID:          user.FromContext(ctx),
 			sessionID:       ssn.ID,
 			slackThread:     slackThread,
+			onResolved:      onResolved,
 		})))
 	}
 
@@ -306,7 +319,10 @@ func (c *BluebellChat) triggerTechniqueReflection(ctx context.Context, taskCtx c
 }
 
 // triggerFactReflection runs background knowledge reflection for a completed session.
-func (c *BluebellChat) triggerFactReflection(ctx context.Context, summary string, t *ticket.Ticket) {
+// The OnComplete hook posts the reflection ID through the active chat
+// sink — for Slack this becomes a context block in the thread, for Web
+// it persists as a trace session.Message.
+func (c *BluebellChat) triggerFactReflection(ctx context.Context, summary string, chatCtx *chatModel.ChatContext) {
 	logger := logging.From(ctx)
 
 	if c.knowledgeService == nil {
@@ -320,7 +336,7 @@ func (c *BluebellChat) triggerFactReflection(ctx context.Context, summary string
 
 	logger.Info("triggering fact reflection",
 		"summary_length", len(summary),
-		"has_ticket", t != nil,
+		"has_ticket", chatCtx != nil && chatCtx.Ticket != nil,
 	)
 
 	tool := knowledgeTool.New(c.knowledgeService, types.KnowledgeCategoryFact, knowledgeTool.ModeReadWrite)
@@ -328,22 +344,22 @@ func (c *BluebellChat) triggerFactReflection(ctx context.Context, summary string
 		Category:         types.KnowledgeCategoryFact,
 		ExecutionSummary: summary,
 		OnComplete: func(bgCtx context.Context, traceID string) {
-			if c.slackService == nil || t == nil || t.SlackThread == nil {
+			sink := chat.ResolveSink(chatCtx, c.slackService, c.repository)
+			if sink == nil {
 				return
 			}
-			threadSvc := c.slackService.NewThread(*t.SlackThread)
 			suffix := "reflection done"
 			if traceID != "" {
 				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
 			}
-			if err := threadSvc.PostContextBlock(bgCtx, fmt.Sprintf("📝 Fact knowledge %s", suffix)); err != nil {
+			if err := sink.PostContextBlock(bgCtx, fmt.Sprintf("📝 Fact knowledge %s", suffix)); err != nil {
 				logging.From(bgCtx).Warn("failed to post fact reflection result", "error", err)
 			}
 		},
 	}
-	if t != nil {
-		input.Ticket = t
-		input.TicketID = t.ID
+	if chatCtx != nil && chatCtx.Ticket != nil {
+		input.Ticket = chatCtx.Ticket
+		input.TicketID = chatCtx.Ticket.ID
 	}
 
 	if err := c.knowledgeService.RunReflection(ctx, c.llmClient, tool, input); err != nil {
@@ -352,34 +368,33 @@ func (c *BluebellChat) triggerFactReflection(ctx context.Context, summary string
 }
 
 // setupTaskMessageRouting creates task-specific msg routing with title-prefixed trace.
-// The initial "Waiting..." message is posted immediately so all task messages appear upfront.
+// The initial "Waiting..." message is posted immediately through the active transport sink.
 // Returns the new context, a function to mark the task as completed (changes emoji),
-// and an UpdatableBlockMessage for HITL integration (nil if Slack is not configured).
-func (c *BluebellChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, target *ticket.Ticket, taskTitle string) (context.Context, func(), *slackService.UpdatableBlockMessage) {
-	if c.slackService == nil || target.SlackThread == nil {
+// and a ProgressHandle for HITL integration (nil if no sink is available).
+func (c *BluebellChat) setupTaskMessageRouting(ctx context.Context, ssn *session.Session, chatCtx *chatModel.ChatContext, taskTitle string) (context.Context, func(), chat.ProgressHandle) {
+	escaped := escapeSlackMrkdwn(taskTitle)
+	initialMsg := fmt.Sprintf("🕐 *[%s]*\n\nWaiting...", escaped)
+
+	progress := chat.NewProgressHandle(ctx, chatCtx, c.slackService, c.repository, initialMsg)
+	if progress == nil {
 		return ctx, func() {}, nil
 	}
 
-	threadSvc := c.slackService.NewThread(*target.SlackThread).(*slackService.ThreadService)
-
-	// Post initial "waiting" message immediately
 	completed := false
-	escaped := escapeSlackMrkdwn(taskTitle)
-	initialMsg := fmt.Sprintf("🕐 *[%s]*\n\nWaiting...", escaped)
-	ubm := threadSvc.NewUpdatableBlockMessage(ctx, initialMsg)
-
 	taskTraceFunc := func(ctx context.Context, message string) {
 		emoji := "⏳"
 		if completed {
 			emoji = "✅"
 		}
 		prefixed := fmt.Sprintf("%s *[%s]*\n\n> %s", emoji, escaped, escapeSlackMrkdwn(message))
+		// Persist the trace line against the Warren ssn regardless of
+		// transport so the Slack Session timeline retains per-step
+		// trace rows (Web persistence is folded into progress.UpdateText).
 		m := session.NewMessageV2(ctx, ssn.ID, nil, nil, session.MessageTypeTrace, prefixed, nil)
 		if err := c.repository.PutSessionMessage(ctx, m); err != nil {
 			errutil.Handle(ctx, err)
 		}
-
-		ubm.UpdateText(ctx, prefixed)
+		progress.UpdateText(ctx, prefixed)
 	}
 	markCompleted := func() {
 		completed = true
@@ -393,7 +408,7 @@ func (c *BluebellChat) setupTaskMessageRouting(ctx context.Context, ssn *session
 		taskTraceFunc(ctx, "⚠️ "+message)
 	}
 
-	return msg.With(ctx, notifyFunc, taskTraceFunc, warnFunc), markCompleted, ubm
+	return msg.With(ctx, notifyFunc, taskTraceFunc, warnFunc), markCompleted, progress
 }
 
 // filterToolSets filters tool sets to only include those matching the given IDs.

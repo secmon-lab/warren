@@ -103,6 +103,18 @@ type DiagnosisIssuesResponse struct {
 	TotalCount int               `json:"totalCount"`
 }
 
+type HITLRequest struct {
+	ID          string  `json:"id"`
+	SessionID   string  `json:"sessionID"`
+	Type        string  `json:"type"`
+	Status      string  `json:"status"`
+	UserID      *string `json:"userID,omitempty"`
+	Payload     *string `json:"payload,omitempty"`
+	Response    *string `json:"response,omitempty"`
+	CreatedAt   string  `json:"createdAt"`
+	RespondedAt *string `json:"respondedAt,omitempty"`
+}
+
 type Knowledge struct {
 	ID        string          `json:"id"`
 	Category  string          `json:"category"`
@@ -142,6 +154,11 @@ type MessageAuthor struct {
 	Email       *string `json:"email,omitempty"`
 }
 
+type MessageRevision struct {
+	Content   string `json:"content"`
+	CreatedAt string `json:"createdAt"`
+}
+
 type Mutation struct {
 }
 
@@ -168,15 +185,16 @@ type Session struct {
 }
 
 type SessionMessage struct {
-	ID        string         `json:"id"`
-	SessionID string         `json:"sessionID"`
-	TurnID    *string        `json:"turnID,omitempty"`
-	TicketID  *string        `json:"ticketID,omitempty"`
-	Type      string         `json:"type"`
-	Content   string         `json:"content"`
-	Author    *MessageAuthor `json:"author,omitempty"`
-	CreatedAt string         `json:"createdAt"`
-	UpdatedAt string         `json:"updatedAt"`
+	ID        string             `json:"id"`
+	SessionID string             `json:"sessionID"`
+	TurnID    *string            `json:"turnID,omitempty"`
+	TicketID  *string            `json:"ticketID,omitempty"`
+	Type      string             `json:"type"`
+	Content   string             `json:"content"`
+	Author    *MessageAuthor     `json:"author,omitempty"`
+	CreatedAt string             `json:"createdAt"`
+	UpdatedAt string             `json:"updatedAt"`
+	Revisions []*MessageRevision `json:"revisions,omitempty"`
 }
 
 type TagMetadata struct {

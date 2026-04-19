@@ -10,6 +10,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
+	hitlModel "github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -51,12 +52,18 @@ func (x *UseCases) EnsureCLISession(ctx context.Context, ticketID types.TicketID
 // ChatTurnEvent describes a lifecycle event produced by a Web chat
 // invocation so the WebSocket handler can publish envelope-format
 // updates to the bound client. Emitted for "turn_started",
-// "session_message_added" (user input) and "turn_ended"; the payload
+// "session_message_added", "session_message_updated", "turn_ended",
+// "hitl_request_pending", and "hitl_request_resolved"; the payload
 // field set depends on the event kind.
 type ChatTurnEvent struct {
-	Kind    string
-	Turn    *sessModel.Turn
-	Message *sessModel.Message
+	Kind        string
+	Turn        *sessModel.Turn
+	Message     *sessModel.Message
+	HITLRequest *hitlModel.Request
+	// HITLMessageID binds a HITL prompt to the progress message that
+	// hosts it, so the frontend can render approval UI in-place rather
+	// than as a floating banner.
+	HITLMessageID string
 }
 
 // ChatFromWebSocket processes a single user message inside an already-
@@ -84,6 +91,9 @@ func (x *UseCases) ChatFromWebSocket(ctx context.Context, ticketID types.TicketI
 				ev.Turn = v
 			case *sessModel.Message:
 				ev.Message = v
+			case hitlEventPayload:
+				ev.HITLRequest = v.Request
+				ev.HITLMessageID = v.MessageID
 			}
 			onEvent(ev)
 		}
@@ -283,6 +293,12 @@ func (x *UseCases) executeChatTurn(
 		chatCtx.OnSessionEvent = func(kind string, m *sessModel.Message) {
 			onEvent(kind, m)
 		}
+		// HITL events carry a hitl.Request (not a session.Message) so
+		// they ride a dedicated envelope — the WebSocket handler maps
+		// them to hitl_request_pending / hitl_request_resolved.
+		chatCtx.OnHITLEvent = func(kind string, req *hitlModel.Request, messageID string) {
+			onEvent("hitl_request_"+kind, hitlEventPayload{Request: req, MessageID: messageID})
+		}
 	}
 
 	runErr := x.ChatUC.Execute(ctx, message, chatCtx)
@@ -306,6 +322,16 @@ func (x *UseCases) executeChatTurn(
 	}
 
 	return runErr
+}
+
+// hitlEventPayload is carried on "hitl_request_pending" /
+// "hitl_request_resolved" onEvent invocations so the WebSocket handler
+// can marshal both the Request and the optional progress-message
+// binding without committing to a concrete envelope shape at this
+// layer.
+type hitlEventPayload struct {
+	Request   *hitlModel.Request
+	MessageID string
 }
 
 // filterOutMessage returns msgs with the row whose ID matches `id`

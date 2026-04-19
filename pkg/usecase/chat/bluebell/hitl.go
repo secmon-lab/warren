@@ -10,11 +10,14 @@ import (
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
-	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 
 // hitlConfig holds the configuration for the HITL tool middleware.
+// onResolved fires after RequestAndWait returns so the WebSocket
+// handler can emit a hitl_request_resolved envelope and the frontend
+// can clear its pending approval banner. nil for transports that do
+// not fan out envelopes (Slack / CLI).
 type hitlConfig struct {
 	requireApproval map[string]bool
 	service         *hitlService.Service
@@ -22,6 +25,7 @@ type hitlConfig struct {
 	userID          string
 	sessionID       types.SessionID
 	slackThread     *slackModel.Thread
+	onResolved      func(*hitl.Request)
 }
 
 // newHITLMiddleware creates a gollem.ToolMiddleware that intercepts tool calls
@@ -61,9 +65,15 @@ func newHITLMiddleware(cfg hitlConfig) gollem.ToolMiddleware {
 			// Request approval and wait
 			result, err := cfg.service.RequestAndWait(ctx, hitlReq, cfg.presenter)
 			if err != nil {
+				if cfg.onResolved != nil {
+					cfg.onResolved(hitlReq)
+				}
 				return &gollem.ToolExecResponse{
 					Error: err,
 				}, nil
+			}
+			if cfg.onResolved != nil && result != nil {
+				cfg.onResolved(result)
 			}
 
 			// Handle denied
@@ -88,11 +98,3 @@ func newHITLMiddleware(cfg hitlConfig) gollem.ToolMiddleware {
 	}
 }
 
-// buildHITLPresenter creates a Slack HITL presenter for a task.
-// Returns nil if Slack is not configured.
-func buildHITLPresenter(updatableMsg *slackService.UpdatableBlockMessage, taskTitle, userID string) hitlService.Presenter {
-	if updatableMsg == nil {
-		return nil
-	}
-	return slackService.NewHITLPresenter(updatableMsg, taskTitle, userID)
-}

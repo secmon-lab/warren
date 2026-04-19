@@ -169,6 +169,17 @@ type Mutation {
   deleteTag(id: ID!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
   declineAlerts(ids: [ID!]!): [Alert!]!
+
+  # chat-session-redesign: respond to a pending HITL request from the
+  # Web UI. approved=true means "approve" for tool_approval requests or
+  # "submit the selected answer" for question requests. answer/comment
+  # are optional. Returns the updated HITLRequest with Status populated.
+  resolveHITLRequest(
+    id: ID!
+    approved: Boolean!
+    answer: String
+    comment: String
+  ): HITLRequest!
 }
 
 input UpdateTagInput {
@@ -204,6 +215,34 @@ type SessionMessage {
   author: MessageAuthor
   createdAt: String!
   updatedAt: String!
+  # Revisions is the chronologically-ordered list of prior content
+  # values for updatable messages (e.g. task progress, HITL prompts).
+  # Empty for messages that have never been updated in-place.
+  revisions: [MessageRevision!]
+}
+
+type MessageRevision {
+  content: String!
+  createdAt: String!
+}
+
+# HITLRequest mirrors the domain hitl.Request model. The payload shape
+# is intentionally a JSON scalar (encoded as String) because it is
+# already transport-shape-specific (tool_approval vs question) and the
+# frontend renders both variants from the same envelope.
+type HITLRequest {
+  id: ID!
+  sessionID: ID!
+  type: String!
+  status: String!
+  userID: String
+  # Payload / response are serialized JSON strings so the frontend can
+  # parse them directly. Having the same wire shape as the
+  # hitl_request_pending envelope avoids a second translation layer.
+  payload: String
+  response: String
+  createdAt: String!
+  respondedAt: String
 }
 
 type MessageAuthor {

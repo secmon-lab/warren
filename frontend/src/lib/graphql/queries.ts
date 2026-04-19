@@ -1068,3 +1068,32 @@ export const GET_REPROCESS_BATCH_JOB = gql`
     }
   }
 `;
+
+// chat-session-redesign: HITL web-side resolution. Submitted by the
+// HITLPanel when the user clicks Approve / Deny / Submit. The
+// mutation unblocks the agent pipeline's RequestAndWait call.
+export const RESOLVE_HITL_REQUEST = gql`
+  mutation ResolveHITLRequest(
+    $id: ID!
+    $approved: Boolean!
+    $answer: String
+    $comment: String
+  ) {
+    resolveHITLRequest(
+      id: $id
+      approved: $approved
+      answer: $answer
+      comment: $comment
+    ) {
+      id
+      sessionID
+      type
+      status
+      userID
+      payload
+      response
+      createdAt
+      respondedAt
+    }
+  }
+`;

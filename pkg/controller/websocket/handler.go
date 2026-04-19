@@ -520,6 +520,24 @@ func (h *Handler) handleChatMessage(client *Client, message *websocket_model.Cha
 					if ev.Message != nil {
 						h.publishEnvelope(client, NewSessionMessageAddedEvent(ev.Message))
 					}
+				case "session_message_updated":
+					if ev.Message != nil {
+						h.publishEnvelope(client, NewSessionMessageUpdatedEvent(ev.Message))
+					}
+				case "hitl_request_pending":
+					if ev.HITLRequest != nil {
+						h.publishEnvelope(client, NewHITLRequestPendingEvent(
+							ev.HITLRequest.SessionID,
+							hitlViewFromRequest(ev.HITLRequest, ev.HITLMessageID),
+						))
+					}
+				case "hitl_request_resolved":
+					if ev.HITLRequest != nil {
+						h.publishEnvelope(client, NewHITLRequestResolvedEvent(
+							ev.HITLRequest.SessionID,
+							hitlViewFromRequest(ev.HITLRequest, ev.HITLMessageID),
+						))
+					}
 				}
 			}
 

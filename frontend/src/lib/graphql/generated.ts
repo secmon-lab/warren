@@ -145,6 +145,19 @@ export type Finding = {
   summary: Scalars['String']['output'];
 };
 
+export type HitlRequest = {
+  __typename?: 'HITLRequest';
+  createdAt: Scalars['String']['output'];
+  id: Scalars['ID']['output'];
+  payload?: Maybe<Scalars['String']['output']>;
+  respondedAt?: Maybe<Scalars['String']['output']>;
+  response?: Maybe<Scalars['String']['output']>;
+  sessionID: Scalars['ID']['output'];
+  status: Scalars['String']['output'];
+  type: Scalars['String']['output'];
+  userID?: Maybe<Scalars['String']['output']>;
+};
+
 export type Knowledge = {
   __typename?: 'Knowledge';
   author: User;
@@ -188,6 +201,12 @@ export type MessageAuthor = {
   userID: Scalars['String']['output'];
 };
 
+export type MessageRevision = {
+  __typename?: 'MessageRevision';
+  content: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   archiveAllResolvedTickets: ArchiveAllResolvedResult;
@@ -210,6 +229,7 @@ export type Mutation = {
   reopenTicket: Ticket;
   reprocessQueuedAlert: ReprocessJob;
   reprocessQueuedAlertsByFilter: ReprocessBatchJob;
+  resolveHITLRequest: HitlRequest;
   resolveTicket: Ticket;
   runDiagnosis: Diagnosis;
   unarchiveTicket: Ticket;
@@ -322,6 +342,14 @@ export type MutationReprocessQueuedAlertArgs = {
 
 export type MutationReprocessQueuedAlertsByFilterArgs = {
   keyword?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationResolveHitlRequestArgs = {
+  answer?: InputMaybe<Scalars['String']['input']>;
+  approved: Scalars['Boolean']['input'];
+  comment?: InputMaybe<Scalars['String']['input']>;
+  id: Scalars['ID']['input'];
 };
 
 
@@ -605,6 +633,7 @@ export type SessionMessage = {
   content: Scalars['String']['output'];
   createdAt: Scalars['String']['output'];
   id: Scalars['ID']['output'];
+  revisions?: Maybe<Array<MessageRevision>>;
   sessionID: Scalars['ID']['output'];
   ticketID?: Maybe<Scalars['ID']['output']>;
   turnID?: Maybe<Scalars['ID']['output']>;
@@ -1128,6 +1157,16 @@ export type GetReprocessBatchJobQueryVariables = Exact<{
 
 
 export type GetReprocessBatchJobQuery = { __typename?: 'Query', reprocessBatchJob?: { __typename?: 'ReprocessBatchJob', id: string, status: ReprocessJobStatus, totalCount: number, completedCount: number, failedCount: number, createdAt: string, updatedAt: string } | null };
+
+export type ResolveHitlRequestMutationVariables = Exact<{
+  id: Scalars['ID']['input'];
+  approved: Scalars['Boolean']['input'];
+  answer?: InputMaybe<Scalars['String']['input']>;
+  comment?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ResolveHitlRequestMutation = { __typename?: 'Mutation', resolveHITLRequest: { __typename?: 'HITLRequest', id: string, sessionID: string, type: string, status: string, userID?: string | null, payload?: string | null, response?: string | null, createdAt: string, respondedAt?: string | null } };
 
 
 export const GetTicketsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetTickets"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"offset"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"limit"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Int"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"statuses"},"value":{"kind":"Variable","name":{"kind":"Name","value":"statuses"}}},{"kind":"Argument","name":{"kind":"Name","value":"keyword"},"value":{"kind":"Variable","name":{"kind":"Name","value":"keyword"}}},{"kind":"Argument","name":{"kind":"Name","value":"assigneeID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"assigneeID"}}},{"kind":"Argument","name":{"kind":"Name","value":"offset"},"value":{"kind":"Variable","name":{"kind":"Name","value":"offset"}}},{"kind":"Argument","name":{"kind":"Name","value":"limit"},"value":{"kind":"Variable","name":{"kind":"Name","value":"limit"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"tickets"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"description"}},{"kind":"Field","name":{"kind":"Name","value":"conclusion"}},{"kind":"Field","name":{"kind":"Name","value":"reason"}},{"kind":"Field","name":{"kind":"Name","value":"isTest"}},{"kind":"Field","name":{"kind":"Name","value":"assignee"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}},{"kind":"Field","name":{"kind":"Name","value":"alertsCount"}},{"kind":"Field","name":{"kind":"Name","value":"tags"}},{"kind":"Field","name":{"kind":"Name","value":"tagObjects"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}}]}}]}}]} as unknown as DocumentNode;
@@ -2979,3 +3018,33 @@ export type GetReprocessBatchJobQueryHookResult = ReturnType<typeof useGetReproc
 export type GetReprocessBatchJobLazyQueryHookResult = ReturnType<typeof useGetReprocessBatchJobLazyQuery>;
 export type GetReprocessBatchJobSuspenseQueryHookResult = ReturnType<typeof useGetReprocessBatchJobSuspenseQuery>;
 export type GetReprocessBatchJobQueryResult = Apollo.QueryResult<GetReprocessBatchJobQuery, GetReprocessBatchJobQueryVariables>;
+export const ResolveHitlRequestDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ResolveHITLRequest"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"id"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"approved"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"answer"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"comment"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"resolveHITLRequest"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"id"}}},{"kind":"Argument","name":{"kind":"Name","value":"approved"},"value":{"kind":"Variable","name":{"kind":"Name","value":"approved"}}},{"kind":"Argument","name":{"kind":"Name","value":"answer"},"value":{"kind":"Variable","name":{"kind":"Name","value":"answer"}}},{"kind":"Argument","name":{"kind":"Name","value":"comment"},"value":{"kind":"Variable","name":{"kind":"Name","value":"comment"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"sessionID"}},{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"userID"}},{"kind":"Field","name":{"kind":"Name","value":"payload"}},{"kind":"Field","name":{"kind":"Name","value":"response"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"respondedAt"}}]}}]}}]} as unknown as DocumentNode;
+export type ResolveHitlRequestMutationFn = Apollo.MutationFunction<ResolveHitlRequestMutation, ResolveHitlRequestMutationVariables>;
+
+/**
+ * __useResolveHitlRequestMutation__
+ *
+ * To run a mutation, you first call `useResolveHitlRequestMutation` within a React component and pass it any options that fit your needs.
+ * When your component renders, `useResolveHitlRequestMutation` returns a tuple that includes:
+ * - A mutate function that you can call at any time to execute the mutation
+ * - An object with fields that represent the current status of the mutation's execution
+ *
+ * @param baseOptions options that will be passed into the mutation, supported options are listed on: https://www.apollographql.com/docs/react/api/react-hooks/#options-2;
+ *
+ * @example
+ * const [resolveHitlRequestMutation, { data, loading, error }] = useResolveHitlRequestMutation({
+ *   variables: {
+ *      id: // value for 'id'
+ *      approved: // value for 'approved'
+ *      answer: // value for 'answer'
+ *      comment: // value for 'comment'
+ *   },
+ * });
+ */
+export function useResolveHitlRequestMutation(baseOptions?: Apollo.MutationHookOptions<ResolveHitlRequestMutation, ResolveHitlRequestMutationVariables>) {
+        const options = {...defaultOptions, ...baseOptions}
+        return Apollo.useMutation<ResolveHitlRequestMutation, ResolveHitlRequestMutationVariables>(ResolveHitlRequestDocument, options);
+      }
+export type ResolveHitlRequestMutationHookResult = ReturnType<typeof useResolveHitlRequestMutation>;
+export type ResolveHitlRequestMutationResult = Apollo.MutationResult<ResolveHitlRequestMutation>;
+export type ResolveHitlRequestMutationOptions = Apollo.BaseMutationOptions<ResolveHitlRequestMutation, ResolveHitlRequestMutationVariables>;

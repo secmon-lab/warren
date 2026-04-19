@@ -141,6 +141,17 @@ func (h *webProgressHandle) createInitial(ctx context.Context, text string) *ses
 	return m
 }
 
+// ProgressMessageID returns the underlying SessionMessage ID so the
+// WebSocket handler can bind HITL prompts to the exact progress row.
+func (h *webProgressHandle) ProgressMessageID() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.msg == nil {
+		return ""
+	}
+	return string(h.msg.ID)
+}
+
 func (h *webProgressHandle) UpdateText(ctx context.Context, text string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

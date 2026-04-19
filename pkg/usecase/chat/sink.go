@@ -76,6 +76,24 @@ type ProgressHandle interface {
 	PresentHITL(ctx context.Context, req *hitl.Request, taskTitle, userID string) error
 }
 
+// MessageBound is an optional interface that ProgressHandle impls may
+// satisfy to report the underlying SessionMessage ID backing the
+// display row. Used by the WebSocket handler to bind a HITL prompt to
+// an existing progress message so the UI can render approval UI in
+// place. Slack / CLI impls return "".
+type MessageBound interface {
+	ProgressMessageID() string
+}
+
+// ProgressMessageID returns the SessionMessage ID for h when h
+// implements MessageBound, or "" otherwise.
+func ProgressMessageID(h ProgressHandle) string {
+	if mb, ok := h.(MessageBound); ok {
+		return mb.ProgressMessageID()
+	}
+	return ""
+}
+
 // ProgressHandleAsPresenter adapts a ProgressHandle to hitlService.Presenter.
 // Each Present() call routes through the handle's PresentHITL.
 type progressHandleAsPresenter struct {

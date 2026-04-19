@@ -37,6 +37,15 @@ func toGraphQLSessionMessage(m *session.Message) *graphql1.SessionMessage {
 			Email:       m.Author.Email,
 		}
 	}
+	if len(m.Revisions) > 0 {
+		out.Revisions = make([]*graphql1.MessageRevision, len(m.Revisions))
+		for i, rev := range m.Revisions {
+			out.Revisions[i] = &graphql1.MessageRevision{
+				Content:   rev.Content,
+				CreatedAt: rev.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			}
+		}
+	}
 	return out
 }
 

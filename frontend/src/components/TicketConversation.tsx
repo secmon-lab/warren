@@ -13,6 +13,8 @@ import { Session, SessionMessage } from "@/lib/types";
 import { useWebSocket } from "@/hooks/useWebSocket";
 import { formatRelativeTime } from "@/lib/utils-extended";
 import { ConversationMainPane } from "./ConversationMainPane";
+import { HITLPanel } from "./HITLPanel";
+import type { HITLView } from "@/lib/websocket-types";
 
 interface TicketConversationProps {
   ticketId: string;
@@ -316,6 +318,10 @@ function WebChatPane({
   // upstream pulls them into `persistedMessages`, so keeping them in
   // the live buffer would double-render.
   const [liveBuffer, setLiveBuffer] = useState<SessionMessage[]>([]);
+  // HITL pending request bound to this session. Populated on
+  // hitl_request_pending envelope, cleared on hitl_request_resolved
+  // or when the mutation reports success locally.
+  const [hitlRequest, setHitlRequest] = useState<HITLView | null>(null);
 
   const { status, sendMessage } = useWebSocket(
     ticketId,
@@ -324,17 +330,20 @@ function WebChatPane({
       onMessage: (m) => {
         // Every message received while a Turn is active becomes a
         // synthetic SessionMessage row so it renders with the same
-        // MessageBubble styling as persisted content.
-        if (m.type === "message") {
-          setLiveBuffer((prev) => [
-            ...prev,
-            synthesizeMessage(m.message_id || `live-${Date.now()}`, "response", m.content),
-          ]);
-        } else if (m.type === "trace") {
-          setLiveBuffer((prev) => [
-            ...prev,
-            synthesizeMessage(m.message_id || `live-${Date.now()}`, "trace", m.content),
-          ]);
+        // MessageBubble styling as persisted content. session_message_updated
+        // envelopes surface as ChatResponse with the same message_id, so
+        // the liveBuffer update logic swaps in place via ID match.
+        if (m.type === "message" || m.type === "trace") {
+          const id = m.message_id || `live-${Date.now()}`;
+          const kind = m.type === "trace" ? "trace" : "response";
+          setLiveBuffer((prev) => {
+            const idx = prev.findIndex((x) => x.id === id);
+            const synthesized = synthesizeMessage(id, kind, m.content);
+            if (idx < 0) return [...prev, synthesized];
+            const next = prev.slice();
+            next[idx] = synthesized;
+            return next;
+          });
         } else if (m.type === "status" && /^Turn /.test(m.content)) {
           // Turn closed — drop the live buffer so we don't double
           // render against the just-persisted rows, then ask the
@@ -343,6 +352,13 @@ function WebChatPane({
           onTurnCompleted();
         } else if (m.type === "status" && /^Session /.test(m.content)) {
           onSessionCreated();
+        }
+      },
+      onHITLEvent: (kind, hitl) => {
+        if (kind === "pending") {
+          setHitlRequest(hitl);
+        } else {
+          setHitlRequest(null);
         }
       },
     },
@@ -405,6 +421,14 @@ function WebChatPane({
         ref={scrollRef}
         className="flex-1 overflow-y-auto pr-1 min-h-0">
         <ConversationMainPane messages={timeline} loading={messagesLoading} />
+        {hitlRequest && (
+          <div className="mt-3">
+            <HITLPanel
+              request={hitlRequest}
+              onResolved={() => setHitlRequest(null)}
+            />
+          </div>
+        )}
       </div>
       <form
         onSubmit={handleSubmit}

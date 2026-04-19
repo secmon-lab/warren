@@ -92,8 +92,28 @@ export function isTraceResponse(response: ChatResponse): response is ChatRespons
 export type EventKind =
   | 'session_created'
   | 'session_message_added'
+  | 'session_message_updated'
   | 'turn_started'
-  | 'turn_ended';
+  | 'turn_ended'
+  | 'hitl_request_pending'
+  | 'hitl_request_resolved';
+
+// HITLView mirrors pkg/controller/websocket/events.go#HITLView. The
+// payload / response fields are domain-typed (map) in Go and arrive as
+// JSON objects here; the frontend renders them based on `type`.
+export interface HITLView {
+  id: string;
+  session_id: string;
+  type: 'tool_approval' | 'question';
+  status: 'pending' | 'approved' | 'denied';
+  user_id?: string;
+  payload?: Record<string, unknown>;
+  response?: Record<string, unknown>;
+  // message_id binds the prompt to an existing progress message so
+  // the UI can render approval/question controls in-place instead of
+  // floating them above the timeline.
+  message_id?: string;
+}
 
 export interface MessageView {
   id: string;
@@ -136,6 +156,7 @@ export interface EventEnvelope {
   session?: SessionView | null;
   turn?: TurnView | null;
   status?: 'running' | 'completed' | 'aborted' | null;
+  hitl?: HITLView | null;
 }
 
 export function isEventEnvelope(data: unknown): data is EventEnvelope {
@@ -144,8 +165,11 @@ export function isEventEnvelope(data: unknown): data is EventEnvelope {
   const validKinds: EventKind[] = [
     'session_created',
     'session_message_added',
+    'session_message_updated',
     'turn_started',
     'turn_ended',
+    'hitl_request_pending',
+    'hitl_request_resolved',
   ];
   return (
     typeof e.event === 'string' &&

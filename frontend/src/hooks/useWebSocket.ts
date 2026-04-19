@@ -15,6 +15,10 @@ export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'err
 interface UseWebSocketOptions {
   onMessage?: (message: ChatResponse) => void;
   onStatusChange?: (status: WebSocketStatus) => void;
+  // onHITLEvent fires when the backend emits a hitl_request_pending
+  // or hitl_request_resolved envelope. The HITLPanel consumer listens
+  // for these events; ChatResponse-level consumers ignore them.
+  onHITLEvent?: (kind: 'pending' | 'resolved', hitl: import('@/lib/websocket-types').HITLView) => void;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
 }
@@ -44,6 +48,7 @@ export function useWebSocket(
   const {
     onMessage,
     onStatusChange,
+    onHITLEvent,
     reconnectInterval = 8000, // Increased to 8 seconds to reduce frequency
     maxReconnectAttempts = 3, // Limited to 3 attempts
   } = options;
@@ -90,6 +95,7 @@ export function useWebSocket(
 
   const onStatusChangeRef = useRef(onStatusChange);
   const onMessageRef = useRef(onMessage);
+  const onHITLEventRef = useRef(onHITLEvent);
   
   // Initialize messages from cache on mount
   useEffect(() => {
@@ -108,7 +114,8 @@ export function useWebSocket(
   useEffect(() => {
     onStatusChangeRef.current = onStatusChange;
     onMessageRef.current = onMessage;
-  }, [onStatusChange, onMessage]);
+    onHITLEventRef.current = onHITLEvent;
+  }, [onStatusChange, onMessage, onHITLEvent]);
 
   const updateStatus = useCallback((newStatus: WebSocketStatus) => {
     setStatus(newStatus);
@@ -206,6 +213,36 @@ export function useWebSocket(
         // shape so existing render paths keep working while the UI is
         // migrated incrementally.
         if (isEventEnvelope(data)) {
+          // HITL events bypass the ChatResponse stream — they drive
+          // approval / question UI instead of the message timeline.
+          if (data.event === 'hitl_request_pending' && data.hitl) {
+            onHITLEventRef.current?.('pending', data.hitl);
+            return;
+          }
+          if (data.event === 'hitl_request_resolved' && data.hitl) {
+            onHITLEventRef.current?.('resolved', data.hitl);
+            return;
+          }
+          // session_message_updated replaces an existing entry in
+          // place. The receiver is expected to identify the row by
+          // message_id and swap the content; if no existing entry
+          // matches (e.g. the client joined mid-turn), append as a
+          // fresh message so the user still sees it.
+          if (data.event === 'session_message_updated') {
+            const translated = translateEventToChatResponse(data);
+            if (translated && translated.message_id) {
+              setMessages(prev => {
+                const idx = prev.findIndex(x => x.message_id === translated.message_id);
+                if (idx < 0) return [...prev, translated];
+                const next = prev.slice();
+                next[idx] = translated;
+                return next;
+              });
+              wsManager.addMessage(ticketId, tabIdRef.current, translated);
+              onMessageRef.current?.(translated);
+            }
+            return;
+          }
           const translated = translateEventToChatResponse(data);
           if (translated) {
             setMessages(prev => [...prev, translated]);
@@ -385,6 +422,29 @@ export function useWebSocket(
           console.log('Parsed WebSocket message:', data);
 
           if (isEventEnvelope(data)) {
+            if (data.event === 'hitl_request_pending' && data.hitl) {
+              onHITLEventRef.current?.('pending', data.hitl);
+              return;
+            }
+            if (data.event === 'hitl_request_resolved' && data.hitl) {
+              onHITLEventRef.current?.('resolved', data.hitl);
+              return;
+            }
+            if (data.event === 'session_message_updated') {
+              const translated = translateEventToChatResponse(data);
+              if (translated && translated.message_id) {
+                setMessages(prev => {
+                  const idx = prev.findIndex(x => x.message_id === translated.message_id);
+                  if (idx < 0) return [...prev, translated];
+                  const next = prev.slice();
+                  next[idx] = translated;
+                  return next;
+                });
+                wsManager.addMessage(ticketId, tabIdRef.current, translated);
+                onMessageRef.current?.(translated);
+              }
+              return;
+            }
             const translated = translateEventToChatResponse(data);
             if (translated) {
               setMessages(prev => [...prev, translated]);
@@ -500,6 +560,25 @@ function translateEventToChatResponse(env: EventEnvelope): ChatResponse | null {
           : undefined,
       };
     }
+    case 'session_message_updated': {
+      // Updated messages carry the same ID as an earlier
+      // session_message_added row; the consumer replaces the
+      // existing entry in place (handled by ID matching in the
+      // live buffer) rather than appending a new one.
+      const m = env.message;
+      if (!m) return null;
+      if (m.type === 'user') return null;
+      const isTrace = m.type === 'trace';
+      return {
+        type: isTrace ? 'trace' : 'message',
+        content: m.content,
+        timestamp,
+        message_id: m.id,
+        user: m.author
+          ? { id: m.author.user_id, name: m.author.display_name }
+          : undefined,
+      };
+    }
     case 'session_created':
       return {
         type: 'status',
@@ -518,6 +597,13 @@ function translateEventToChatResponse(env: EventEnvelope): ChatResponse | null {
         content: `Turn ${env.status ?? 'completed'}.`,
         timestamp,
       };
+    case 'hitl_request_pending':
+    case 'hitl_request_resolved':
+      // HITL events are handled by a dedicated subscriber
+      // (see useHITLRequests) rather than the ChatResponse
+      // stream — they require their own UI (approval buttons,
+      // radio options) that doesn't fit the message timeline.
+      return null;
     default:
       return null;
   }
