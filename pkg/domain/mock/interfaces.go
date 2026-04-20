@@ -9656,6 +9656,9 @@ func (mock *EmbeddingClientMock) EmbeddingsCalls() []struct {
 //			CloseFunc: func(ctx context.Context)  {
 //				panic("mock out the Close method")
 //			},
+//			CopyObjectFunc: func(ctx context.Context, src string, dst string) error {
+//				panic("mock out the CopyObject method")
+//			},
 //			DeleteObjectFunc: func(ctx context.Context, object string) error {
 //				panic("mock out the DeleteObject method")
 //			},
@@ -9675,6 +9678,9 @@ type StorageClientMock struct {
 	// CloseFunc mocks the Close method.
 	CloseFunc func(ctx context.Context)
 
+	// CopyObjectFunc mocks the CopyObject method.
+	CopyObjectFunc func(ctx context.Context, src string, dst string) error
+
 	// DeleteObjectFunc mocks the DeleteObject method.
 	DeleteObjectFunc func(ctx context.Context, object string) error
 
@@ -9690,6 +9696,15 @@ type StorageClientMock struct {
 		Close []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+		}
+		// CopyObject holds details about calls to the CopyObject method.
+		CopyObject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Src is the src argument value.
+			Src string
+			// Dst is the dst argument value.
+			Dst string
 		}
 		// DeleteObject holds details about calls to the DeleteObject method.
 		DeleteObject []struct {
@@ -9714,6 +9729,7 @@ type StorageClientMock struct {
 		}
 	}
 	lockClose        sync.RWMutex
+	lockCopyObject   sync.RWMutex
 	lockDeleteObject sync.RWMutex
 	lockGetObject    sync.RWMutex
 	lockPutObject    sync.RWMutex
@@ -9748,6 +9764,49 @@ func (mock *StorageClientMock) CloseCalls() []struct {
 	mock.lockClose.RLock()
 	calls = mock.calls.Close
 	mock.lockClose.RUnlock()
+	return calls
+}
+
+// CopyObject calls CopyObjectFunc.
+func (mock *StorageClientMock) CopyObject(ctx context.Context, src string, dst string) error {
+	callInfo := struct {
+		Ctx context.Context
+		Src string
+		Dst string
+	}{
+		Ctx: ctx,
+		Src: src,
+		Dst: dst,
+	}
+	mock.lockCopyObject.Lock()
+	mock.calls.CopyObject = append(mock.calls.CopyObject, callInfo)
+	mock.lockCopyObject.Unlock()
+	if mock.CopyObjectFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.CopyObjectFunc(ctx, src, dst)
+}
+
+// CopyObjectCalls gets all the calls that were made to CopyObject.
+// Check the length with:
+//
+//	len(mockedStorageClient.CopyObjectCalls())
+func (mock *StorageClientMock) CopyObjectCalls() []struct {
+	Ctx context.Context
+	Src string
+	Dst string
+} {
+	var calls []struct {
+		Ctx context.Context
+		Src string
+		Dst string
+	}
+	mock.lockCopyObject.RLock()
+	calls = mock.calls.CopyObject
+	mock.lockCopyObject.RUnlock()
 	return calls
 }
 

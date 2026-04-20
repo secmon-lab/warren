@@ -20,8 +20,8 @@ import (
 )
 
 // migrateRuntime bundles the infrastructure handles the migration jobs
-// need. Phase 7 jobs that touch Cloud Storage (history-scope,
-// cleanup-legacy) consult Storage; the index/backfill jobs ignore it.
+// need. Phase 7 jobs that touch Cloud Storage (history-scope) consult
+// Storage; the index/backfill jobs ignore it.
 type migrateRuntime struct {
 	projectID  string
 	databaseID string
@@ -69,17 +69,12 @@ var migrationJobs = []migrationJob{
 	},
 	{
 		Name:        "history-scope",
-		Description: "Copy legacy Ticket-scoped gollem.History files into Session-scoped destinations (chat-session-redesign Phase 7). Placeholder.",
+		Description: "Server-side copy of legacy Ticket-scoped gollem.History files into Session-scoped destinations (chat-session-redesign Phase 7). Non-destructive; legacy files are left in place.",
 		Run:         runHistoryScope,
 	},
 	{
-		Name:        "cleanup-legacy",
-		Description: "Remove legacy ticket_comments, old history files, and deprecated Session fields (chat-session-redesign Phase 7). DESTRUCTIVE; --dry-run first. Placeholder.",
-		Run:         runCleanupLegacy,
-	},
-	{
 		Name:        "session-consolidate",
-		Description: "Delete legacy UUID Session rows that duplicate the canonical slack_<hash> Session per (Ticket, Thread). Keeps rows that still carry messages so operators can investigate anomalies.",
+		Description: "Materialize the canonical slack_<hash> Session for every Slack-origin Ticket so the Conversation sidebar has a single survivor per thread. Non-destructive; legacy UUID Session rows are left in place and filtered out at read time.",
 		Run:         runSessionConsolidate,
 	},
 }

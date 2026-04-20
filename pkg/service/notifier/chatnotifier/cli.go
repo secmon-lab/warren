@@ -15,11 +15,11 @@ import (
 // CLINotifier delivers messages to a writer (typically os.Stdout) and
 // persists them as Messages in the current CLI Session.
 type CLINotifier struct {
-	repo      interfaces.Repository
-	session   *session.Session
-	turnID    *types.TurnID
-	w         io.Writer
-	ticketID  *types.TicketID
+	repo     interfaces.Repository
+	session  *session.Session
+	turnID   *types.TurnID
+	w        io.Writer
+	ticketID *types.TicketID
 }
 
 // NewCLINotifier constructs a CLINotifier bound to sess + turnID. turnID may

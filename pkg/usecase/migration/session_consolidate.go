@@ -105,8 +105,8 @@ func (j *SessionConsolidateJob) Run(ctx context.Context, opts Options) (*Result,
 	}
 
 	result.MergeDetails(map[string]any{
-		"created":  created,
-		"existed":  existed,
+		"created": created,
+		"existed": existed,
 	})
 	return result, nil
 }

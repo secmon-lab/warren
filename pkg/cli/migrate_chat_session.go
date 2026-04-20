@@ -87,8 +87,8 @@ func forEachSession(
 	return nil
 }
 
-// firestoreCommentSource satisfies migration.LegacyCommentStore using
-// the raw Firestore client directly, never going through the Repository
+// firestoreCommentSource satisfies migration.CommentSource using the
+// raw Firestore client directly, never going through the Repository
 // interface. This keeps every legacy-Comment code path confined to the
 // migration wrapper: the main application's Repository no longer knows
 // `ticket.Comment` exists.
@@ -165,23 +165,6 @@ func (f firestoreCommentSource) GetTicketComments(ctx context.Context, ticketID 
 		out = append(out, c)
 	}
 	return out, nil
-}
-
-func (f firestoreCommentSource) DeleteTicketComment(ctx context.Context, ticketID types.TicketID, commentID types.CommentID) error {
-	db, err := f.openClient(ctx)
-	if err != nil {
-		return err
-	}
-	defer safe.Close(ctx, db)
-
-	_, err = db.Collection(firestoreTicketsCollection).Doc(ticketID.String()).
-		Collection(firestoreCommentsCollection).Doc(commentID.String()).
-		Delete(ctx)
-	if err != nil {
-		return goerr.Wrap(err, "failed to delete comment",
-			goerr.V("ticket_id", ticketID), goerr.V("comment_id", commentID))
-	}
-	return nil
 }
 
 func runSessionSourceBackfill(ctx context.Context, rt *migrateRuntime) error {
@@ -317,39 +300,6 @@ func runHistoryScope(ctx context.Context, rt *migrateRuntime) error {
 		return err
 	}
 	logger.Info("history-scope complete",
-		"scanned", result.Scanned,
-		"migrated", result.Migrated,
-		"skipped", result.Skipped,
-		"errors", result.Errors,
-	)
-	return nil
-}
-
-func runCleanupLegacy(ctx context.Context, rt *migrateRuntime) error {
-	logger := logging.From(ctx)
-
-	// Storage is optional for cleanup-legacy; when absent, only
-	// Firestore ticket_comments are purged.
-	var storageSvc *storage.Service
-	if rt.storage != nil && rt.storage.IsConfigured() {
-		svc, err := buildStorageService(ctx, rt)
-		if err != nil {
-			return err
-		}
-		storageSvc = svc
-	}
-
-	store := firestoreCommentSource{projectID: rt.projectID, databaseID: rt.databaseID}
-	forEach := func(ctx context.Context, handle func(*sessModel.Session) error) error {
-		return forEachSession(ctx, rt.projectID, rt.databaseID, handle)
-	}
-
-	job := migration.NewCleanupLegacyJob(store, storageSvc, forEach)
-	result, err := job.Run(ctx, migration.Options{DryRun: rt.dryRun})
-	if err != nil {
-		return err
-	}
-	logger.Info("cleanup-legacy complete",
 		"scanned", result.Scanned,
 		"migrated", result.Migrated,
 		"skipped", result.Skipped,

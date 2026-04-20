@@ -47,6 +47,47 @@ func (s *Service) PutSessionHistory(ctx context.Context, sessionID types.Session
 	return nil
 }
 
+// HasSessionHistory reports whether a Session-scoped history object has
+// already been persisted. Uses a cheap GetObject probe because the
+// StorageClient interface does not expose attribute lookups; callers
+// should treat read errors ("object not found", etc.) as "no history
+// yet" rather than a hard failure.
+func (s *Service) HasSessionHistory(ctx context.Context, sessionID types.SessionID) bool {
+	if s.storageClient == nil {
+		return false
+	}
+	path := pathToSessionHistory(s.prefix, sessionID)
+	r, err := s.storageClient.GetObject(ctx, path)
+	if err != nil || r == nil {
+		return false
+	}
+	safe.Close(ctx, r)
+	return true
+}
+
+// CopyLatestHistoryToSession performs a server-side copy from the
+// legacy ticket-scoped latest.json path into the Session-scoped
+// history.json path. The payload never transits the caller's process —
+// GCS executes the rewrite internally. Returns (copied=false, nil)
+// when the legacy file does not exist, so the migration job can count
+// the Session as a skip instead of an error.
+func (s *Service) CopyLatestHistoryToSession(ctx context.Context, ticketID types.TicketID, sessionID types.SessionID) (bool, error) {
+	if s.storageClient == nil {
+		return false, nil
+	}
+	src := pathToLatestHistory(s.prefix, ticketID)
+	dst := pathToSessionHistory(s.prefix, sessionID)
+	if err := s.storageClient.CopyObject(ctx, src, dst); err != nil {
+		return false, goerr.Wrap(err, "failed to copy latest history into session scope",
+			goerr.V("ticket_id", ticketID),
+			goerr.V("session_id", sessionID),
+			goerr.V("src", src),
+			goerr.V("dst", dst),
+		)
+	}
+	return true, nil
+}
+
 // GetSessionHistory loads the gollem.History for a Session. Returns
 // (nil, nil) when no history has been saved yet so callers can start
 // fresh without special-casing.

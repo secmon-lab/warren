@@ -26,8 +26,8 @@ import (
 // bootstrap, tests, etc.).
 type NoopNotifier struct{}
 
-func (NoopNotifier) Notify(context.Context, string) error                     { return nil }
-func (NoopNotifier) Trace(context.Context, string) error                      { return nil }
-func (NoopNotifier) Warn(context.Context, string) error                       { return nil }
-func (NoopNotifier) Plan(context.Context, string) error                       { return nil }
+func (NoopNotifier) Notify(context.Context, string) error                      { return nil }
+func (NoopNotifier) Trace(context.Context, string) error                       { return nil }
+func (NoopNotifier) Warn(context.Context, string) error                        { return nil }
+func (NoopNotifier) Plan(context.Context, string) error                        { return nil }
 func (NoopNotifier) NotifyUser(context.Context, string, *session.Author) error { return nil }

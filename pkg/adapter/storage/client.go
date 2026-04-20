@@ -47,6 +47,30 @@ func (x *Client) GetObject(ctx context.Context, object string) (io.ReadCloser, e
 	return rc, nil
 }
 
+// CopyObject copies src to dst inside the same bucket using GCS's
+// server-side copy API. No bytes traverse the caller's process; the
+// rewrite runs entirely on Google's side. A missing source surfaces
+// as storage.ErrObjectNotExist, wrapped so callers can discriminate.
+func (x *Client) CopyObject(ctx context.Context, src, dst string) error {
+	bucket := x.client.Bucket(x.bucket)
+	_, err := bucket.Object(dst).CopierFrom(bucket.Object(src)).Run(ctx)
+	if err != nil {
+		if errors.Is(err, storage.ErrObjectNotExist) {
+			return goerr.Wrap(err, "source object not found",
+				goerr.V("bucket", x.bucket),
+				goerr.V("src", src),
+				goerr.V("dst", dst),
+			)
+		}
+		return goerr.Wrap(err, "failed to copy object",
+			goerr.V("bucket", x.bucket),
+			goerr.V("src", src),
+			goerr.V("dst", dst),
+		)
+	}
+	return nil
+}
+
 func (x *Client) DeleteObject(ctx context.Context, object string) error {
 	err := x.client.Bucket(x.bucket).Object(object).Delete(ctx)
 	if err != nil {

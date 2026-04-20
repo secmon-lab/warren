@@ -12,8 +12,8 @@ import (
 
 // CommentToMessageJob rewrites every existing ticket.Comment as a
 // type=user session.Message attached to the corresponding Slack Session.
-// The legacy Comment row is NOT deleted — cleanup happens in
-// CleanupLegacyJob once application code no longer reads Comments.
+// The legacy Comment row is NOT deleted — operators retain the original
+// data indefinitely and decide separately when it is safe to discard.
 //
 // Idempotence: each generated Message carries a SessionID derived
 // deterministically from (ticket_id, slack_thread), so re-running the
@@ -23,30 +23,20 @@ import (
 // the same content already exists on the target Session under that
 // author and timestamp.
 type CommentToMessageJob struct {
-	source     CommentSource
-	resolver   CommentResolverClient
-	writer     MessageWriter
+	source       CommentSource
+	resolver     CommentResolverClient
+	writer       MessageWriter
 	readMessages SessionMessageReader
 }
 
-// LegacyCommentStore abstracts the pre-redesign Comment subcollection so
-// migration jobs can operate against either a raw Firestore client
-// (production, see pkg/cli/migrate_chat_session.go) or the memory
-// repository's internal comment map (tests) without pulling Comment CRUD
-// back onto the main Repository interface.
-//
-// Methods on this interface are intentionally the **only** code path
-// that reads or writes `ticket.Comment`. Application code must never
-// hold a LegacyCommentStore; it is scoped to the migration package.
-type LegacyCommentStore interface {
-	ListTicketsWithComments(ctx context.Context) ([]*ticket.Ticket, error)
-	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
-	DeleteTicketComment(ctx context.Context, ticketID types.TicketID, commentID types.CommentID) error
-}
-
-// CommentSource is the read-only subset of LegacyCommentStore used by
-// comment-to-message. Kept as a distinct interface so cleanup-legacy's
-// additional destructive surface does not leak into the read path.
+// CommentSource abstracts the pre-redesign Comment subcollection so the
+// migration job can operate against either a raw Firestore client
+// (production, see pkg/cli/migrate_chat_session.go) or an in-memory
+// fake (tests) without pulling Comment CRUD back onto the main
+// Repository interface. The interface is read-only on purpose: this PR
+// migrates legacy Comment rows into Session Messages but never deletes
+// the originals — operators can decide separately when the pre-redesign
+// data is safe to discard.
 type CommentSource interface {
 	ListTicketsWithComments(ctx context.Context) ([]*ticket.Ticket, error)
 	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
@@ -89,7 +79,7 @@ func NewCommentToMessageJob(source CommentSource, resolver CommentResolverClient
 func (j *CommentToMessageJob) Name() string { return "comment-to-message" }
 
 func (j *CommentToMessageJob) Description() string {
-	return "Rewrite ticket.Comment rows as session.Message(type=user) attached to the owning Slack Session. Idempotent; original Comment rows are not deleted (see cleanup-legacy)."
+	return "Rewrite ticket.Comment rows as session.Message(type=user) attached to the owning Slack Session. Idempotent and non-destructive: original Comment rows are retained indefinitely."
 }
 
 // Run scans every Ticket with Slack comments, resolves its Slack
@@ -120,9 +110,8 @@ func (j *CommentToMessageJob) Run(ctx context.Context, opts Options) (*Result, e
 		}
 		if t.SlackThread == nil {
 			// No Slack thread context; the Session cannot be
-			// resolved deterministically, so these Comments will
-			// have to be migrated manually or dropped by
-			// cleanup-legacy. Count and move on.
+			// resolved deterministically, so these Comments have
+			// to be migrated manually. Count and move on.
 			result.Scanned += len(comments)
 			result.Skipped += len(comments)
 			continue

@@ -287,7 +287,6 @@ func TestWarren_UpdateFindingDryRun(t *testing.T) {
 	}))
 }
 
-
 func TestWarren_SearchTicketsByWords(t *testing.T) {
 	repo := repository.NewMemory()
 	ctx := context.Background()

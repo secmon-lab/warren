@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/m-mizutani/gt"
+	sessSvcDomain "github.com/secmon-lab/warren/pkg/domain/interfaces"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	slackModel "github.com/secmon-lab/warren/pkg/domain/model/slack"
@@ -23,18 +24,17 @@ import (
 	slackSvc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/slack/testutil"
 	"github.com/secmon-lab/warren/pkg/usecase"
-	sessSvcDomain "github.com/secmon-lab/warren/pkg/domain/interfaces"
 )
 
 // stubChatUC lets us assert that ChatFromSlack reaches Execute (or not)
 // without pulling in the full LLM stack. It also lets a test pause the
 // Execute call so the lock can be inspected while a run is in flight.
 type stubChatUC struct {
-	mu       sync.Mutex
-	runs     int
-	release  chan struct{}
-	err      error
-	onExec   func(ctx context.Context)
+	mu      sync.Mutex
+	runs    int
+	release chan struct{}
+	err     error
+	onExec  func(ctx context.Context)
 }
 
 func (s *stubChatUC) Execute(ctx context.Context, message string, chatCtx chatModel.ChatContext) error {

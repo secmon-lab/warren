@@ -265,4 +265,3 @@ func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[st
 
 	return response, nil
 }
-

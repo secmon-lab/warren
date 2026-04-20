@@ -52,8 +52,8 @@ func (uc *UseCases) HandleSlackMessage(ctx context.Context, slackMsg slack.Messa
 	// ticket.Comment write path has been removed. Slack-origin thread
 	// messages are persisted exclusively as type=user
 	// session.Message(TurnID=nil) rows. Pre-redesign Comment documents
-	// still exist in production until cleanup-legacy runs; they are
-	// accessible only via the migration package.
+	// remain in production indefinitely (the migration never deletes
+	// them); they are accessible only via the migration package.
 	uc.persistSlackThreadMessageAsSessionMessage(ctx, existingTicket.ID, slackMsg)
 
 	return nil

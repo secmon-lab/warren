@@ -55,4 +55,13 @@ func (m *Mock) DeleteObject(_ context.Context, object string) error {
 	return nil
 }
 
+func (m *Mock) CopyObject(_ context.Context, src, dst string) error {
+	v, ok := m.data[src]
+	if !ok {
+		return goerr.New("source object not found", goerr.V("src", src))
+	}
+	m.data[dst] = v
+	return nil
+}
+
 func (m *Mock) Close(_ context.Context) {}

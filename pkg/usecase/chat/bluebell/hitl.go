@@ -97,4 +97,3 @@ func newHITLMiddleware(cfg hitlConfig) gollem.ToolMiddleware {
 		}
 	}
 }
-

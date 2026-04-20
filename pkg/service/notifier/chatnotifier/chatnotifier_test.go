@@ -163,7 +163,7 @@ func TestWebNotifier_TicketlessSkipsPublish(t *testing.T) {
 
 	msgs, err := repo.GetSessionMessages(ctx, sess.ID)
 	gt.NoError(t, err)
-	gt.A(t, msgs).Length(1) // persisted
+	gt.A(t, msgs).Length(1)      // persisted
 	gt.A(t, pub.Calls).Length(0) // no publish without ticket
 }
 

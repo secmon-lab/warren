@@ -3,8 +3,8 @@ package graphql
 import (
 	"encoding/json"
 
-	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
+	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 )
 
 // hitlRequestToGraphQL converts a domain hitl.Request into the GraphQL

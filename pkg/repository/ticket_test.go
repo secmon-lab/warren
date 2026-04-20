@@ -317,7 +317,6 @@ func TestGetTicketsWithInvalidEmbedding(t *testing.T) {
 	})
 }
 
-
 func TestGetTicketsByStatus(t *testing.T) {
 	testFn := func(t *testing.T, repo interfaces.Repository) {
 		ctx := t.Context()
@@ -819,4 +818,3 @@ func TestCountTicketsByStatus(t *testing.T) {
 		testFn(t, repo)
 	})
 }
-

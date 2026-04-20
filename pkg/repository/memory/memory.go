@@ -26,14 +26,14 @@ type Memory struct {
 
 	diagnosisMu sync.RWMutex
 
-	alerts         map[types.AlertID]*alert.Alert
-	lists          map[types.AlertListID]*alert.List
-	tickets        map[types.TicketID]*ticket.Ticket
-	tokens         map[auth.TokenID]*auth.Token
-	activities     map[types.ActivityID]*activity.Activity
-	tagsV2         map[string]*tag.Tag // New ID-based tags
-	notices        map[types.NoticeID]*notice.Notice
-	refineGroups   map[types.RefineGroupID]*refine.Group
+	alerts       map[types.AlertID]*alert.Alert
+	lists        map[types.AlertListID]*alert.List
+	tickets      map[types.TicketID]*ticket.Ticket
+	tokens       map[auth.TokenID]*auth.Token
+	activities   map[types.ActivityID]*activity.Activity
+	tagsV2       map[string]*tag.Tag // New ID-based tags
+	notices      map[types.NoticeID]*notice.Notice
+	refineGroups map[types.RefineGroupID]*refine.Group
 	// Diagnosis management
 	diagnoses       map[types.DiagnosisID]*diagnosis.Diagnosis
 	diagnosisIssues map[types.DiagnosisID]map[string]*diagnosis.Issue
@@ -66,14 +66,14 @@ var _ interfaces.Repository = &Memory{}
 
 func New() *Memory {
 	return &Memory{
-		alerts:         make(map[types.AlertID]*alert.Alert),
-		lists:          make(map[types.AlertListID]*alert.List),
-		tickets:        make(map[types.TicketID]*ticket.Ticket),
-		tokens:         make(map[auth.TokenID]*auth.Token),
-		activities:     make(map[types.ActivityID]*activity.Activity),
-		tagsV2:         make(map[string]*tag.Tag),
-		notices:        make(map[types.NoticeID]*notice.Notice),
-		refineGroups:   make(map[types.RefineGroupID]*refine.Group),
+		alerts:       make(map[types.AlertID]*alert.Alert),
+		lists:        make(map[types.AlertListID]*alert.List),
+		tickets:      make(map[types.TicketID]*ticket.Ticket),
+		tokens:       make(map[auth.TokenID]*auth.Token),
+		activities:   make(map[types.ActivityID]*activity.Activity),
+		tagsV2:       make(map[string]*tag.Tag),
+		notices:      make(map[types.NoticeID]*notice.Notice),
+		refineGroups: make(map[types.RefineGroupID]*refine.Group),
 
 		diagnoses:          make(map[types.DiagnosisID]*diagnosis.Diagnosis),
 		diagnosisIssues:    make(map[types.DiagnosisID]map[string]*diagnosis.Issue),

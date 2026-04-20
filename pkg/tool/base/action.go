@@ -109,10 +109,10 @@ func (x *Warren) Prompt(ctx context.Context) (string, error) {
 }
 
 const (
-	cmdGetAlerts               = "warren_get_alerts"
-	cmdFindNearestTicket       = "warren_find_nearest_ticket"
-	cmdSearchTicketsByWords    = "warren_search_tickets_by_words"
-	cmdUpdateFinding           = "warren_update_finding"
+	cmdGetAlerts                = "warren_get_alerts"
+	cmdFindNearestTicket        = "warren_find_nearest_ticket"
+	cmdSearchTicketsByWords     = "warren_search_tickets_by_words"
+	cmdUpdateFinding            = "warren_update_finding"
 	cmdGetTicketSessionMessages = "warren_get_ticket_session_messages"
 	cmdSearchSessionMessages    = "warren_search_session_messages"
 

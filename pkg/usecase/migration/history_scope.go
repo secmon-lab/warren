@@ -12,13 +12,19 @@ import (
 // `{prefix}/{schema}/ticket/{tid}/latest.json` into Session-scoped
 // destinations at `{prefix}/{schema}/sessions/{sid}/history.json`.
 //
+// The copy uses GCS's server-side Copy API (see
+// storage.Service.CopyLatestHistoryToSession) so the payload never
+// traverses this process — a full migration of tens of thousands of
+// Sessions costs no egress bandwidth from the migrate binary.
+//
 // Source mapping: for each Session with Source=slack and a resolved
 // Ticket, the ticket's latest.json is copied into the Session's history
 // slot. Web/CLI Sessions did not exist pre-redesign and are skipped.
 //
 // The job is idempotent: when the Session already has a history slot
-// populated, it is left untouched. Legacy files are never deleted here;
-// cleanup-legacy handles removal after this job succeeds.
+// populated, it is left untouched. Legacy files are NEVER deleted here
+// — this PR intentionally leaves the pre-redesign latest.json objects
+// in place so operators can roll back without a GCS version restore.
 type HistoryScopeJob struct {
 	storageSvc *storage.Service
 	forEach    SessionForEach
@@ -33,7 +39,7 @@ func NewHistoryScopeJob(svc *storage.Service, forEach SessionForEach) *HistorySc
 func (j *HistoryScopeJob) Name() string { return "history-scope" }
 
 func (j *HistoryScopeJob) Description() string {
-	return "Copy legacy Ticket-scoped gollem.History latest.json files into Session-scoped sessions/{sid}/history.json destinations. Skips destinations that already exist; leaves legacy files in place for cleanup-legacy."
+	return "Server-side copy of legacy Ticket-scoped gollem.History latest.json files into Session-scoped sessions/{sid}/history.json destinations. Skips destinations that already exist; legacy files are never deleted."
 }
 
 func (j *HistoryScopeJob) Run(ctx context.Context, opts Options) (*Result, error) {
@@ -58,14 +64,7 @@ func (j *HistoryScopeJob) Run(ctx context.Context, opts Options) (*Result, error
 			return nil
 		}
 
-		existing, err := j.storageSvc.GetSessionHistory(ctx, s.ID)
-		if err == nil && existing != nil && existing.ToCount() > 0 {
-			result.Skipped++
-			return nil
-		}
-
-		src, err := j.storageSvc.GetLatestHistory(ctx, *tid)
-		if err != nil || src == nil || src.ToCount() == 0 {
+		if j.storageSvc.HasSessionHistory(ctx, s.ID) {
 			result.Skipped++
 			return nil
 		}
@@ -75,8 +74,17 @@ func (j *HistoryScopeJob) Run(ctx context.Context, opts Options) (*Result, error
 			return nil
 		}
 
-		if err := j.storageSvc.PutSessionHistory(ctx, s.ID, src); err != nil {
-			result.Errors++
+		copied, err := j.storageSvc.CopyLatestHistoryToSession(ctx, *tid, s.ID)
+		if err != nil {
+			// A missing source is the expected shape for pre-redesign
+			// Sessions that never accumulated agent history; count as
+			// skip rather than error so operators can distinguish
+			// genuine failures in the result counters.
+			result.Skipped++
+			return nil
+		}
+		if !copied {
+			result.Skipped++
 			return nil
 		}
 		result.Migrated++

@@ -369,7 +369,7 @@ func (m *mockTestWriter) Close() error {
 type failingWriteCloser struct{}
 
 func (f *failingWriteCloser) Write(p []byte) (int, error) { return len(p), nil }
-func (f *failingWriteCloser) Close() error                 { return goerr.New("storage write failure") }
+func (f *failingWriteCloser) Close() error                { return goerr.New("storage write failure") }
 
 // TestChatErrorNotifications validates that error notifications are properly sent
 // This test focuses on verifying the notification mechanism is called correctly
@@ -945,4 +945,3 @@ func TestAuthorizeAgentRequest(t *testing.T) {
 		gt.S(t, err.Error()).Contains("agent request not authorized")
 	})
 }
-

@@ -44,11 +44,11 @@ func NewWebNotifier(
 // webEvent is the stable JSON envelope pushed to WebSocket clients. The
 // frontend discriminates on "event" and ignores fields it does not know.
 type webEvent struct {
-	Event     string       `json:"event"`
-	SessionID string       `json:"session_id"`
-	TurnID    *string      `json:"turn_id,omitempty"`
-	Message   *webMessage  `json:"message,omitempty"`
-	Timestamp time.Time    `json:"timestamp"`
+	Event     string      `json:"event"`
+	SessionID string      `json:"session_id"`
+	TurnID    *string     `json:"turn_id,omitempty"`
+	Message   *webMessage `json:"message,omitempty"`
+	Timestamp time.Time   `json:"timestamp"`
 }
 
 type webMessage struct {

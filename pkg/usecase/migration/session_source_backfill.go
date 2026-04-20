@@ -80,7 +80,6 @@ func (j *SessionSourceBackfillJob) Run(ctx context.Context, opts Options) (*Resu
 	return result, nil
 }
 
-
 // inferTicketIDPtr returns a pointer to the Session's existing TicketID
 // when the legacy column is populated, or the existing TicketIDPtr
 // verbatim. Returns nil only when neither field carries a ticket.

@@ -42,15 +42,6 @@ func pathToLatestHistory(prefix string, ticketID types.TicketID) string {
 	return fmt.Sprintf("%s%s/ticket/%s/latest.json", prefix, StorageSchemaVersion, ticketID)
 }
 
-// DeleteLatestHistory removes the legacy ticket-scoped latest.json.
-// Idempotent; missing files are not treated as errors.
-func (s *Service) DeleteLatestHistory(ctx context.Context, ticketID types.TicketID) error {
-	if s.storageClient == nil {
-		return nil
-	}
-	return s.storageClient.DeleteObject(ctx, pathToLatestHistory(s.prefix, ticketID))
-}
-
 // PutLatestHistory saves the history as the latest snapshot for the given ticket.
 // The object at latest.json is overwritten on each call.
 func (s *Service) PutLatestHistory(ctx context.Context, ticketID types.TicketID, history *gollem.History) error {
