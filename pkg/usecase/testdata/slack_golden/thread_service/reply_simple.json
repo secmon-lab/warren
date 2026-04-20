@@ -1,0 +1,19 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "text": {
+            "text": "*hello* from warren",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        }
+      ],
+      "channel": "C_TICKET",
+      "thread_ts": "1700000000.000000"
+    }
+  }
+]

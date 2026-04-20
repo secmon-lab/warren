@@ -16,11 +16,15 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
 	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	graphql1 "github.com/secmon-lab/warren/pkg/domain/model/graphql"
+	hitlModel "github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
+	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/user"
 )
 
 // User is the resolver for the user field.
@@ -136,41 +140,6 @@ func (r *alertResolver) TagObjects(ctx context.Context, obj *alert.Alert) ([]*gr
 	}
 
 	return tagObjects, nil
-}
-
-// ID is the resolver for the id field.
-func (r *commentResolver) ID(ctx context.Context, obj *ticket.Comment) (string, error) {
-	return string(obj.ID), nil
-}
-
-// Content is the resolver for the content field.
-func (r *commentResolver) Content(ctx context.Context, obj *ticket.Comment) (string, error) {
-	if r.mrkdwnConv != nil {
-		converted := r.mrkdwnConv.ConvertToMarkdown(ctx, obj.Comment)
-		return converted, nil
-	}
-	return obj.Comment, nil
-}
-
-// User is the resolver for the user field.
-func (r *commentResolver) User(ctx context.Context, obj *ticket.Comment) (*graphql1.User, error) {
-	if obj.User == nil {
-		return nil, nil
-	}
-	return &graphql1.User{
-		ID:   obj.User.ID,
-		Name: obj.User.Name,
-	}, nil
-}
-
-// CreatedAt is the resolver for the createdAt field.
-func (r *commentResolver) CreatedAt(ctx context.Context, obj *ticket.Comment) (string, error) {
-	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
-}
-
-// UpdatedAt is the resolver for the updatedAt field.
-func (r *commentResolver) UpdatedAt(ctx context.Context, obj *ticket.Comment) (string, error) {
-	return obj.CreatedAt.Format("2006-01-02T15:04:05Z07:00"), nil
 }
 
 // Severity is the resolver for the severity field.
@@ -532,6 +501,59 @@ func (r *mutationResolver) DeclineAlerts(ctx context.Context, ids []string) ([]*
 	return results, nil
 }
 
+// ResolveHITLRequest is the resolver for the resolveHITLRequest field.
+//
+// Persists the user's answer into the hitl.Request row keyed by id,
+// which unblocks the hitl.Service.RequestAndWait goroutine that the
+// agent pipeline is blocked on. The updated record is returned so the
+// caller can reflect RespondedAt / Status back in its UI without a
+// second round-trip.
+//
+// Multi-instance correctness: the Firestore row transition fans out
+// through the existing HITL watcher, so the resolution reaches the
+// waiting instance regardless of which node served this mutation.
+func (r *mutationResolver) ResolveHITLRequest(ctx context.Context, id string, approved bool, answer *string, comment *string) (*graphql1.HITLRequest, error) {
+	reqID := types.HITLRequestID(id)
+	existing, err := r.repo.GetHITLRequest(ctx, reqID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to load HITL request", goerr.V("id", id))
+	}
+	if existing == nil {
+		return nil, goerr.New("HITL request not found", goerr.V("id", id))
+	}
+	if existing.Status != hitlModel.StatusPending {
+		return nil, goerr.New("HITL request is not pending; cannot respond",
+			goerr.V("id", id), goerr.V("status", existing.Status))
+	}
+
+	respondedBy := string(types.UserID(user.FromContext(ctx)))
+	status := hitlModel.StatusDenied
+	if approved {
+		status = hitlModel.StatusApproved
+	}
+	response := map[string]any{}
+	if answer != nil {
+		response["answer"] = *answer
+	}
+	if comment != nil {
+		response["comment"] = *comment
+	}
+
+	svc := hitlService.New(r.repo)
+	if err := svc.Respond(ctx, reqID, status, respondedBy, response); err != nil {
+		return nil, goerr.Wrap(err, "failed to record HITL response", goerr.V("id", id))
+	}
+
+	updated, err := r.repo.GetHITLRequest(ctx, reqID)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to reload HITL request", goerr.V("id", id))
+	}
+	if updated == nil {
+		return nil, goerr.New("HITL request disappeared after respond", goerr.V("id", id))
+	}
+	return hitlRequestToGraphQL(updated), nil
+}
+
 // RunDiagnosis is the resolver for the runDiagnosis field.
 func (r *mutationResolver) RunDiagnosis(ctx context.Context) (*graphql1.Diagnosis, error) {
 	diag, err := r.uc.RunDiagnosis(ctx)
@@ -870,47 +892,6 @@ func (r *queryResolver) SimilarTicketsForAlert(ctx context.Context, alertID stri
 	}, nil
 }
 
-// TicketComments is the resolver for the ticketComments field.
-func (r *queryResolver) TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error) {
-	// Set default values for offset and limit
-	var offsetVal, limitVal int
-	if offset != nil {
-		offsetVal = *offset
-	}
-	if limit != nil {
-		limitVal = *limit
-		// Restrict limit to allowed values: 20, 50, 100
-		if limitVal != 20 && limitVal != 50 && limitVal != 100 {
-			limitVal = defaultCommentsLimit
-		}
-	} else {
-		limitVal = defaultCommentsLimit
-	}
-
-	// Get paginated comments sorted by timestamp descending (newest first)
-	comments, err := r.repo.GetTicketCommentsPaginated(ctx, types.TicketID(ticketID), offsetVal, limitVal)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket comments")
-	}
-
-	// Get total count for pagination
-	totalCount, err := r.repo.CountTicketComments(ctx, types.TicketID(ticketID))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to count ticket comments")
-	}
-
-	// Convert []ticket.Comment to []*ticket.Comment
-	commentPtrs := make([]*ticket.Comment, len(comments))
-	for i := range comments {
-		commentPtrs[i] = &comments[i]
-	}
-
-	return &graphql1.CommentsResponse{
-		Comments:   commentPtrs,
-		TotalCount: totalCount,
-	}, nil
-}
-
 // Alert is the resolver for the alert field.
 func (r *queryResolver) Alert(ctx context.Context, id string) (*alert.Alert, error) {
 	a, err := r.repo.GetAlert(ctx, types.AlertID(id))
@@ -1177,18 +1158,28 @@ func (r *queryResolver) AvailableTagColorNames(ctx context.Context) ([]string, e
 }
 
 // TicketSessions is the resolver for the ticketSessions field.
+//
+// Sessions without a Source value are unmigrated legacy rows from
+// pre-Phase-2 Warren (the runtime wrote one UUID Session per @warren
+// mention on a thread; the redesign uses a single deterministic
+// Session per thread). The session-source-backfill +
+// session-consolidate migrations bring these rows into the new model,
+// but the Conversation sidebar filters them out regardless of whether
+// the migrations have been run — showing them would surface a dozen
+// near-duplicate entries per thread.
 func (r *queryResolver) TicketSessions(ctx context.Context, ticketID string) ([]*graphql1.Session, error) {
 	sessions, err := r.repo.GetSessionsByTicket(ctx, types.TicketID(ticketID))
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to get sessions by ticket", goerr.V("ticketID", ticketID))
 	}
 
-	// Convert to GraphQL model
-	result := make([]*graphql1.Session, len(sessions))
-	for i, s := range sessions {
-		result[i] = toGraphQLSession(s)
+	result := make([]*graphql1.Session, 0, len(sessions))
+	for _, s := range sessions {
+		if !s.Source.Valid() {
+			continue
+		}
+		result = append(result, toGraphQLSession(s))
 	}
-
 	return result, nil
 }
 
@@ -1213,19 +1204,59 @@ func (r *queryResolver) SessionMessages(ctx context.Context, sessionID string) (
 		return nil, goerr.Wrap(err, "failed to get session messages", goerr.V("sessionID", sessionID))
 	}
 
-	// Convert to GraphQL model
 	result := make([]*graphql1.SessionMessage, len(messages))
 	for i, m := range messages {
-		result[i] = &graphql1.SessionMessage{
-			ID:        string(m.ID),
-			SessionID: string(m.SessionID),
-			Type:      string(m.Type),
-			Content:   m.Content,
-			CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt: m.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-		}
+		result[i] = toGraphQLSessionMessage(m)
+		resolveAuthorDisplayName(ctx, r.slackService, result[i])
+		resolveMessageMentions(ctx, r.mrkdwnConv, result[i])
 	}
 
+	return result, nil
+}
+
+// TicketSessionMessages is the resolver for the ticketSessionMessages field.
+// chat-session-redesign Phase 3.4: superset of the legacy ticketComments
+// query. Filters are optional; omit them to return every message across
+// every Session attached to the ticket.
+func (r *queryResolver) TicketSessionMessages(ctx context.Context, ticketID string, source *string, typeArg *string, offset *int, limit *int) ([]*graphql1.SessionMessage, error) {
+	var sourceFilter *session.SessionSource
+	if source != nil && *source != "" {
+		s := session.SessionSource(*source)
+		if !s.Valid() {
+			return nil, goerr.New("invalid source value", goerr.V("source", *source))
+		}
+		sourceFilter = &s
+	}
+	var typeFilter *session.MessageType
+	if typeArg != nil && *typeArg != "" {
+		mt := session.MessageType(*typeArg)
+		if !mt.Valid() {
+			return nil, goerr.New("invalid type value", goerr.V("type", *typeArg))
+		}
+		typeFilter = &mt
+	}
+
+	limitVal := 0
+	if limit != nil {
+		limitVal = *limit
+	}
+	offsetVal := 0
+	if offset != nil {
+		offsetVal = *offset
+	}
+
+	msgs, err := r.repo.GetTicketSessionMessages(ctx, types.TicketID(ticketID), sourceFilter, typeFilter, limitVal, offsetVal)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get ticket session messages",
+			goerr.V("ticketID", ticketID))
+	}
+
+	result := make([]*graphql1.SessionMessage, len(msgs))
+	for i, m := range msgs {
+		result[i] = toGraphQLSessionMessage(m)
+		resolveAuthorDisplayName(ctx, r.slackService, result[i])
+		resolveMessageMentions(ctx, r.mrkdwnConv, result[i])
+	}
 	return result, nil
 }
 
@@ -1653,29 +1684,9 @@ func (r *ticketResolver) AlertsPaginated(ctx context.Context, obj *ticket.Ticket
 	}, nil
 }
 
-// Comments is the resolver for the comments field.
-func (r *ticketResolver) Comments(ctx context.Context, obj *ticket.Ticket) ([]*ticket.Comment, error) {
-	comments, err := r.repo.GetTicketComments(ctx, obj.ID)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get ticket comments")
-	}
-
-	// Convert []ticket.Comment to []*ticket.Comment
-	commentPtrs := make([]*ticket.Comment, len(comments))
-	for i := range comments {
-		commentPtrs[i] = &comments[i]
-	}
-	return commentPtrs, nil
-}
-
 // AlertsCount is the resolver for the alertsCount field.
 func (r *ticketResolver) AlertsCount(ctx context.Context, obj *ticket.Ticket) (int, error) {
 	return len(obj.AlertIDs), nil
-}
-
-// CommentsCount is the resolver for the commentsCount field.
-func (r *ticketResolver) CommentsCount(ctx context.Context, obj *ticket.Ticket) (int, error) {
-	return r.repo.CountTicketComments(ctx, obj.ID)
 }
 
 // Conclusion is the resolver for the conclusion field.
@@ -1775,9 +1786,6 @@ func (r *Resolver) Activity() ActivityResolver { return &activityResolver{r} }
 // Alert returns AlertResolver implementation.
 func (r *Resolver) Alert() AlertResolver { return &alertResolver{r} }
 
-// Comment returns CommentResolver implementation.
-func (r *Resolver) Comment() CommentResolver { return &commentResolver{r} }
-
 // Finding returns FindingResolver implementation.
 func (r *Resolver) Finding() FindingResolver { return &findingResolver{r} }
 
@@ -1809,7 +1817,6 @@ func (r *Resolver) Ticket() TicketResolver { return &ticketResolver{r} }
 
 type activityResolver struct{ *Resolver }
 type alertResolver struct{ *Resolver }
-type commentResolver struct{ *Resolver }
 type findingResolver struct{ *Resolver }
 type knowledgeResolver struct{ *Resolver }
 type mutationResolver struct{ *Resolver }

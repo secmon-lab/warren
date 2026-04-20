@@ -31,7 +31,6 @@ type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
 type ResolverRoot interface {
 	Activity() ActivityResolver
 	Alert() AlertResolver
-	Comment() CommentResolver
 	Finding() FindingResolver
 	Knowledge() KnowledgeResolver
 	Mutation() MutationResolver
@@ -96,19 +95,6 @@ type ComplexityRoot struct {
 		ArchivedCount func(childComplexity int) int
 	}
 
-	Comment struct {
-		Content   func(childComplexity int) int
-		CreatedAt func(childComplexity int) int
-		ID        func(childComplexity int) int
-		UpdatedAt func(childComplexity int) int
-		User      func(childComplexity int) int
-	}
-
-	CommentsResponse struct {
-		Comments   func(childComplexity int) int
-		TotalCount func(childComplexity int) int
-	}
-
 	DashboardStats struct {
 		DeclinedAlertsCount func(childComplexity int) int
 		OpenTickets         func(childComplexity int) int
@@ -158,6 +144,18 @@ type ComplexityRoot struct {
 		Summary        func(childComplexity int) int
 	}
 
+	HITLRequest struct {
+		CreatedAt   func(childComplexity int) int
+		ID          func(childComplexity int) int
+		Payload     func(childComplexity int) int
+		RespondedAt func(childComplexity int) int
+		Response    func(childComplexity int) int
+		SessionID   func(childComplexity int) int
+		Status      func(childComplexity int) int
+		Type        func(childComplexity int) int
+		UserID      func(childComplexity int) int
+	}
+
 	Knowledge struct {
 		Author    func(childComplexity int) int
 		AuthorID  func(childComplexity int) int
@@ -190,6 +188,18 @@ type ComplexityRoot struct {
 		UpdatedAt   func(childComplexity int) int
 	}
 
+	MessageAuthor struct {
+		DisplayName func(childComplexity int) int
+		Email       func(childComplexity int) int
+		SlackUserID func(childComplexity int) int
+		UserID      func(childComplexity int) int
+	}
+
+	MessageRevision struct {
+		Content   func(childComplexity int) int
+		CreatedAt func(childComplexity int) int
+	}
+
 	Mutation struct {
 		ArchiveAllResolvedTickets     func(childComplexity int) int
 		ArchiveTicket                 func(childComplexity int, id string) int
@@ -211,6 +221,7 @@ type ComplexityRoot struct {
 		ReopenTicket                  func(childComplexity int, id string) int
 		ReprocessQueuedAlert          func(childComplexity int, id string) int
 		ReprocessQueuedAlertsByFilter func(childComplexity int, keyword *string) int
+		ResolveHITLRequest            func(childComplexity int, id string, approved bool, answer *string, comment *string) int
 		ResolveTicket                 func(childComplexity int, id string, conclusion string, reason string) int
 		RunDiagnosis                  func(childComplexity int) int
 		UnarchiveTicket               func(childComplexity int, id string) int
@@ -246,7 +257,7 @@ type ComplexityRoot struct {
 		SimilarTicketsForAlert func(childComplexity int, alertID string, threshold float64, offset *int, limit *int) int
 		Tags                   func(childComplexity int) int
 		Ticket                 func(childComplexity int, id string) int
-		TicketComments         func(childComplexity int, ticketID string, offset *int, limit *int) int
+		TicketSessionMessages  func(childComplexity int, ticketID string, source *string, typeArg *string, offset *int, limit *int) int
 		TicketSessions         func(childComplexity int, ticketID string) int
 		Tickets                func(childComplexity int, statuses []string, keyword *string, assigneeID *string, offset *int, limit *int) int
 		UnboundAlerts          func(childComplexity int, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) int
@@ -290,6 +301,7 @@ type ComplexityRoot struct {
 		Intent    func(childComplexity int) int
 		Query     func(childComplexity int) int
 		SlackURL  func(childComplexity int) int
+		Source    func(childComplexity int) int
 		Status    func(childComplexity int) int
 		TicketID  func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
@@ -298,10 +310,14 @@ type ComplexityRoot struct {
 	}
 
 	SessionMessage struct {
+		Author    func(childComplexity int) int
 		Content   func(childComplexity int) int
 		CreatedAt func(childComplexity int) int
 		ID        func(childComplexity int) int
+		Revisions func(childComplexity int) int
 		SessionID func(childComplexity int) int
+		TicketID  func(childComplexity int) int
+		TurnID    func(childComplexity int) int
 		Type      func(childComplexity int) int
 		UpdatedAt func(childComplexity int) int
 	}
@@ -326,8 +342,6 @@ type ComplexityRoot struct {
 		AlertsPaginated func(childComplexity int, offset *int, limit *int) int
 		ArchivedAt      func(childComplexity int) int
 		Assignee        func(childComplexity int) int
-		Comments        func(childComplexity int) int
-		CommentsCount   func(childComplexity int) int
 		Conclusion      func(childComplexity int) int
 		CreatedAt       func(childComplexity int) int
 		Description     func(childComplexity int) int
@@ -374,13 +388,6 @@ type AlertResolver interface {
 
 	TagObjects(ctx context.Context, obj *alert.Alert) ([]*graphql1.TagObject, error)
 }
-type CommentResolver interface {
-	ID(ctx context.Context, obj *ticket.Comment) (string, error)
-	Content(ctx context.Context, obj *ticket.Comment) (string, error)
-	User(ctx context.Context, obj *ticket.Comment) (*graphql1.User, error)
-	CreatedAt(ctx context.Context, obj *ticket.Comment) (string, error)
-	UpdatedAt(ctx context.Context, obj *ticket.Comment) (string, error)
-}
 type FindingResolver interface {
 	Severity(ctx context.Context, obj *ticket.Finding) (string, error)
 }
@@ -405,6 +412,7 @@ type MutationResolver interface {
 	DeleteTag(ctx context.Context, id string) (bool, error)
 	UpdateTag(ctx context.Context, input graphql1.UpdateTagInput) (*graphql1.TagMetadata, error)
 	DeclineAlerts(ctx context.Context, ids []string) ([]*alert.Alert, error)
+	ResolveHITLRequest(ctx context.Context, id string, approved bool, answer *string, comment *string) (*graphql1.HITLRequest, error)
 	RunDiagnosis(ctx context.Context) (*graphql1.Diagnosis, error)
 	FixDiagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
 	ReprocessQueuedAlert(ctx context.Context, id string) (*alert.ReprocessJob, error)
@@ -424,7 +432,6 @@ type QueryResolver interface {
 	Tickets(ctx context.Context, statuses []string, keyword *string, assigneeID *string, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	SimilarTickets(ctx context.Context, ticketID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error)
 	SimilarTicketsForAlert(ctx context.Context, alertID string, threshold float64, offset *int, limit *int) (*graphql1.TicketsResponse, error)
-	TicketComments(ctx context.Context, ticketID string, offset *int, limit *int) (*graphql1.CommentsResponse, error)
 	Alert(ctx context.Context, id string) (*alert.Alert, error)
 	Alerts(ctx context.Context, offset *int, limit *int, status *alert.AlertStatus) (*graphql1.AlertsResponse, error)
 	UnboundAlerts(ctx context.Context, threshold *float64, keyword *string, ticketID *string, offset *int, limit *int) (*graphql1.AlertsResponse, error)
@@ -436,6 +443,7 @@ type QueryResolver interface {
 	TicketSessions(ctx context.Context, ticketID string) ([]*graphql1.Session, error)
 	Session(ctx context.Context, id string) (*graphql1.Session, error)
 	SessionMessages(ctx context.Context, sessionID string) ([]*graphql1.SessionMessage, error)
+	TicketSessionMessages(ctx context.Context, ticketID string, source *string, typeArg *string, offset *int, limit *int) ([]*graphql1.SessionMessage, error)
 	Diagnoses(ctx context.Context, offset *int, limit *int) (*graphql1.DiagnosesResponse, error)
 	Diagnosis(ctx context.Context, id string) (*graphql1.Diagnosis, error)
 	DiagnosisIssues(ctx context.Context, diagnosisID string, offset *int, limit *int, status *string, ruleID *string) (*graphql1.DiagnosisIssuesResponse, error)
@@ -479,9 +487,7 @@ type TicketResolver interface {
 	Assignee(ctx context.Context, obj *ticket.Ticket) (*graphql1.User, error)
 	Alerts(ctx context.Context, obj *ticket.Ticket) ([]*alert.Alert, error)
 	AlertsPaginated(ctx context.Context, obj *ticket.Ticket, offset *int, limit *int) (*graphql1.AlertsResponse, error)
-	Comments(ctx context.Context, obj *ticket.Ticket) ([]*ticket.Comment, error)
 	AlertsCount(ctx context.Context, obj *ticket.Ticket) (int, error)
-	CommentsCount(ctx context.Context, obj *ticket.Ticket) (int, error)
 	Conclusion(ctx context.Context, obj *ticket.Ticket) (*string, error)
 
 	SlackLink(ctx context.Context, obj *ticket.Ticket) (*string, error)
@@ -700,50 +706,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.ArchiveAllResolvedResult.ArchivedCount(childComplexity), true
 
-	case "Comment.content":
-		if e.ComplexityRoot.Comment.Content == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Comment.Content(childComplexity), true
-	case "Comment.createdAt":
-		if e.ComplexityRoot.Comment.CreatedAt == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Comment.CreatedAt(childComplexity), true
-	case "Comment.id":
-		if e.ComplexityRoot.Comment.ID == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Comment.ID(childComplexity), true
-	case "Comment.updatedAt":
-		if e.ComplexityRoot.Comment.UpdatedAt == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Comment.UpdatedAt(childComplexity), true
-	case "Comment.user":
-		if e.ComplexityRoot.Comment.User == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Comment.User(childComplexity), true
-
-	case "CommentsResponse.comments":
-		if e.ComplexityRoot.CommentsResponse.Comments == nil {
-			break
-		}
-
-		return e.ComplexityRoot.CommentsResponse.Comments(childComplexity), true
-	case "CommentsResponse.totalCount":
-		if e.ComplexityRoot.CommentsResponse.TotalCount == nil {
-			break
-		}
-
-		return e.ComplexityRoot.CommentsResponse.TotalCount(childComplexity), true
-
 	case "DashboardStats.declinedAlertsCount":
 		if e.ComplexityRoot.DashboardStats.DeclinedAlertsCount == nil {
 			break
@@ -936,6 +898,61 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Finding.Summary(childComplexity), true
 
+	case "HITLRequest.createdAt":
+		if e.ComplexityRoot.HITLRequest.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.CreatedAt(childComplexity), true
+	case "HITLRequest.id":
+		if e.ComplexityRoot.HITLRequest.ID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.ID(childComplexity), true
+	case "HITLRequest.payload":
+		if e.ComplexityRoot.HITLRequest.Payload == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.Payload(childComplexity), true
+	case "HITLRequest.respondedAt":
+		if e.ComplexityRoot.HITLRequest.RespondedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.RespondedAt(childComplexity), true
+	case "HITLRequest.response":
+		if e.ComplexityRoot.HITLRequest.Response == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.Response(childComplexity), true
+	case "HITLRequest.sessionID":
+		if e.ComplexityRoot.HITLRequest.SessionID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.SessionID(childComplexity), true
+	case "HITLRequest.status":
+		if e.ComplexityRoot.HITLRequest.Status == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.Status(childComplexity), true
+	case "HITLRequest.type":
+		if e.ComplexityRoot.HITLRequest.Type == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.Type(childComplexity), true
+	case "HITLRequest.userID":
+		if e.ComplexityRoot.HITLRequest.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.HITLRequest.UserID(childComplexity), true
+
 	case "Knowledge.author":
 		if e.ComplexityRoot.Knowledge.Author == nil {
 			break
@@ -1076,6 +1093,44 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.KnowledgeTag.UpdatedAt(childComplexity), true
+
+	case "MessageAuthor.displayName":
+		if e.ComplexityRoot.MessageAuthor.DisplayName == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageAuthor.DisplayName(childComplexity), true
+	case "MessageAuthor.email":
+		if e.ComplexityRoot.MessageAuthor.Email == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageAuthor.Email(childComplexity), true
+	case "MessageAuthor.slackUserID":
+		if e.ComplexityRoot.MessageAuthor.SlackUserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageAuthor.SlackUserID(childComplexity), true
+	case "MessageAuthor.userID":
+		if e.ComplexityRoot.MessageAuthor.UserID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageAuthor.UserID(childComplexity), true
+
+	case "MessageRevision.content":
+		if e.ComplexityRoot.MessageRevision.Content == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageRevision.Content(childComplexity), true
+	case "MessageRevision.createdAt":
+		if e.ComplexityRoot.MessageRevision.CreatedAt == nil {
+			break
+		}
+
+		return e.ComplexityRoot.MessageRevision.CreatedAt(childComplexity), true
 
 	case "Mutation.archiveAllResolvedTickets":
 		if e.ComplexityRoot.Mutation.ArchiveAllResolvedTickets == nil {
@@ -1292,6 +1347,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Mutation.ReprocessQueuedAlertsByFilter(childComplexity, args["keyword"].(*string)), true
+	case "Mutation.resolveHITLRequest":
+		if e.ComplexityRoot.Mutation.ResolveHITLRequest == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_resolveHITLRequest_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.ComplexityRoot.Mutation.ResolveHITLRequest(childComplexity, args["id"].(string), args["approved"].(bool), args["answer"].(*string), args["comment"].(*string)), true
 	case "Mutation.resolveTicket":
 		if e.ComplexityRoot.Mutation.ResolveTicket == nil {
 			break
@@ -1616,17 +1682,17 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Query.Ticket(childComplexity, args["id"].(string)), true
-	case "Query.ticketComments":
-		if e.ComplexityRoot.Query.TicketComments == nil {
+	case "Query.ticketSessionMessages":
+		if e.ComplexityRoot.Query.TicketSessionMessages == nil {
 			break
 		}
 
-		args, err := ec.field_Query_ticketComments_args(ctx, rawArgs)
+		args, err := ec.field_Query_ticketSessionMessages_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.ComplexityRoot.Query.TicketComments(childComplexity, args["ticketId"].(string), args["offset"].(*int), args["limit"].(*int)), true
+		return e.ComplexityRoot.Query.TicketSessionMessages(childComplexity, args["ticketId"].(string), args["source"].(*string), args["type"].(*string), args["offset"].(*int), args["limit"].(*int)), true
 	case "Query.ticketSessions":
 		if e.ComplexityRoot.Query.TicketSessions == nil {
 			break
@@ -1815,6 +1881,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Session.SlackURL(childComplexity), true
+	case "Session.source":
+		if e.ComplexityRoot.Session.Source == nil {
+			break
+		}
+
+		return e.ComplexityRoot.Session.Source(childComplexity), true
 	case "Session.status":
 		if e.ComplexityRoot.Session.Status == nil {
 			break
@@ -1846,6 +1918,12 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.ComplexityRoot.Session.UserID(childComplexity), true
 
+	case "SessionMessage.author":
+		if e.ComplexityRoot.SessionMessage.Author == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SessionMessage.Author(childComplexity), true
 	case "SessionMessage.content":
 		if e.ComplexityRoot.SessionMessage.Content == nil {
 			break
@@ -1864,12 +1942,30 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.SessionMessage.ID(childComplexity), true
+	case "SessionMessage.revisions":
+		if e.ComplexityRoot.SessionMessage.Revisions == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SessionMessage.Revisions(childComplexity), true
 	case "SessionMessage.sessionID":
 		if e.ComplexityRoot.SessionMessage.SessionID == nil {
 			break
 		}
 
 		return e.ComplexityRoot.SessionMessage.SessionID(childComplexity), true
+	case "SessionMessage.ticketID":
+		if e.ComplexityRoot.SessionMessage.TicketID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SessionMessage.TicketID(childComplexity), true
+	case "SessionMessage.turnID":
+		if e.ComplexityRoot.SessionMessage.TurnID == nil {
+			break
+		}
+
+		return e.ComplexityRoot.SessionMessage.TurnID(childComplexity), true
 	case "SessionMessage.type":
 		if e.ComplexityRoot.SessionMessage.Type == nil {
 			break
@@ -1968,18 +2064,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.ComplexityRoot.Ticket.Assignee(childComplexity), true
-	case "Ticket.comments":
-		if e.ComplexityRoot.Ticket.Comments == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Ticket.Comments(childComplexity), true
-	case "Ticket.commentsCount":
-		if e.ComplexityRoot.Ticket.CommentsCount == nil {
-			break
-		}
-
-		return e.ComplexityRoot.Ticket.CommentsCount(childComplexity), true
 	case "Ticket.conclusion":
 		if e.ComplexityRoot.Ticket.Conclusion == nil {
 			break
@@ -2205,9 +2289,7 @@ type Ticket {
   assignee: User
   alerts: [Alert!]!
   alertsPaginated(offset: Int, limit: Int): AlertsResponse!
-  comments: [Comment!]!
   alertsCount: Int!
-  commentsCount: Int!
   conclusion: String
   reason: String
   finding: Finding
@@ -2225,14 +2307,6 @@ type User {
   id: ID!
   name: String!
   icon: String
-}
-
-type Comment {
-  id: ID!
-  content: String!
-  user: User
-  createdAt: String!
-  updatedAt: String!
 }
 
 enum AlertStatus {
@@ -2270,11 +2344,6 @@ type Finding {
 
 type TicketsResponse {
   tickets: [Ticket!]!
-  totalCount: Int!
-}
-
-type CommentsResponse {
-  comments: [Comment!]!
   totalCount: Int!
 }
 
@@ -2335,7 +2404,6 @@ type Query {
     offset: Int
     limit: Int
   ): TicketsResponse!
-  ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts(offset: Int, limit: Int, status: AlertStatus): AlertsResponse!
   unboundAlerts(
@@ -2378,6 +2446,17 @@ type Mutation {
   deleteTag(id: ID!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
   declineAlerts(ids: [ID!]!): [Alert!]!
+
+  # chat-session-redesign: respond to a pending HITL request from the
+  # Web UI. approved=true means "approve" for tool_approval requests or
+  # "submit the selected answer" for question requests. answer/comment
+  # are optional. Returns the updated HITLRequest with Status populated.
+  resolveHITLRequest(
+    id: ID!
+    approved: Boolean!
+    answer: String
+    comment: String
+  ): HITLRequest!
 }
 
 input UpdateTagInput {
@@ -2398,21 +2477,72 @@ type Session {
   intent: String
   createdAt: String!
   updatedAt: String!
+  # chat-session-redesign: source channel (slack/web/cli). Empty when
+  # a pre-redesign Session has not been backfilled yet.
+  source: String!
 }
 
 type SessionMessage {
   id: ID!
   sessionID: ID!
+  turnID: ID
+  ticketID: ID
   type: String!
   content: String!
+  author: MessageAuthor
   createdAt: String!
   updatedAt: String!
+  # Revisions is the chronologically-ordered list of prior content
+  # values for updatable messages (e.g. task progress, HITL prompts).
+  # Empty for messages that have never been updated in-place.
+  revisions: [MessageRevision!]
+}
+
+type MessageRevision {
+  content: String!
+  createdAt: String!
+}
+
+# HITLRequest mirrors the domain hitl.Request model. The payload shape
+# is intentionally a JSON scalar (encoded as String) because it is
+# already transport-shape-specific (tool_approval vs question) and the
+# frontend renders both variants from the same envelope.
+type HITLRequest {
+  id: ID!
+  sessionID: ID!
+  type: String!
+  status: String!
+  userID: String
+  # Payload / response are serialized JSON strings so the frontend can
+  # parse them directly. Having the same wire shape as the
+  # hitl_request_pending envelope avoids a second translation layer.
+  payload: String
+  response: String
+  createdAt: String!
+  respondedAt: String
+}
+
+type MessageAuthor {
+  userID: String!
+  displayName: String!
+  slackUserID: String
+  email: String
 }
 
 extend type Query {
   ticketSessions(ticketId: ID!): [Session!]!
   session(id: ID!): Session
   sessionMessages(sessionId: ID!): [SessionMessage!]!
+  # chat-session-redesign Phase 3.4: unified replacement for the legacy
+  # ticketComments query. Returns messages across every Session bound
+  # to the ticket with optional source/type filters.
+  ticketSessionMessages(
+    ticketId: ID!
+    source: String
+    type: String
+    offset: Int
+    limit: Int
+  ): [SessionMessage!]!
 }
 
 enum SortOrder {
@@ -2852,6 +2982,32 @@ func (ec *executionContext) field_Mutation_reprocessQueuedAlertsByFilter_args(ct
 	return args, nil
 }
 
+func (ec *executionContext) field_Mutation_resolveHITLRequest_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "id", ec.unmarshalNID2string)
+	if err != nil {
+		return nil, err
+	}
+	args["id"] = arg0
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "approved", ec.unmarshalNBoolean2bool)
+	if err != nil {
+		return nil, err
+	}
+	args["approved"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "answer", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["answer"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "comment", ec.unmarshalOString2ᚖstring)
+	if err != nil {
+		return nil, err
+	}
+	args["comment"] = arg3
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_resolveTicket_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
@@ -3268,7 +3424,7 @@ func (ec *executionContext) field_Query_similarTickets_args(ctx context.Context,
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_ticketComments_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+func (ec *executionContext) field_Query_ticketSessionMessages_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
 	arg0, err := graphql.ProcessArgField(ctx, rawArgs, "ticketId", ec.unmarshalNID2string)
@@ -3276,16 +3432,26 @@ func (ec *executionContext) field_Query_ticketComments_args(ctx context.Context,
 		return nil, err
 	}
 	args["ticketId"] = arg0
-	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	arg1, err := graphql.ProcessArgField(ctx, rawArgs, "source", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["offset"] = arg1
-	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	args["source"] = arg1
+	arg2, err := graphql.ProcessArgField(ctx, rawArgs, "type", ec.unmarshalOString2ᚖstring)
 	if err != nil {
 		return nil, err
 	}
-	args["limit"] = arg2
+	args["type"] = arg2
+	arg3, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["offset"] = arg3
+	arg4, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+	if err != nil {
+		return nil, err
+	}
+	args["limit"] = arg4
 	return args, nil
 }
 
@@ -3885,12 +4051,8 @@ func (ec *executionContext) fieldContext_Activity_ticket(_ context.Context, fiel
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -4202,12 +4364,8 @@ func (ec *executionContext) fieldContext_Alert_ticket(_ context.Context, field g
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -4528,229 +4686,6 @@ func (ec *executionContext) fieldContext_ArchiveAllResolvedResult_archivedCount(
 	return fc, nil
 }
 
-func (ec *executionContext) _Comment_id(ctx context.Context, field graphql.CollectedField, obj *ticket.Comment) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Comment_id,
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Comment().ID(ctx, obj)
-		},
-		nil,
-		ec.marshalNID2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Comment_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Comment",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Comment_content(ctx context.Context, field graphql.CollectedField, obj *ticket.Comment) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Comment_content,
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Comment().Content(ctx, obj)
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Comment_content(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Comment",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Comment_user(ctx context.Context, field graphql.CollectedField, obj *ticket.Comment) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Comment_user,
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Comment().User(ctx, obj)
-		},
-		nil,
-		ec.marshalOUser2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐUser,
-		true,
-		false,
-	)
-}
-
-func (ec *executionContext) fieldContext_Comment_user(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Comment",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "name":
-				return ec.fieldContext_User_name(ctx, field)
-			case "icon":
-				return ec.fieldContext_User_icon(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Comment_createdAt(ctx context.Context, field graphql.CollectedField, obj *ticket.Comment) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Comment_createdAt,
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Comment().CreatedAt(ctx, obj)
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Comment_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Comment",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Comment_updatedAt(ctx context.Context, field graphql.CollectedField, obj *ticket.Comment) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Comment_updatedAt,
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Comment().UpdatedAt(ctx, obj)
-		},
-		nil,
-		ec.marshalNString2string,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Comment_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Comment",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _CommentsResponse_comments(ctx context.Context, field graphql.CollectedField, obj *graphql1.CommentsResponse) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_CommentsResponse_comments,
-		func(ctx context.Context) (any, error) {
-			return obj.Comments, nil
-		},
-		nil,
-		ec.marshalNComment2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐCommentᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_CommentsResponse_comments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "CommentsResponse",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Comment_id(ctx, field)
-			case "content":
-				return ec.fieldContext_Comment_content(ctx, field)
-			case "user":
-				return ec.fieldContext_Comment_user(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Comment_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Comment_updatedAt(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _CommentsResponse_totalCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.CommentsResponse) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_CommentsResponse_totalCount,
-		func(ctx context.Context) (any, error) {
-			return obj.TotalCount, nil
-		},
-		nil,
-		ec.marshalNInt2int,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_CommentsResponse_totalCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "CommentsResponse",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _DashboardStats_openTicketsCount(ctx context.Context, field graphql.CollectedField, obj *graphql1.DashboardStats) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -4907,12 +4842,8 @@ func (ec *executionContext) fieldContext_DashboardStats_openTickets(_ context.Co
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -5758,6 +5689,267 @@ func (ec *executionContext) fieldContext_Finding_recommendation(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _HITLRequest_id(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_id,
+		func(ctx context.Context) (any, error) {
+			return obj.ID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_sessionID(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_sessionID,
+		func(ctx context.Context) (any, error) {
+			return obj.SessionID, nil
+		},
+		nil,
+		ec.marshalNID2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_sessionID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_type(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_type,
+		func(ctx context.Context) (any, error) {
+			return obj.Type, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_status(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_status,
+		func(ctx context.Context) (any, error) {
+			return obj.Status, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_userID(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_userID,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_userID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_payload(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_payload,
+		func(ctx context.Context) (any, error) {
+			return obj.Payload, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_payload(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_response(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_response,
+		func(ctx context.Context) (any, error) {
+			return obj.Response, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_response(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _HITLRequest_respondedAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.HITLRequest) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_HITLRequest_respondedAt,
+		func(ctx context.Context) (any, error) {
+			return obj.RespondedAt, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_HITLRequest_respondedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "HITLRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Knowledge_id(ctx context.Context, field graphql.CollectedField, obj *graphql1.Knowledge) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6453,6 +6645,180 @@ func (ec *executionContext) fieldContext_KnowledgeTag_updatedAt(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _MessageAuthor_userID(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageAuthor) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageAuthor_userID,
+		func(ctx context.Context) (any, error) {
+			return obj.UserID, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageAuthor_userID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageAuthor_displayName(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageAuthor) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageAuthor_displayName,
+		func(ctx context.Context) (any, error) {
+			return obj.DisplayName, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageAuthor_displayName(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageAuthor_slackUserID(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageAuthor) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageAuthor_slackUserID,
+		func(ctx context.Context) (any, error) {
+			return obj.SlackUserID, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageAuthor_slackUserID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageAuthor_email(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageAuthor) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageAuthor_email,
+		func(ctx context.Context) (any, error) {
+			return obj.Email, nil
+		},
+		nil,
+		ec.marshalOString2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageAuthor_email(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageAuthor",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageRevision_content(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageRevision) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageRevision_content,
+		func(ctx context.Context) (any, error) {
+			return obj.Content, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageRevision_content(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageRevision",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _MessageRevision_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.MessageRevision) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_MessageRevision_createdAt,
+		func(ctx context.Context) (any, error) {
+			return obj.CreatedAt, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_MessageRevision_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "MessageRevision",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Mutation_resolveTicket(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -6494,12 +6860,8 @@ func (ec *executionContext) fieldContext_Mutation_resolveTicket(ctx context.Cont
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -6581,12 +6943,8 @@ func (ec *executionContext) fieldContext_Mutation_reopenTicket(ctx context.Conte
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -6668,12 +7026,8 @@ func (ec *executionContext) fieldContext_Mutation_archiveTicket(ctx context.Cont
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -6755,12 +7109,8 @@ func (ec *executionContext) fieldContext_Mutation_archiveTickets(ctx context.Con
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -6875,12 +7225,8 @@ func (ec *executionContext) fieldContext_Mutation_unarchiveTicket(ctx context.Co
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -6962,12 +7308,8 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketConclusion(ctx con
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -7049,12 +7391,8 @@ func (ec *executionContext) fieldContext_Mutation_updateTicket(ctx context.Conte
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -7136,12 +7474,8 @@ func (ec *executionContext) fieldContext_Mutation_createTicket(ctx context.Conte
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -7223,12 +7557,8 @@ func (ec *executionContext) fieldContext_Mutation_createTicketFromAlerts(ctx con
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -7310,12 +7640,8 @@ func (ec *executionContext) fieldContext_Mutation_bindAlertsToTicket(ctx context
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -7462,12 +7788,8 @@ func (ec *executionContext) fieldContext_Mutation_updateTicketTags(ctx context.C
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -7718,6 +8040,67 @@ func (ec *executionContext) fieldContext_Mutation_declineAlerts(ctx context.Cont
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Mutation_declineAlerts_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_resolveHITLRequest(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Mutation_resolveHITLRequest,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Mutation().ResolveHITLRequest(ctx, fc.Args["id"].(string), fc.Args["approved"].(bool), fc.Args["answer"].(*string), fc.Args["comment"].(*string))
+		},
+		nil,
+		ec.marshalNHITLRequest2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐHITLRequest,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Mutation_resolveHITLRequest(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_HITLRequest_id(ctx, field)
+			case "sessionID":
+				return ec.fieldContext_HITLRequest_sessionID(ctx, field)
+			case "type":
+				return ec.fieldContext_HITLRequest_type(ctx, field)
+			case "status":
+				return ec.fieldContext_HITLRequest_status(ctx, field)
+			case "userID":
+				return ec.fieldContext_HITLRequest_userID(ctx, field)
+			case "payload":
+				return ec.fieldContext_HITLRequest_payload(ctx, field)
+			case "response":
+				return ec.fieldContext_HITLRequest_response(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_HITLRequest_createdAt(ctx, field)
+			case "respondedAt":
+				return ec.fieldContext_HITLRequest_respondedAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type HITLRequest", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_resolveHITLRequest_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -8416,12 +8799,8 @@ func (ec *executionContext) fieldContext_Query_ticket(ctx context.Context, field
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -8597,53 +8976,6 @@ func (ec *executionContext) fieldContext_Query_similarTicketsForAlert(ctx contex
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_similarTicketsForAlert_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_ticketComments(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Query_ticketComments,
-		func(ctx context.Context) (any, error) {
-			fc := graphql.GetFieldContext(ctx)
-			return ec.Resolvers.Query().TicketComments(ctx, fc.Args["ticketId"].(string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
-		},
-		nil,
-		ec.marshalNCommentsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCommentsResponse,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Query_ticketComments(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "comments":
-				return ec.fieldContext_CommentsResponse_comments(ctx, field)
-			case "totalCount":
-				return ec.fieldContext_CommentsResponse_totalCount(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type CommentsResponse", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_ticketComments_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -9045,6 +9377,8 @@ func (ec *executionContext) fieldContext_Query_ticketSessions(ctx context.Contex
 				return ec.fieldContext_Session_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Session_updatedAt(ctx, field)
+			case "source":
+				return ec.fieldContext_Session_source(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Session", field.Name)
 		},
@@ -9108,6 +9442,8 @@ func (ec *executionContext) fieldContext_Query_session(ctx context.Context, fiel
 				return ec.fieldContext_Session_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_Session_updatedAt(ctx, field)
+			case "source":
+				return ec.fieldContext_Session_source(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type Session", field.Name)
 		},
@@ -9155,14 +9491,22 @@ func (ec *executionContext) fieldContext_Query_sessionMessages(ctx context.Conte
 				return ec.fieldContext_SessionMessage_id(ctx, field)
 			case "sessionID":
 				return ec.fieldContext_SessionMessage_sessionID(ctx, field)
+			case "turnID":
+				return ec.fieldContext_SessionMessage_turnID(ctx, field)
+			case "ticketID":
+				return ec.fieldContext_SessionMessage_ticketID(ctx, field)
 			case "type":
 				return ec.fieldContext_SessionMessage_type(ctx, field)
 			case "content":
 				return ec.fieldContext_SessionMessage_content(ctx, field)
+			case "author":
+				return ec.fieldContext_SessionMessage_author(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_SessionMessage_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_SessionMessage_updatedAt(ctx, field)
+			case "revisions":
+				return ec.fieldContext_SessionMessage_revisions(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type SessionMessage", field.Name)
 		},
@@ -9175,6 +9519,69 @@ func (ec *executionContext) fieldContext_Query_sessionMessages(ctx context.Conte
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
 	if fc.Args, err = ec.field_Query_sessionMessages_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_ticketSessionMessages(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Query_ticketSessionMessages,
+		func(ctx context.Context) (any, error) {
+			fc := graphql.GetFieldContext(ctx)
+			return ec.Resolvers.Query().TicketSessionMessages(ctx, fc.Args["ticketId"].(string), fc.Args["source"].(*string), fc.Args["type"].(*string), fc.Args["offset"].(*int), fc.Args["limit"].(*int))
+		},
+		nil,
+		ec.marshalNSessionMessage2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐSessionMessageᚄ,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Query_ticketSessionMessages(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_SessionMessage_id(ctx, field)
+			case "sessionID":
+				return ec.fieldContext_SessionMessage_sessionID(ctx, field)
+			case "turnID":
+				return ec.fieldContext_SessionMessage_turnID(ctx, field)
+			case "ticketID":
+				return ec.fieldContext_SessionMessage_ticketID(ctx, field)
+			case "type":
+				return ec.fieldContext_SessionMessage_type(ctx, field)
+			case "content":
+				return ec.fieldContext_SessionMessage_content(ctx, field)
+			case "author":
+				return ec.fieldContext_SessionMessage_author(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_SessionMessage_createdAt(ctx, field)
+			case "updatedAt":
+				return ec.fieldContext_SessionMessage_updatedAt(ctx, field)
+			case "revisions":
+				return ec.fieldContext_SessionMessage_revisions(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SessionMessage", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_ticketSessionMessages_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -10715,6 +11122,35 @@ func (ec *executionContext) fieldContext_Session_updatedAt(_ context.Context, fi
 	return fc, nil
 }
 
+func (ec *executionContext) _Session_source(ctx context.Context, field graphql.CollectedField, obj *graphql1.Session) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_Session_source,
+		func(ctx context.Context) (any, error) {
+			return obj.Source, nil
+		},
+		nil,
+		ec.marshalNString2string,
+		true,
+		true,
+	)
+}
+
+func (ec *executionContext) fieldContext_Session_source(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Session",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SessionMessage_id(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10761,6 +11197,64 @@ func (ec *executionContext) _SessionMessage_sessionID(ctx context.Context, field
 }
 
 func (ec *executionContext) fieldContext_SessionMessage_sessionID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionMessage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionMessage_turnID(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SessionMessage_turnID,
+		func(ctx context.Context) (any, error) {
+			return obj.TurnID, nil
+		},
+		nil,
+		ec.marshalOID2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_SessionMessage_turnID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionMessage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionMessage_ticketID(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SessionMessage_ticketID,
+		func(ctx context.Context) (any, error) {
+			return obj.TicketID, nil
+		},
+		nil,
+		ec.marshalOID2ᚖstring,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_SessionMessage_ticketID(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "SessionMessage",
 		Field:      field,
@@ -10831,6 +11325,45 @@ func (ec *executionContext) fieldContext_SessionMessage_content(_ context.Contex
 	return fc, nil
 }
 
+func (ec *executionContext) _SessionMessage_author(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SessionMessage_author,
+		func(ctx context.Context) (any, error) {
+			return obj.Author, nil
+		},
+		nil,
+		ec.marshalOMessageAuthor2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageAuthor,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_SessionMessage_author(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionMessage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "userID":
+				return ec.fieldContext_MessageAuthor_userID(ctx, field)
+			case "displayName":
+				return ec.fieldContext_MessageAuthor_displayName(ctx, field)
+			case "slackUserID":
+				return ec.fieldContext_MessageAuthor_slackUserID(ctx, field)
+			case "email":
+				return ec.fieldContext_MessageAuthor_email(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MessageAuthor", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SessionMessage_createdAt(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -10884,6 +11417,41 @@ func (ec *executionContext) fieldContext_SessionMessage_updatedAt(_ context.Cont
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SessionMessage_revisions(ctx context.Context, field graphql.CollectedField, obj *graphql1.SessionMessage) (ret graphql.Marshaler) {
+	return graphql.ResolveField(
+		ctx,
+		ec.OperationContext,
+		field,
+		ec.fieldContext_SessionMessage_revisions,
+		func(ctx context.Context) (any, error) {
+			return obj.Revisions, nil
+		},
+		nil,
+		ec.marshalOMessageRevision2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageRevisionᚄ,
+		true,
+		false,
+	)
+}
+
+func (ec *executionContext) fieldContext_SessionMessage_revisions(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SessionMessage",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "content":
+				return ec.fieldContext_MessageRevision_content(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_MessageRevision_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type MessageRevision", field.Name)
 		},
 	}
 	return fc, nil
@@ -11403,47 +11971,6 @@ func (ec *executionContext) fieldContext_Ticket_alertsPaginated(ctx context.Cont
 	return fc, nil
 }
 
-func (ec *executionContext) _Ticket_comments(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Ticket_comments,
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Ticket().Comments(ctx, obj)
-		},
-		nil,
-		ec.marshalNComment2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐCommentᚄ,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Ticket_comments(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Ticket",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Comment_id(ctx, field)
-			case "content":
-				return ec.fieldContext_Comment_content(ctx, field)
-			case "user":
-				return ec.fieldContext_Comment_user(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Comment_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Comment_updatedAt(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Comment", field.Name)
-		},
-	}
-	return fc, nil
-}
-
 func (ec *executionContext) _Ticket_alertsCount(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
 	return graphql.ResolveField(
 		ctx,
@@ -11461,35 +11988,6 @@ func (ec *executionContext) _Ticket_alertsCount(ctx context.Context, field graph
 }
 
 func (ec *executionContext) fieldContext_Ticket_alertsCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Ticket",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Ticket_commentsCount(ctx context.Context, field graphql.CollectedField, obj *ticket.Ticket) (ret graphql.Marshaler) {
-	return graphql.ResolveField(
-		ctx,
-		ec.OperationContext,
-		field,
-		ec.fieldContext_Ticket_commentsCount,
-		func(ctx context.Context) (any, error) {
-			return ec.Resolvers.Ticket().CommentsCount(ctx, obj)
-		},
-		nil,
-		ec.marshalNInt2int,
-		true,
-		true,
-	)
-}
-
-func (ec *executionContext) fieldContext_Ticket_commentsCount(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Ticket",
 		Field:      field,
@@ -11877,12 +12375,8 @@ func (ec *executionContext) fieldContext_TicketsResponse_tickets(_ context.Conte
 				return ec.fieldContext_Ticket_alerts(ctx, field)
 			case "alertsPaginated":
 				return ec.fieldContext_Ticket_alertsPaginated(ctx, field)
-			case "comments":
-				return ec.fieldContext_Ticket_comments(ctx, field)
 			case "alertsCount":
 				return ec.fieldContext_Ticket_alertsCount(ctx, field)
-			case "commentsCount":
-				return ec.fieldContext_Ticket_commentsCount(ctx, field)
 			case "conclusion":
 				return ec.fieldContext_Ticket_conclusion(ctx, field)
 			case "reason":
@@ -14380,261 +14874,6 @@ func (ec *executionContext) _ArchiveAllResolvedResult(ctx context.Context, sel a
 	return out
 }
 
-var commentImplementors = []string{"Comment"}
-
-func (ec *executionContext) _Comment(ctx context.Context, sel ast.SelectionSet, obj *ticket.Comment) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, commentImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Comment")
-		case "id":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Comment_id(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "content":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Comment_content(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "user":
-			field := field
-
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Comment_user(ctx, field, obj)
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "createdAt":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Comment_createdAt(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "updatedAt":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Comment_updatedAt(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.ProcessDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
-var commentsResponseImplementors = []string{"CommentsResponse"}
-
-func (ec *executionContext) _CommentsResponse(ctx context.Context, sel ast.SelectionSet, obj *graphql1.CommentsResponse) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, commentsResponseImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("CommentsResponse")
-		case "comments":
-			out.Values[i] = ec._CommentsResponse_comments(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "totalCount":
-			out.Values[i] = ec._CommentsResponse_totalCount(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.ProcessDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
 var dashboardStatsImplementors = []string{"DashboardStats"}
 
 func (ec *executionContext) _DashboardStats(ctx context.Context, sel ast.SelectionSet, obj *graphql1.DashboardStats) graphql.Marshaler {
@@ -15019,6 +15258,73 @@ func (ec *executionContext) _Finding(ctx context.Context, sel ast.SelectionSet, 
 	return out
 }
 
+var hITLRequestImplementors = []string{"HITLRequest"}
+
+func (ec *executionContext) _HITLRequest(ctx context.Context, sel ast.SelectionSet, obj *graphql1.HITLRequest) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, hITLRequestImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("HITLRequest")
+		case "id":
+			out.Values[i] = ec._HITLRequest_id(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "sessionID":
+			out.Values[i] = ec._HITLRequest_sessionID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "type":
+			out.Values[i] = ec._HITLRequest_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "status":
+			out.Values[i] = ec._HITLRequest_status(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "userID":
+			out.Values[i] = ec._HITLRequest_userID(ctx, field, obj)
+		case "payload":
+			out.Values[i] = ec._HITLRequest_payload(ctx, field, obj)
+		case "response":
+			out.Values[i] = ec._HITLRequest_response(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._HITLRequest_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "respondedAt":
+			out.Values[i] = ec._HITLRequest_respondedAt(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var knowledgeImplementors = []string{"Knowledge"}
 
 func (ec *executionContext) _Knowledge(ctx context.Context, sel ast.SelectionSet, obj *graphql1.Knowledge) graphql.Marshaler {
@@ -15264,6 +15570,98 @@ func (ec *executionContext) _KnowledgeTag(ctx context.Context, sel ast.Selection
 	return out
 }
 
+var messageAuthorImplementors = []string{"MessageAuthor"}
+
+func (ec *executionContext) _MessageAuthor(ctx context.Context, sel ast.SelectionSet, obj *graphql1.MessageAuthor) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageAuthorImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageAuthor")
+		case "userID":
+			out.Values[i] = ec._MessageAuthor_userID(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "displayName":
+			out.Values[i] = ec._MessageAuthor_displayName(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "slackUserID":
+			out.Values[i] = ec._MessageAuthor_slackUserID(ctx, field, obj)
+		case "email":
+			out.Values[i] = ec._MessageAuthor_email(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var messageRevisionImplementors = []string{"MessageRevision"}
+
+func (ec *executionContext) _MessageRevision(ctx context.Context, sel ast.SelectionSet, obj *graphql1.MessageRevision) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, messageRevisionImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("MessageRevision")
+		case "content":
+			out.Values[i] = ec._MessageRevision_content(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "createdAt":
+			out.Values[i] = ec._MessageRevision_createdAt(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.Deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.ProcessDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
 var mutationImplementors = []string{"Mutation"}
 
 func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
@@ -15398,6 +15796,13 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		case "declineAlerts":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Mutation_declineAlerts(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "resolveHITLRequest":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_resolveHITLRequest(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -15608,28 +16013,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_similarTicketsForAlert(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "ticketComments":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_ticketComments(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -15866,6 +16249,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_sessionMessages(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "ticketSessionMessages":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_ticketSessionMessages(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -16830,6 +17235,11 @@ func (ec *executionContext) _Session(ctx context.Context, sel ast.SelectionSet, 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&out.Invalids, 1)
 			}
+		case "source":
+			out.Values[i] = ec._Session_source(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&out.Invalids, 1)
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -16874,6 +17284,10 @@ func (ec *executionContext) _SessionMessage(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "turnID":
+			out.Values[i] = ec._SessionMessage_turnID(ctx, field, obj)
+		case "ticketID":
+			out.Values[i] = ec._SessionMessage_ticketID(ctx, field, obj)
 		case "type":
 			out.Values[i] = ec._SessionMessage_type(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -16884,6 +17298,8 @@ func (ec *executionContext) _SessionMessage(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "author":
+			out.Values[i] = ec._SessionMessage_author(ctx, field, obj)
 		case "createdAt":
 			out.Values[i] = ec._SessionMessage_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -16894,6 +17310,8 @@ func (ec *executionContext) _SessionMessage(ctx context.Context, sel ast.Selecti
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "revisions":
+			out.Values[i] = ec._SessionMessage_revisions(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -17225,42 +17643,6 @@ func (ec *executionContext) _Ticket(ctx context.Context, sel ast.SelectionSet, o
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "comments":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Ticket_comments(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
 		case "alertsCount":
 			field := field
 
@@ -17271,42 +17653,6 @@ func (ec *executionContext) _Ticket(ctx context.Context, sel ast.SelectionSet, o
 					}
 				}()
 				res = ec._Ticket_alertsCount(ctx, field, obj)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			if field.Deferrable != nil {
-				dfs, ok := deferred[field.Deferrable.Label]
-				di := 0
-				if ok {
-					dfs.AddField(field)
-					di = len(dfs.Values) - 1
-				} else {
-					dfs = graphql.NewFieldSet([]graphql.CollectedField{field})
-					deferred[field.Deferrable.Label] = dfs
-				}
-				dfs.Concurrently(di, func(ctx context.Context) graphql.Marshaler {
-					return innerFunc(ctx, dfs)
-				})
-
-				// don't run the out.Concurrently() call below
-				out.Values[i] = graphql.Null
-				continue
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-		case "commentsCount":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Ticket_commentsCount(ctx, field, obj)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -18216,46 +18562,6 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalNComment2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐCommentᚄ(ctx context.Context, sel ast.SelectionSet, v []*ticket.Comment) graphql.Marshaler {
-	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
-		fc := graphql.GetFieldContext(ctx)
-		fc.Result = &v[i]
-		return ec.marshalNComment2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐComment(ctx, sel, v[i])
-	})
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
-func (ec *executionContext) marshalNComment2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋticketᚐComment(ctx context.Context, sel ast.SelectionSet, v *ticket.Comment) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._Comment(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNCommentsResponse2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCommentsResponse(ctx context.Context, sel ast.SelectionSet, v graphql1.CommentsResponse) graphql.Marshaler {
-	return ec._CommentsResponse(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNCommentsResponse2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCommentsResponse(ctx context.Context, sel ast.SelectionSet, v *graphql1.CommentsResponse) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._CommentsResponse(ctx, sel, v)
-}
-
 func (ec *executionContext) unmarshalNCreateKnowledgeInput2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐCreateKnowledgeInput(ctx context.Context, v any) (graphql1.CreateKnowledgeInput, error) {
 	res, err := ec.unmarshalInputCreateKnowledgeInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -18378,6 +18684,20 @@ func (ec *executionContext) marshalNFloat2float64(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNHITLRequest2githubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐHITLRequest(ctx context.Context, sel ast.SelectionSet, v graphql1.HITLRequest) graphql.Marshaler {
+	return ec._HITLRequest(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNHITLRequest2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐHITLRequest(ctx context.Context, sel ast.SelectionSet, v *graphql1.HITLRequest) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._HITLRequest(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v any) (string, error) {
@@ -18526,6 +18846,16 @@ func (ec *executionContext) marshalNKnowledgeTag2ᚖgithubᚗcomᚋsecmonᚑlab�
 		return graphql.Null
 	}
 	return ec._KnowledgeTag(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNMessageRevision2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageRevision(ctx context.Context, sel ast.SelectionSet, v *graphql1.MessageRevision) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._MessageRevision(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNQueuedAlert2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐQueuedAlertᚄ(ctx context.Context, sel ast.SelectionSet, v []*alert.QueuedAlert) graphql.Marshaler {
@@ -19136,6 +19466,32 @@ func (ec *executionContext) marshalOKnowledge2ᚖgithubᚗcomᚋsecmonᚑlabᚋw
 		return graphql.Null
 	}
 	return ec._Knowledge(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOMessageAuthor2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageAuthor(ctx context.Context, sel ast.SelectionSet, v *graphql1.MessageAuthor) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._MessageAuthor(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalOMessageRevision2ᚕᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageRevisionᚄ(ctx context.Context, sel ast.SelectionSet, v []*graphql1.MessageRevision) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler {
+		fc := graphql.GetFieldContext(ctx)
+		fc.Result = &v[i]
+		return ec.marshalNMessageRevision2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋgraphqlᚐMessageRevision(ctx, sel, v[i])
+	})
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
 }
 
 func (ec *executionContext) marshalOReprocessBatchJob2ᚖgithubᚗcomᚋsecmonᚑlabᚋwarrenᚋpkgᚋdomainᚋmodelᚋalertᚐReprocessBatchJob(ctx context.Context, sel ast.SelectionSet, v *alert.ReprocessBatchJob) graphql.Marshaler {

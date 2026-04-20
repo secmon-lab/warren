@@ -25,6 +25,14 @@ type PolicyClient interface {
 type StorageClient interface {
 	PutObject(ctx context.Context, object string) io.WriteCloser
 	GetObject(ctx context.Context, object string) (io.ReadCloser, error)
+	// DeleteObject removes the object. Missing objects are not treated
+	// as errors so callers can use it for idempotent cleanup.
+	DeleteObject(ctx context.Context, object string) error
+	// CopyObject performs a copy from src to dst within the same bucket.
+	// Implementations SHOULD use a server-side copy (e.g. GCS
+	// CopierFrom) to avoid streaming payloads through the caller.
+	// Returns an error when src does not exist.
+	CopyObject(ctx context.Context, src, dst string) error
 	Close(ctx context.Context)
 }
 

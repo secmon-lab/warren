@@ -2,10 +2,16 @@ import { formatDistanceToNow, format } from 'date-fns';
 import { enUS } from 'date-fns/locale';
 
 export function formatRelativeTime(dateString: string): string {
+  if (!dateString) return "";
   const date = new Date(dateString);
-  return formatDistanceToNow(date, { 
+  if (isNaN(date.getTime()) || date.getFullYear() <= 1970) {
+    // Guard against zero / empty / invalid timestamps that would
+    // otherwise render as "over 2025 years ago".
+    return "";
+  }
+  return formatDistanceToNow(date, {
     addSuffix: true,
-    locale: enUS 
+    locale: enUS,
   });
 }
 

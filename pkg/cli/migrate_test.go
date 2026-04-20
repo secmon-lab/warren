@@ -14,11 +14,11 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	config := cli.DefineFirestoreIndexes()
 
 	gt.Value(t, config).NotNil()
-	// Only alerts and tickets carry explicit index declarations. The
-	// previously-declared lists / memories / records entries were dropped
-	// because no query targets them and the target Firestore databases
-	// carry no residual indexes for those collections.
-	gt.Equal(t, len(config.Collections), 2)
+	// alerts and tickets carry vector/composite index declarations; turns
+	// and messages were added by chat-session-redesign and are actively
+	// queried. The previously-declared lists / memories / records entries
+	// were dropped on main because no query targets them.
+	gt.Equal(t, len(config.Collections), 4)
 
 	findCollection := func(name string) *fireconf.Collection {
 		for _, col := range config.Collections {

@@ -11,11 +11,9 @@ import (
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	ticketmodel "github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
-	"github.com/slack-go/slack/slackevents"
 )
 
 func TestGetLatestAlertByThread(t *testing.T) {
@@ -126,26 +124,9 @@ func TestAlertTicketBinding(t *testing.T) {
 		gt.Array(t, updatedTicket.AlertIDs).Any(func(id types.AlertID) bool { return id == alert3.ID })    // From BindAlertsToTicket
 		gt.Number(t, len(updatedTicket.AlertIDs)).GreaterOrEqual(3)                                        // Should have at least 3 alerts
 
-		// PutTicketComment
-		slackMsg := slack.NewMessage(ctx, &slackevents.EventsAPIEvent{
-			InnerEvent: slackevents.EventsAPIInnerEvent{
-				Data: &slackevents.AppMentionEvent{
-					TimeStamp: "test-message-id",
-					Text:      "Test Comment",
-					User:      "test-user",
-					Channel:   "test-channel",
-				},
-			},
-		})
-		comment := ticketObj.NewComment(ctx, slackMsg.Text(), slackMsg.User(), slackMsg.ID())
-		gt.NoError(t, repo.PutTicketComment(ctx, comment))
-
-		// GetTicketComments
-		gotComments, err := repo.GetTicketComments(ctx, ticketObj.ID)
-		gt.NoError(t, err)
-		gt.Array(t, gotComments).Longer(0).Required()
-		gt.Value(t, gotComments[0].Comment).Equal("Test Comment")
-		gt.Value(t, gotComments[0].SlackMessageID).Equal("test-message-id")
+		// chat-session-redesign Phase 7 (confinement): Comment CRUD was
+		// removed from the Repository interface. Thread message
+		// coverage now lives under session.Message tests.
 	}
 
 	t.Run("Memory", func(t *testing.T) {

@@ -2711,6 +2711,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			AcquireAlertThrottleSlotFunc: func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error) {
 //				panic("mock out the AcquireAlertThrottleSlot method")
 //			},
+//			AcquireSessionLockFunc: func(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) (bool, error) {
+//				panic("mock out the AcquireSessionLock method")
+//			},
 //			BatchGetAlertsFunc: func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error) {
 //				panic("mock out the BatchGetAlerts method")
 //			},
@@ -2747,14 +2750,14 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			CountQueuedAlertsFunc: func(ctx context.Context) (int, error) {
 //				panic("mock out the CountQueuedAlerts method")
 //			},
-//			CountTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) (int, error) {
-//				panic("mock out the CountTicketComments method")
-//			},
 //			CountTicketsByStatusFunc: func(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string) (int, error) {
 //				panic("mock out the CountTicketsByStatus method")
 //			},
 //			CreateNoticeFunc: func(ctx context.Context, noticeMoqParam *notice.Notice) error {
 //				panic("mock out the CreateNotice method")
+//			},
+//			CreateSessionFunc: func(ctx context.Context, sessionMoqParam *session.Session) error {
+//				panic("mock out the CreateSession method")
 //			},
 //			CreateTagWithIDFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
 //				panic("mock out the CreateTagWithID method")
@@ -2852,8 +2855,8 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetLatestAlertListInThreadFunc: func(ctx context.Context, thread slack.Thread) (*alert.List, error) {
 //				panic("mock out the GetLatestAlertListInThread method")
 //			},
-//			GetLatestHistoryFunc: func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
-//				panic("mock out the GetLatestHistory method")
+//			GetMessagesByTurnFunc: func(ctx context.Context, turnID types.TurnID) ([]*session.Message, error) {
+//				panic("mock out the GetMessagesByTurn method")
 //			},
 //			GetNoticeFunc: func(ctx context.Context, id types.NoticeID) (*notice.Notice, error) {
 //				panic("mock out the GetNotice method")
@@ -2897,14 +2900,8 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			GetTicketByThreadFunc: func(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error) {
 //				panic("mock out the GetTicketByThread method")
 //			},
-//			GetTicketCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
-//				panic("mock out the GetTicketComments method")
-//			},
-//			GetTicketCommentsPaginatedFunc: func(ctx context.Context, ticketID types.TicketID, offset int, limit int) ([]ticket.Comment, error) {
-//				panic("mock out the GetTicketCommentsPaginated method")
-//			},
-//			GetTicketUnpromptedCommentsFunc: func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
-//				panic("mock out the GetTicketUnpromptedComments method")
+//			GetTicketSessionMessagesFunc: func(ctx context.Context, ticketID types.TicketID, source *session.SessionSource, msgType *session.MessageType, limit int, offset int) ([]*session.Message, error) {
+//				panic("mock out the GetTicketSessionMessages method")
 //			},
 //			GetTicketsBySpanFunc: func(ctx context.Context, begin time.Time, end time.Time) ([]*ticket.Ticket, error) {
 //				panic("mock out the GetTicketsBySpan method")
@@ -2920,6 +2917,12 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			GetTokenFunc: func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error) {
 //				panic("mock out the GetToken method")
+//			},
+//			GetTurnFunc: func(ctx context.Context, turnID types.TurnID) (*session.Turn, error) {
+//				panic("mock out the GetTurn method")
+//			},
+//			GetTurnsBySessionFunc: func(ctx context.Context, sessionID types.SessionID) ([]*session.Turn, error) {
+//				panic("mock out the GetTurnsBySession method")
 //			},
 //			IsTagNameExistsFunc: func(ctx context.Context, name string) (bool, error) {
 //				panic("mock out the IsTagNameExists method")
@@ -2954,6 +2957,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			ListQueuedAlertsFunc: func(ctx context.Context, offset int, limit int) ([]*alert.QueuedAlert, error) {
 //				panic("mock out the ListQueuedAlerts method")
 //			},
+//			PromoteSessionToTicketFunc: func(ctx context.Context, sessionID types.SessionID, ticketID types.TicketID) error {
+//				panic("mock out the PromoteSessionToTicket method")
+//			},
 //			PutActivityFunc: func(ctx context.Context, activityMoqParam *activity.Activity) error {
 //				panic("mock out the PutActivity method")
 //			},
@@ -2971,9 +2977,6 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			},
 //			PutHITLRequestFunc: func(ctx context.Context, req *hitl.Request) error {
 //				panic("mock out the PutHITLRequest method")
-//			},
-//			PutHistoryFunc: func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
-//				panic("mock out the PutHistory method")
 //			},
 //			PutKnowledgeFunc: func(ctx context.Context, k *knowledge.Knowledge) error {
 //				panic("mock out the PutKnowledge method")
@@ -3005,14 +3008,17 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			PutTicketFunc: func(ctx context.Context, ticketMoqParam ticket.Ticket) error {
 //				panic("mock out the PutTicket method")
 //			},
-//			PutTicketCommentFunc: func(ctx context.Context, comment ticket.Comment) error {
-//				panic("mock out the PutTicketComment method")
-//			},
-//			PutTicketCommentsPromptedFunc: func(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
-//				panic("mock out the PutTicketCommentsPrompted method")
-//			},
 //			PutTokenFunc: func(ctx context.Context, token *auth.Token) error {
 //				panic("mock out the PutToken method")
+//			},
+//			PutTurnFunc: func(ctx context.Context, turn *session.Turn) error {
+//				panic("mock out the PutTurn method")
+//			},
+//			RefreshSessionLockFunc: func(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) error {
+//				panic("mock out the RefreshSessionLock method")
+//			},
+//			ReleaseSessionLockFunc: func(ctx context.Context, sessionID types.SessionID, holderID string) error {
+//				panic("mock out the ReleaseSessionLock method")
 //			},
 //			RemoveTagFromAllAlertsFunc: func(ctx context.Context, name string) error {
 //				panic("mock out the RemoveTagFromAllAlerts method")
@@ -3032,6 +3038,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			SearchQueuedAlertsFunc: func(ctx context.Context, keyword string, offset int, limit int) ([]*alert.QueuedAlert, int, error) {
 //				panic("mock out the SearchQueuedAlerts method")
 //			},
+//			SearchSessionMessagesFunc: func(ctx context.Context, ticketID types.TicketID, query string, limit int) ([]*session.Message, error) {
+//				panic("mock out the SearchSessionMessages method")
+//			},
 //			UnbindAlertFromTicketFunc: func(ctx context.Context, alertID types.AlertID) error {
 //				panic("mock out the UnbindAlertFromTicket method")
 //			},
@@ -3044,8 +3053,17 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			UpdateNoticeFunc: func(ctx context.Context, noticeMoqParam *notice.Notice) error {
 //				panic("mock out the UpdateNotice method")
 //			},
+//			UpdateSessionLastActiveFunc: func(ctx context.Context, sessionID types.SessionID, t time.Time) error {
+//				panic("mock out the UpdateSessionLastActive method")
+//			},
 //			UpdateTagFunc: func(ctx context.Context, tagMoqParam *tag.Tag) error {
 //				panic("mock out the UpdateTag method")
+//			},
+//			UpdateTurnIntentFunc: func(ctx context.Context, turnID types.TurnID, intent string) error {
+//				panic("mock out the UpdateTurnIntent method")
+//			},
+//			UpdateTurnStatusFunc: func(ctx context.Context, turnID types.TurnID, status session.TurnStatus, endedAt *time.Time) error {
+//				panic("mock out the UpdateTurnStatus method")
 //			},
 //			WatchHITLRequestFunc: func(ctx context.Context, id types.HITLRequestID) (<-chan *hitl.Request, <-chan error) {
 //				panic("mock out the WatchHITLRequest method")
@@ -3059,6 +3077,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 type RepositoryMock struct {
 	// AcquireAlertThrottleSlotFunc mocks the AcquireAlertThrottleSlot method.
 	AcquireAlertThrottleSlotFunc func(ctx context.Context, window time.Duration, limit int) (*alert.ThrottleResult, error)
+
+	// AcquireSessionLockFunc mocks the AcquireSessionLock method.
+	AcquireSessionLockFunc func(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) (bool, error)
 
 	// BatchGetAlertsFunc mocks the BatchGetAlerts method.
 	BatchGetAlertsFunc func(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
@@ -3096,14 +3117,14 @@ type RepositoryMock struct {
 	// CountQueuedAlertsFunc mocks the CountQueuedAlerts method.
 	CountQueuedAlertsFunc func(ctx context.Context) (int, error)
 
-	// CountTicketCommentsFunc mocks the CountTicketComments method.
-	CountTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) (int, error)
-
 	// CountTicketsByStatusFunc mocks the CountTicketsByStatus method.
 	CountTicketsByStatusFunc func(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string) (int, error)
 
 	// CreateNoticeFunc mocks the CreateNotice method.
 	CreateNoticeFunc func(ctx context.Context, noticeMoqParam *notice.Notice) error
+
+	// CreateSessionFunc mocks the CreateSession method.
+	CreateSessionFunc func(ctx context.Context, sessionMoqParam *session.Session) error
 
 	// CreateTagWithIDFunc mocks the CreateTagWithID method.
 	CreateTagWithIDFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
@@ -3201,8 +3222,8 @@ type RepositoryMock struct {
 	// GetLatestAlertListInThreadFunc mocks the GetLatestAlertListInThread method.
 	GetLatestAlertListInThreadFunc func(ctx context.Context, thread slack.Thread) (*alert.List, error)
 
-	// GetLatestHistoryFunc mocks the GetLatestHistory method.
-	GetLatestHistoryFunc func(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
+	// GetMessagesByTurnFunc mocks the GetMessagesByTurn method.
+	GetMessagesByTurnFunc func(ctx context.Context, turnID types.TurnID) ([]*session.Message, error)
 
 	// GetNoticeFunc mocks the GetNotice method.
 	GetNoticeFunc func(ctx context.Context, id types.NoticeID) (*notice.Notice, error)
@@ -3246,14 +3267,8 @@ type RepositoryMock struct {
 	// GetTicketByThreadFunc mocks the GetTicketByThread method.
 	GetTicketByThreadFunc func(ctx context.Context, thread slack.Thread) (*ticket.Ticket, error)
 
-	// GetTicketCommentsFunc mocks the GetTicketComments method.
-	GetTicketCommentsFunc func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
-
-	// GetTicketCommentsPaginatedFunc mocks the GetTicketCommentsPaginated method.
-	GetTicketCommentsPaginatedFunc func(ctx context.Context, ticketID types.TicketID, offset int, limit int) ([]ticket.Comment, error)
-
-	// GetTicketUnpromptedCommentsFunc mocks the GetTicketUnpromptedComments method.
-	GetTicketUnpromptedCommentsFunc func(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
+	// GetTicketSessionMessagesFunc mocks the GetTicketSessionMessages method.
+	GetTicketSessionMessagesFunc func(ctx context.Context, ticketID types.TicketID, source *session.SessionSource, msgType *session.MessageType, limit int, offset int) ([]*session.Message, error)
 
 	// GetTicketsBySpanFunc mocks the GetTicketsBySpan method.
 	GetTicketsBySpanFunc func(ctx context.Context, begin time.Time, end time.Time) ([]*ticket.Ticket, error)
@@ -3269,6 +3284,12 @@ type RepositoryMock struct {
 
 	// GetTokenFunc mocks the GetToken method.
 	GetTokenFunc func(ctx context.Context, tokenID auth.TokenID) (*auth.Token, error)
+
+	// GetTurnFunc mocks the GetTurn method.
+	GetTurnFunc func(ctx context.Context, turnID types.TurnID) (*session.Turn, error)
+
+	// GetTurnsBySessionFunc mocks the GetTurnsBySession method.
+	GetTurnsBySessionFunc func(ctx context.Context, sessionID types.SessionID) ([]*session.Turn, error)
 
 	// IsTagNameExistsFunc mocks the IsTagNameExists method.
 	IsTagNameExistsFunc func(ctx context.Context, name string) (bool, error)
@@ -3303,6 +3324,9 @@ type RepositoryMock struct {
 	// ListQueuedAlertsFunc mocks the ListQueuedAlerts method.
 	ListQueuedAlertsFunc func(ctx context.Context, offset int, limit int) ([]*alert.QueuedAlert, error)
 
+	// PromoteSessionToTicketFunc mocks the PromoteSessionToTicket method.
+	PromoteSessionToTicketFunc func(ctx context.Context, sessionID types.SessionID, ticketID types.TicketID) error
+
 	// PutActivityFunc mocks the PutActivity method.
 	PutActivityFunc func(ctx context.Context, activityMoqParam *activity.Activity) error
 
@@ -3320,9 +3344,6 @@ type RepositoryMock struct {
 
 	// PutHITLRequestFunc mocks the PutHITLRequest method.
 	PutHITLRequestFunc func(ctx context.Context, req *hitl.Request) error
-
-	// PutHistoryFunc mocks the PutHistory method.
-	PutHistoryFunc func(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
 
 	// PutKnowledgeFunc mocks the PutKnowledge method.
 	PutKnowledgeFunc func(ctx context.Context, k *knowledge.Knowledge) error
@@ -3354,14 +3375,17 @@ type RepositoryMock struct {
 	// PutTicketFunc mocks the PutTicket method.
 	PutTicketFunc func(ctx context.Context, ticketMoqParam ticket.Ticket) error
 
-	// PutTicketCommentFunc mocks the PutTicketComment method.
-	PutTicketCommentFunc func(ctx context.Context, comment ticket.Comment) error
-
-	// PutTicketCommentsPromptedFunc mocks the PutTicketCommentsPrompted method.
-	PutTicketCommentsPromptedFunc func(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
-
 	// PutTokenFunc mocks the PutToken method.
 	PutTokenFunc func(ctx context.Context, token *auth.Token) error
+
+	// PutTurnFunc mocks the PutTurn method.
+	PutTurnFunc func(ctx context.Context, turn *session.Turn) error
+
+	// RefreshSessionLockFunc mocks the RefreshSessionLock method.
+	RefreshSessionLockFunc func(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) error
+
+	// ReleaseSessionLockFunc mocks the ReleaseSessionLock method.
+	ReleaseSessionLockFunc func(ctx context.Context, sessionID types.SessionID, holderID string) error
 
 	// RemoveTagFromAllAlertsFunc mocks the RemoveTagFromAllAlerts method.
 	RemoveTagFromAllAlertsFunc func(ctx context.Context, name string) error
@@ -3381,6 +3405,9 @@ type RepositoryMock struct {
 	// SearchQueuedAlertsFunc mocks the SearchQueuedAlerts method.
 	SearchQueuedAlertsFunc func(ctx context.Context, keyword string, offset int, limit int) ([]*alert.QueuedAlert, int, error)
 
+	// SearchSessionMessagesFunc mocks the SearchSessionMessages method.
+	SearchSessionMessagesFunc func(ctx context.Context, ticketID types.TicketID, query string, limit int) ([]*session.Message, error)
+
 	// UnbindAlertFromTicketFunc mocks the UnbindAlertFromTicket method.
 	UnbindAlertFromTicketFunc func(ctx context.Context, alertID types.AlertID) error
 
@@ -3393,8 +3420,17 @@ type RepositoryMock struct {
 	// UpdateNoticeFunc mocks the UpdateNotice method.
 	UpdateNoticeFunc func(ctx context.Context, noticeMoqParam *notice.Notice) error
 
+	// UpdateSessionLastActiveFunc mocks the UpdateSessionLastActive method.
+	UpdateSessionLastActiveFunc func(ctx context.Context, sessionID types.SessionID, t time.Time) error
+
 	// UpdateTagFunc mocks the UpdateTag method.
 	UpdateTagFunc func(ctx context.Context, tagMoqParam *tag.Tag) error
+
+	// UpdateTurnIntentFunc mocks the UpdateTurnIntent method.
+	UpdateTurnIntentFunc func(ctx context.Context, turnID types.TurnID, intent string) error
+
+	// UpdateTurnStatusFunc mocks the UpdateTurnStatus method.
+	UpdateTurnStatusFunc func(ctx context.Context, turnID types.TurnID, status session.TurnStatus, endedAt *time.Time) error
 
 	// WatchHITLRequestFunc mocks the WatchHITLRequest method.
 	WatchHITLRequestFunc func(ctx context.Context, id types.HITLRequestID) (<-chan *hitl.Request, <-chan error)
@@ -3409,6 +3445,17 @@ type RepositoryMock struct {
 			Window time.Duration
 			// Limit is the limit argument value.
 			Limit int
+		}
+		// AcquireSessionLock holds details about calls to the AcquireSessionLock method.
+		AcquireSessionLock []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
+			// HolderID is the holderID argument value.
+			HolderID string
+			// TTL is the ttl argument value.
+			TTL time.Duration
 		}
 		// BatchGetAlerts holds details about calls to the BatchGetAlerts method.
 		BatchGetAlerts []struct {
@@ -3494,13 +3541,6 @@ type RepositoryMock struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 		}
-		// CountTicketComments holds details about calls to the CountTicketComments method.
-		CountTicketComments []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// TicketID is the ticketID argument value.
-			TicketID types.TicketID
-		}
 		// CountTicketsByStatus holds details about calls to the CountTicketsByStatus method.
 		CountTicketsByStatus []struct {
 			// Ctx is the ctx argument value.
@@ -3518,6 +3558,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// NoticeMoqParam is the noticeMoqParam argument value.
 			NoticeMoqParam *notice.Notice
+		}
+		// CreateSession holds details about calls to the CreateSession method.
+		CreateSession []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionMoqParam is the sessionMoqParam argument value.
+			SessionMoqParam *session.Session
 		}
 		// CreateTagWithID holds details about calls to the CreateTagWithID method.
 		CreateTagWithID []struct {
@@ -3757,12 +3804,12 @@ type RepositoryMock struct {
 			// Thread is the thread argument value.
 			Thread slack.Thread
 		}
-		// GetLatestHistory holds details about calls to the GetLatestHistory method.
-		GetLatestHistory []struct {
+		// GetMessagesByTurn holds details about calls to the GetMessagesByTurn method.
+		GetMessagesByTurn []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// TicketID is the ticketID argument value.
-			TicketID types.TicketID
+			// TurnID is the turnID argument value.
+			TurnID types.TurnID
 		}
 		// GetNotice holds details about calls to the GetNotice method.
 		GetNotice []struct {
@@ -3868,30 +3915,20 @@ type RepositoryMock struct {
 			// Thread is the thread argument value.
 			Thread slack.Thread
 		}
-		// GetTicketComments holds details about calls to the GetTicketComments method.
-		GetTicketComments []struct {
+		// GetTicketSessionMessages holds details about calls to the GetTicketSessionMessages method.
+		GetTicketSessionMessages []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TicketID is the ticketID argument value.
 			TicketID types.TicketID
-		}
-		// GetTicketCommentsPaginated holds details about calls to the GetTicketCommentsPaginated method.
-		GetTicketCommentsPaginated []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// TicketID is the ticketID argument value.
-			TicketID types.TicketID
-			// Offset is the offset argument value.
-			Offset int
+			// Source is the source argument value.
+			Source *session.SessionSource
+			// MsgType is the msgType argument value.
+			MsgType *session.MessageType
 			// Limit is the limit argument value.
 			Limit int
-		}
-		// GetTicketUnpromptedComments holds details about calls to the GetTicketUnpromptedComments method.
-		GetTicketUnpromptedComments []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// TicketID is the ticketID argument value.
-			TicketID types.TicketID
+			// Offset is the offset argument value.
+			Offset int
 		}
 		// GetTicketsBySpan holds details about calls to the GetTicketsBySpan method.
 		GetTicketsBySpan []struct {
@@ -3939,6 +3976,20 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// TokenID is the tokenID argument value.
 			TokenID auth.TokenID
+		}
+		// GetTurn holds details about calls to the GetTurn method.
+		GetTurn []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TurnID is the turnID argument value.
+			TurnID types.TurnID
+		}
+		// GetTurnsBySession holds details about calls to the GetTurnsBySession method.
+		GetTurnsBySession []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
 		}
 		// IsTagNameExists holds details about calls to the IsTagNameExists method.
 		IsTagNameExists []struct {
@@ -4023,6 +4074,15 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
+		// PromoteSessionToTicket holds details about calls to the PromoteSessionToTicket method.
+		PromoteSessionToTicket []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+		}
 		// PutActivity holds details about calls to the PutActivity method.
 		PutActivity []struct {
 			// Ctx is the ctx argument value.
@@ -4064,15 +4124,6 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Req is the req argument value.
 			Req *hitl.Request
-		}
-		// PutHistory holds details about calls to the PutHistory method.
-		PutHistory []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// TicketID is the ticketID argument value.
-			TicketID types.TicketID
-			// History is the history argument value.
-			History *ticket.History
 		}
 		// PutKnowledge holds details about calls to the PutKnowledge method.
 		PutKnowledge []struct {
@@ -4144,28 +4195,39 @@ type RepositoryMock struct {
 			// TicketMoqParam is the ticketMoqParam argument value.
 			TicketMoqParam ticket.Ticket
 		}
-		// PutTicketComment holds details about calls to the PutTicketComment method.
-		PutTicketComment []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// Comment is the comment argument value.
-			Comment ticket.Comment
-		}
-		// PutTicketCommentsPrompted holds details about calls to the PutTicketCommentsPrompted method.
-		PutTicketCommentsPrompted []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-			// TicketID is the ticketID argument value.
-			TicketID types.TicketID
-			// CommentIDs is the commentIDs argument value.
-			CommentIDs []types.CommentID
-		}
 		// PutToken holds details about calls to the PutToken method.
 		PutToken []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// Token is the token argument value.
 			Token *auth.Token
+		}
+		// PutTurn holds details about calls to the PutTurn method.
+		PutTurn []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Turn is the turn argument value.
+			Turn *session.Turn
+		}
+		// RefreshSessionLock holds details about calls to the RefreshSessionLock method.
+		RefreshSessionLock []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
+			// HolderID is the holderID argument value.
+			HolderID string
+			// TTL is the ttl argument value.
+			TTL time.Duration
+		}
+		// ReleaseSessionLock holds details about calls to the ReleaseSessionLock method.
+		ReleaseSessionLock []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
+			// HolderID is the holderID argument value.
+			HolderID string
 		}
 		// RemoveTagFromAllAlerts holds details about calls to the RemoveTagFromAllAlerts method.
 		RemoveTagFromAllAlerts []struct {
@@ -4219,6 +4281,17 @@ type RepositoryMock struct {
 			// Limit is the limit argument value.
 			Limit int
 		}
+		// SearchSessionMessages holds details about calls to the SearchSessionMessages method.
+		SearchSessionMessages []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TicketID is the ticketID argument value.
+			TicketID types.TicketID
+			// Query is the query argument value.
+			Query string
+			// Limit is the limit argument value.
+			Limit int
+		}
 		// UnbindAlertFromTicket holds details about calls to the UnbindAlertFromTicket method.
 		UnbindAlertFromTicket []struct {
 			// Ctx is the ctx argument value.
@@ -4255,12 +4328,41 @@ type RepositoryMock struct {
 			// NoticeMoqParam is the noticeMoqParam argument value.
 			NoticeMoqParam *notice.Notice
 		}
+		// UpdateSessionLastActive holds details about calls to the UpdateSessionLastActive method.
+		UpdateSessionLastActive []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// SessionID is the sessionID argument value.
+			SessionID types.SessionID
+			// T is the t argument value.
+			T time.Time
+		}
 		// UpdateTag holds details about calls to the UpdateTag method.
 		UpdateTag []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
 			// TagMoqParam is the tagMoqParam argument value.
 			TagMoqParam *tag.Tag
+		}
+		// UpdateTurnIntent holds details about calls to the UpdateTurnIntent method.
+		UpdateTurnIntent []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TurnID is the turnID argument value.
+			TurnID types.TurnID
+			// Intent is the intent argument value.
+			Intent string
+		}
+		// UpdateTurnStatus holds details about calls to the UpdateTurnStatus method.
+		UpdateTurnStatus []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// TurnID is the turnID argument value.
+			TurnID types.TurnID
+			// Status is the status argument value.
+			Status session.TurnStatus
+			// EndedAt is the endedAt argument value.
+			EndedAt *time.Time
 		}
 		// WatchHITLRequest holds details about calls to the WatchHITLRequest method.
 		WatchHITLRequest []struct {
@@ -4271,6 +4373,7 @@ type RepositoryMock struct {
 		}
 	}
 	lockAcquireAlertThrottleSlot        sync.RWMutex
+	lockAcquireSessionLock              sync.RWMutex
 	lockBatchGetAlerts                  sync.RWMutex
 	lockBatchGetDiagnosisIssueCounts    sync.RWMutex
 	lockBatchGetTickets                 sync.RWMutex
@@ -4283,9 +4386,9 @@ type RepositoryMock struct {
 	lockCountDeclinedAlerts             sync.RWMutex
 	lockCountDiagnosisIssues            sync.RWMutex
 	lockCountQueuedAlerts               sync.RWMutex
-	lockCountTicketComments             sync.RWMutex
 	lockCountTicketsByStatus            sync.RWMutex
 	lockCreateNotice                    sync.RWMutex
+	lockCreateSession                   sync.RWMutex
 	lockCreateTagWithID                 sync.RWMutex
 	lockDeleteKnowledge                 sync.RWMutex
 	lockDeleteKnowledgeTag              sync.RWMutex
@@ -4318,7 +4421,7 @@ type RepositoryMock struct {
 	lockGetKnowledgeTag                 sync.RWMutex
 	lockGetLatestAlertByThread          sync.RWMutex
 	lockGetLatestAlertListInThread      sync.RWMutex
-	lockGetLatestHistory                sync.RWMutex
+	lockGetMessagesByTurn               sync.RWMutex
 	lockGetNotice                       sync.RWMutex
 	lockGetOrCreateTagByName            sync.RWMutex
 	lockGetQueuedAlert                  sync.RWMutex
@@ -4333,14 +4436,14 @@ type RepositoryMock struct {
 	lockGetTagsByIDs                    sync.RWMutex
 	lockGetTicket                       sync.RWMutex
 	lockGetTicketByThread               sync.RWMutex
-	lockGetTicketComments               sync.RWMutex
-	lockGetTicketCommentsPaginated      sync.RWMutex
-	lockGetTicketUnpromptedComments     sync.RWMutex
+	lockGetTicketSessionMessages        sync.RWMutex
 	lockGetTicketsBySpan                sync.RWMutex
 	lockGetTicketsByStatus              sync.RWMutex
 	lockGetTicketsByStatusAndSpan       sync.RWMutex
 	lockGetTicketsWithInvalidEmbedding  sync.RWMutex
 	lockGetToken                        sync.RWMutex
+	lockGetTurn                         sync.RWMutex
+	lockGetTurnsBySession               sync.RWMutex
 	lockIsTagNameExists                 sync.RWMutex
 	lockListAllKnowledges               sync.RWMutex
 	lockListAllTags                     sync.RWMutex
@@ -4352,13 +4455,13 @@ type RepositoryMock struct {
 	lockListLegacyKnowledges            sync.RWMutex
 	lockListPendingDiagnosisIssues      sync.RWMutex
 	lockListQueuedAlerts                sync.RWMutex
+	lockPromoteSessionToTicket          sync.RWMutex
 	lockPutActivity                     sync.RWMutex
 	lockPutAlert                        sync.RWMutex
 	lockPutAlertList                    sync.RWMutex
 	lockPutDiagnosis                    sync.RWMutex
 	lockPutDiagnosisIssue               sync.RWMutex
 	lockPutHITLRequest                  sync.RWMutex
-	lockPutHistory                      sync.RWMutex
 	lockPutKnowledge                    sync.RWMutex
 	lockPutKnowledgeLog                 sync.RWMutex
 	lockPutKnowledgeTag                 sync.RWMutex
@@ -4369,20 +4472,25 @@ type RepositoryMock struct {
 	lockPutSession                      sync.RWMutex
 	lockPutSessionMessage               sync.RWMutex
 	lockPutTicket                       sync.RWMutex
-	lockPutTicketComment                sync.RWMutex
-	lockPutTicketCommentsPrompted       sync.RWMutex
 	lockPutToken                        sync.RWMutex
+	lockPutTurn                         sync.RWMutex
+	lockRefreshSessionLock              sync.RWMutex
+	lockReleaseSessionLock              sync.RWMutex
 	lockRemoveTagFromAllAlerts          sync.RWMutex
 	lockRemoveTagFromAllTickets         sync.RWMutex
 	lockRemoveTagIDFromAllAlerts        sync.RWMutex
 	lockRemoveTagIDFromAllTickets       sync.RWMutex
 	lockSearchAlerts                    sync.RWMutex
 	lockSearchQueuedAlerts              sync.RWMutex
+	lockSearchSessionMessages           sync.RWMutex
 	lockUnbindAlertFromTicket           sync.RWMutex
 	lockUpdateAlertStatus               sync.RWMutex
 	lockUpdateHITLRequestStatus         sync.RWMutex
 	lockUpdateNotice                    sync.RWMutex
+	lockUpdateSessionLastActive         sync.RWMutex
 	lockUpdateTag                       sync.RWMutex
+	lockUpdateTurnIntent                sync.RWMutex
+	lockUpdateTurnStatus                sync.RWMutex
 	lockWatchHITLRequest                sync.RWMutex
 }
 
@@ -4427,6 +4535,54 @@ func (mock *RepositoryMock) AcquireAlertThrottleSlotCalls() []struct {
 	mock.lockAcquireAlertThrottleSlot.RLock()
 	calls = mock.calls.AcquireAlertThrottleSlot
 	mock.lockAcquireAlertThrottleSlot.RUnlock()
+	return calls
+}
+
+// AcquireSessionLock calls AcquireSessionLockFunc.
+func (mock *RepositoryMock) AcquireSessionLock(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) (bool, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		HolderID  string
+		TTL       time.Duration
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+		HolderID:  holderID,
+		TTL:       ttl,
+	}
+	mock.lockAcquireSessionLock.Lock()
+	mock.calls.AcquireSessionLock = append(mock.calls.AcquireSessionLock, callInfo)
+	mock.lockAcquireSessionLock.Unlock()
+	if mock.AcquireSessionLockFunc == nil {
+		var (
+			bOut   bool
+			errOut error
+		)
+		return bOut, errOut
+	}
+	return mock.AcquireSessionLockFunc(ctx, sessionID, holderID, ttl)
+}
+
+// AcquireSessionLockCalls gets all the calls that were made to AcquireSessionLock.
+// Check the length with:
+//
+//	len(mockedRepository.AcquireSessionLockCalls())
+func (mock *RepositoryMock) AcquireSessionLockCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+	HolderID  string
+	TTL       time.Duration
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		HolderID  string
+		TTL       time.Duration
+	}
+	mock.lockAcquireSessionLock.RLock()
+	calls = mock.calls.AcquireSessionLock
+	mock.lockAcquireSessionLock.RUnlock()
 	return calls
 }
 
@@ -4907,46 +5063,6 @@ func (mock *RepositoryMock) CountQueuedAlertsCalls() []struct {
 	return calls
 }
 
-// CountTicketComments calls CountTicketCommentsFunc.
-func (mock *RepositoryMock) CountTicketComments(ctx context.Context, ticketID types.TicketID) (int, error) {
-	callInfo := struct {
-		Ctx      context.Context
-		TicketID types.TicketID
-	}{
-		Ctx:      ctx,
-		TicketID: ticketID,
-	}
-	mock.lockCountTicketComments.Lock()
-	mock.calls.CountTicketComments = append(mock.calls.CountTicketComments, callInfo)
-	mock.lockCountTicketComments.Unlock()
-	if mock.CountTicketCommentsFunc == nil {
-		var (
-			nOut   int
-			errOut error
-		)
-		return nOut, errOut
-	}
-	return mock.CountTicketCommentsFunc(ctx, ticketID)
-}
-
-// CountTicketCommentsCalls gets all the calls that were made to CountTicketComments.
-// Check the length with:
-//
-//	len(mockedRepository.CountTicketCommentsCalls())
-func (mock *RepositoryMock) CountTicketCommentsCalls() []struct {
-	Ctx      context.Context
-	TicketID types.TicketID
-} {
-	var calls []struct {
-		Ctx      context.Context
-		TicketID types.TicketID
-	}
-	mock.lockCountTicketComments.RLock()
-	calls = mock.calls.CountTicketComments
-	mock.lockCountTicketComments.RUnlock()
-	return calls
-}
-
 // CountTicketsByStatus calls CountTicketsByStatusFunc.
 func (mock *RepositoryMock) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword string, assigneeID string) (int, error) {
 	callInfo := struct {
@@ -5031,6 +5147,45 @@ func (mock *RepositoryMock) CreateNoticeCalls() []struct {
 	mock.lockCreateNotice.RLock()
 	calls = mock.calls.CreateNotice
 	mock.lockCreateNotice.RUnlock()
+	return calls
+}
+
+// CreateSession calls CreateSessionFunc.
+func (mock *RepositoryMock) CreateSession(ctx context.Context, sessionMoqParam *session.Session) error {
+	callInfo := struct {
+		Ctx             context.Context
+		SessionMoqParam *session.Session
+	}{
+		Ctx:             ctx,
+		SessionMoqParam: sessionMoqParam,
+	}
+	mock.lockCreateSession.Lock()
+	mock.calls.CreateSession = append(mock.calls.CreateSession, callInfo)
+	mock.lockCreateSession.Unlock()
+	if mock.CreateSessionFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.CreateSessionFunc(ctx, sessionMoqParam)
+}
+
+// CreateSessionCalls gets all the calls that were made to CreateSession.
+// Check the length with:
+//
+//	len(mockedRepository.CreateSessionCalls())
+func (mock *RepositoryMock) CreateSessionCalls() []struct {
+	Ctx             context.Context
+	SessionMoqParam *session.Session
+} {
+	var calls []struct {
+		Ctx             context.Context
+		SessionMoqParam *session.Session
+	}
+	mock.lockCreateSession.RLock()
+	calls = mock.calls.CreateSession
+	mock.lockCreateSession.RUnlock()
 	return calls
 }
 
@@ -6335,43 +6490,43 @@ func (mock *RepositoryMock) GetLatestAlertListInThreadCalls() []struct {
 	return calls
 }
 
-// GetLatestHistory calls GetLatestHistoryFunc.
-func (mock *RepositoryMock) GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error) {
+// GetMessagesByTurn calls GetMessagesByTurnFunc.
+func (mock *RepositoryMock) GetMessagesByTurn(ctx context.Context, turnID types.TurnID) ([]*session.Message, error) {
 	callInfo := struct {
-		Ctx      context.Context
-		TicketID types.TicketID
+		Ctx    context.Context
+		TurnID types.TurnID
 	}{
-		Ctx:      ctx,
-		TicketID: ticketID,
+		Ctx:    ctx,
+		TurnID: turnID,
 	}
-	mock.lockGetLatestHistory.Lock()
-	mock.calls.GetLatestHistory = append(mock.calls.GetLatestHistory, callInfo)
-	mock.lockGetLatestHistory.Unlock()
-	if mock.GetLatestHistoryFunc == nil {
+	mock.lockGetMessagesByTurn.Lock()
+	mock.calls.GetMessagesByTurn = append(mock.calls.GetMessagesByTurn, callInfo)
+	mock.lockGetMessagesByTurn.Unlock()
+	if mock.GetMessagesByTurnFunc == nil {
 		var (
-			historyOut *ticket.History
-			errOut     error
+			messagesOut []*session.Message
+			errOut      error
 		)
-		return historyOut, errOut
+		return messagesOut, errOut
 	}
-	return mock.GetLatestHistoryFunc(ctx, ticketID)
+	return mock.GetMessagesByTurnFunc(ctx, turnID)
 }
 
-// GetLatestHistoryCalls gets all the calls that were made to GetLatestHistory.
+// GetMessagesByTurnCalls gets all the calls that were made to GetMessagesByTurn.
 // Check the length with:
 //
-//	len(mockedRepository.GetLatestHistoryCalls())
-func (mock *RepositoryMock) GetLatestHistoryCalls() []struct {
-	Ctx      context.Context
-	TicketID types.TicketID
+//	len(mockedRepository.GetMessagesByTurnCalls())
+func (mock *RepositoryMock) GetMessagesByTurnCalls() []struct {
+	Ctx    context.Context
+	TurnID types.TurnID
 } {
 	var calls []struct {
-		Ctx      context.Context
-		TicketID types.TicketID
+		Ctx    context.Context
+		TurnID types.TurnID
 	}
-	mock.lockGetLatestHistory.RLock()
-	calls = mock.calls.GetLatestHistory
-	mock.lockGetLatestHistory.RUnlock()
+	mock.lockGetMessagesByTurn.RLock()
+	calls = mock.calls.GetMessagesByTurn
+	mock.lockGetMessagesByTurn.RUnlock()
 	return calls
 }
 
@@ -6947,131 +7102,59 @@ func (mock *RepositoryMock) GetTicketByThreadCalls() []struct {
 	return calls
 }
 
-// GetTicketComments calls GetTicketCommentsFunc.
-func (mock *RepositoryMock) GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
+// GetTicketSessionMessages calls GetTicketSessionMessagesFunc.
+func (mock *RepositoryMock) GetTicketSessionMessages(ctx context.Context, ticketID types.TicketID, source *session.SessionSource, msgType *session.MessageType, limit int, offset int) ([]*session.Message, error) {
 	callInfo := struct {
 		Ctx      context.Context
 		TicketID types.TicketID
-	}{
-		Ctx:      ctx,
-		TicketID: ticketID,
-	}
-	mock.lockGetTicketComments.Lock()
-	mock.calls.GetTicketComments = append(mock.calls.GetTicketComments, callInfo)
-	mock.lockGetTicketComments.Unlock()
-	if mock.GetTicketCommentsFunc == nil {
-		var (
-			commentsOut []ticket.Comment
-			errOut      error
-		)
-		return commentsOut, errOut
-	}
-	return mock.GetTicketCommentsFunc(ctx, ticketID)
-}
-
-// GetTicketCommentsCalls gets all the calls that were made to GetTicketComments.
-// Check the length with:
-//
-//	len(mockedRepository.GetTicketCommentsCalls())
-func (mock *RepositoryMock) GetTicketCommentsCalls() []struct {
-	Ctx      context.Context
-	TicketID types.TicketID
-} {
-	var calls []struct {
-		Ctx      context.Context
-		TicketID types.TicketID
-	}
-	mock.lockGetTicketComments.RLock()
-	calls = mock.calls.GetTicketComments
-	mock.lockGetTicketComments.RUnlock()
-	return calls
-}
-
-// GetTicketCommentsPaginated calls GetTicketCommentsPaginatedFunc.
-func (mock *RepositoryMock) GetTicketCommentsPaginated(ctx context.Context, ticketID types.TicketID, offset int, limit int) ([]ticket.Comment, error) {
-	callInfo := struct {
-		Ctx      context.Context
-		TicketID types.TicketID
-		Offset   int
+		Source   *session.SessionSource
+		MsgType  *session.MessageType
 		Limit    int
+		Offset   int
 	}{
 		Ctx:      ctx,
 		TicketID: ticketID,
-		Offset:   offset,
+		Source:   source,
+		MsgType:  msgType,
 		Limit:    limit,
+		Offset:   offset,
 	}
-	mock.lockGetTicketCommentsPaginated.Lock()
-	mock.calls.GetTicketCommentsPaginated = append(mock.calls.GetTicketCommentsPaginated, callInfo)
-	mock.lockGetTicketCommentsPaginated.Unlock()
-	if mock.GetTicketCommentsPaginatedFunc == nil {
+	mock.lockGetTicketSessionMessages.Lock()
+	mock.calls.GetTicketSessionMessages = append(mock.calls.GetTicketSessionMessages, callInfo)
+	mock.lockGetTicketSessionMessages.Unlock()
+	if mock.GetTicketSessionMessagesFunc == nil {
 		var (
-			commentsOut []ticket.Comment
+			messagesOut []*session.Message
 			errOut      error
 		)
-		return commentsOut, errOut
+		return messagesOut, errOut
 	}
-	return mock.GetTicketCommentsPaginatedFunc(ctx, ticketID, offset, limit)
+	return mock.GetTicketSessionMessagesFunc(ctx, ticketID, source, msgType, limit, offset)
 }
 
-// GetTicketCommentsPaginatedCalls gets all the calls that were made to GetTicketCommentsPaginated.
+// GetTicketSessionMessagesCalls gets all the calls that were made to GetTicketSessionMessages.
 // Check the length with:
 //
-//	len(mockedRepository.GetTicketCommentsPaginatedCalls())
-func (mock *RepositoryMock) GetTicketCommentsPaginatedCalls() []struct {
+//	len(mockedRepository.GetTicketSessionMessagesCalls())
+func (mock *RepositoryMock) GetTicketSessionMessagesCalls() []struct {
 	Ctx      context.Context
 	TicketID types.TicketID
-	Offset   int
+	Source   *session.SessionSource
+	MsgType  *session.MessageType
 	Limit    int
+	Offset   int
 } {
 	var calls []struct {
 		Ctx      context.Context
 		TicketID types.TicketID
-		Offset   int
+		Source   *session.SessionSource
+		MsgType  *session.MessageType
 		Limit    int
+		Offset   int
 	}
-	mock.lockGetTicketCommentsPaginated.RLock()
-	calls = mock.calls.GetTicketCommentsPaginated
-	mock.lockGetTicketCommentsPaginated.RUnlock()
-	return calls
-}
-
-// GetTicketUnpromptedComments calls GetTicketUnpromptedCommentsFunc.
-func (mock *RepositoryMock) GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error) {
-	callInfo := struct {
-		Ctx      context.Context
-		TicketID types.TicketID
-	}{
-		Ctx:      ctx,
-		TicketID: ticketID,
-	}
-	mock.lockGetTicketUnpromptedComments.Lock()
-	mock.calls.GetTicketUnpromptedComments = append(mock.calls.GetTicketUnpromptedComments, callInfo)
-	mock.lockGetTicketUnpromptedComments.Unlock()
-	if mock.GetTicketUnpromptedCommentsFunc == nil {
-		var (
-			commentsOut []ticket.Comment
-			errOut      error
-		)
-		return commentsOut, errOut
-	}
-	return mock.GetTicketUnpromptedCommentsFunc(ctx, ticketID)
-}
-
-// GetTicketUnpromptedCommentsCalls gets all the calls that were made to GetTicketUnpromptedComments.
-// Check the length with:
-//
-//	len(mockedRepository.GetTicketUnpromptedCommentsCalls())
-func (mock *RepositoryMock) GetTicketUnpromptedCommentsCalls() []struct {
-	Ctx      context.Context
-	TicketID types.TicketID
-} {
-	var calls []struct {
-		Ctx      context.Context
-		TicketID types.TicketID
-	}
-	mock.lockGetTicketUnpromptedComments.RLock()
-	calls = mock.calls.GetTicketUnpromptedComments
-	mock.lockGetTicketUnpromptedComments.RUnlock()
+	mock.lockGetTicketSessionMessages.RLock()
+	calls = mock.calls.GetTicketSessionMessages
+	mock.lockGetTicketSessionMessages.RUnlock()
 	return calls
 }
 
@@ -7296,6 +7379,86 @@ func (mock *RepositoryMock) GetTokenCalls() []struct {
 	mock.lockGetToken.RLock()
 	calls = mock.calls.GetToken
 	mock.lockGetToken.RUnlock()
+	return calls
+}
+
+// GetTurn calls GetTurnFunc.
+func (mock *RepositoryMock) GetTurn(ctx context.Context, turnID types.TurnID) (*session.Turn, error) {
+	callInfo := struct {
+		Ctx    context.Context
+		TurnID types.TurnID
+	}{
+		Ctx:    ctx,
+		TurnID: turnID,
+	}
+	mock.lockGetTurn.Lock()
+	mock.calls.GetTurn = append(mock.calls.GetTurn, callInfo)
+	mock.lockGetTurn.Unlock()
+	if mock.GetTurnFunc == nil {
+		var (
+			turnOut *session.Turn
+			errOut  error
+		)
+		return turnOut, errOut
+	}
+	return mock.GetTurnFunc(ctx, turnID)
+}
+
+// GetTurnCalls gets all the calls that were made to GetTurn.
+// Check the length with:
+//
+//	len(mockedRepository.GetTurnCalls())
+func (mock *RepositoryMock) GetTurnCalls() []struct {
+	Ctx    context.Context
+	TurnID types.TurnID
+} {
+	var calls []struct {
+		Ctx    context.Context
+		TurnID types.TurnID
+	}
+	mock.lockGetTurn.RLock()
+	calls = mock.calls.GetTurn
+	mock.lockGetTurn.RUnlock()
+	return calls
+}
+
+// GetTurnsBySession calls GetTurnsBySessionFunc.
+func (mock *RepositoryMock) GetTurnsBySession(ctx context.Context, sessionID types.SessionID) ([]*session.Turn, error) {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+	}
+	mock.lockGetTurnsBySession.Lock()
+	mock.calls.GetTurnsBySession = append(mock.calls.GetTurnsBySession, callInfo)
+	mock.lockGetTurnsBySession.Unlock()
+	if mock.GetTurnsBySessionFunc == nil {
+		var (
+			turnsOut []*session.Turn
+			errOut   error
+		)
+		return turnsOut, errOut
+	}
+	return mock.GetTurnsBySessionFunc(ctx, sessionID)
+}
+
+// GetTurnsBySessionCalls gets all the calls that were made to GetTurnsBySession.
+// Check the length with:
+//
+//	len(mockedRepository.GetTurnsBySessionCalls())
+func (mock *RepositoryMock) GetTurnsBySessionCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+	}
+	mock.lockGetTurnsBySession.RLock()
+	calls = mock.calls.GetTurnsBySession
+	mock.lockGetTurnsBySession.RUnlock()
 	return calls
 }
 
@@ -7753,6 +7916,49 @@ func (mock *RepositoryMock) ListQueuedAlertsCalls() []struct {
 	return calls
 }
 
+// PromoteSessionToTicket calls PromoteSessionToTicketFunc.
+func (mock *RepositoryMock) PromoteSessionToTicket(ctx context.Context, sessionID types.SessionID, ticketID types.TicketID) error {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		TicketID  types.TicketID
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+		TicketID:  ticketID,
+	}
+	mock.lockPromoteSessionToTicket.Lock()
+	mock.calls.PromoteSessionToTicket = append(mock.calls.PromoteSessionToTicket, callInfo)
+	mock.lockPromoteSessionToTicket.Unlock()
+	if mock.PromoteSessionToTicketFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PromoteSessionToTicketFunc(ctx, sessionID, ticketID)
+}
+
+// PromoteSessionToTicketCalls gets all the calls that were made to PromoteSessionToTicket.
+// Check the length with:
+//
+//	len(mockedRepository.PromoteSessionToTicketCalls())
+func (mock *RepositoryMock) PromoteSessionToTicketCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+	TicketID  types.TicketID
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		TicketID  types.TicketID
+	}
+	mock.lockPromoteSessionToTicket.RLock()
+	calls = mock.calls.PromoteSessionToTicket
+	mock.lockPromoteSessionToTicket.RUnlock()
+	return calls
+}
+
 // PutActivity calls PutActivityFunc.
 func (mock *RepositoryMock) PutActivity(ctx context.Context, activityMoqParam *activity.Activity) error {
 	callInfo := struct {
@@ -7984,49 +8190,6 @@ func (mock *RepositoryMock) PutHITLRequestCalls() []struct {
 	mock.lockPutHITLRequest.RLock()
 	calls = mock.calls.PutHITLRequest
 	mock.lockPutHITLRequest.RUnlock()
-	return calls
-}
-
-// PutHistory calls PutHistoryFunc.
-func (mock *RepositoryMock) PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error {
-	callInfo := struct {
-		Ctx      context.Context
-		TicketID types.TicketID
-		History  *ticket.History
-	}{
-		Ctx:      ctx,
-		TicketID: ticketID,
-		History:  history,
-	}
-	mock.lockPutHistory.Lock()
-	mock.calls.PutHistory = append(mock.calls.PutHistory, callInfo)
-	mock.lockPutHistory.Unlock()
-	if mock.PutHistoryFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.PutHistoryFunc(ctx, ticketID, history)
-}
-
-// PutHistoryCalls gets all the calls that were made to PutHistory.
-// Check the length with:
-//
-//	len(mockedRepository.PutHistoryCalls())
-func (mock *RepositoryMock) PutHistoryCalls() []struct {
-	Ctx      context.Context
-	TicketID types.TicketID
-	History  *ticket.History
-} {
-	var calls []struct {
-		Ctx      context.Context
-		TicketID types.TicketID
-		History  *ticket.History
-	}
-	mock.lockPutHistory.RLock()
-	calls = mock.calls.PutHistory
-	mock.lockPutHistory.RUnlock()
 	return calls
 }
 
@@ -8420,88 +8583,6 @@ func (mock *RepositoryMock) PutTicketCalls() []struct {
 	return calls
 }
 
-// PutTicketComment calls PutTicketCommentFunc.
-func (mock *RepositoryMock) PutTicketComment(ctx context.Context, comment ticket.Comment) error {
-	callInfo := struct {
-		Ctx     context.Context
-		Comment ticket.Comment
-	}{
-		Ctx:     ctx,
-		Comment: comment,
-	}
-	mock.lockPutTicketComment.Lock()
-	mock.calls.PutTicketComment = append(mock.calls.PutTicketComment, callInfo)
-	mock.lockPutTicketComment.Unlock()
-	if mock.PutTicketCommentFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.PutTicketCommentFunc(ctx, comment)
-}
-
-// PutTicketCommentCalls gets all the calls that were made to PutTicketComment.
-// Check the length with:
-//
-//	len(mockedRepository.PutTicketCommentCalls())
-func (mock *RepositoryMock) PutTicketCommentCalls() []struct {
-	Ctx     context.Context
-	Comment ticket.Comment
-} {
-	var calls []struct {
-		Ctx     context.Context
-		Comment ticket.Comment
-	}
-	mock.lockPutTicketComment.RLock()
-	calls = mock.calls.PutTicketComment
-	mock.lockPutTicketComment.RUnlock()
-	return calls
-}
-
-// PutTicketCommentsPrompted calls PutTicketCommentsPromptedFunc.
-func (mock *RepositoryMock) PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error {
-	callInfo := struct {
-		Ctx        context.Context
-		TicketID   types.TicketID
-		CommentIDs []types.CommentID
-	}{
-		Ctx:        ctx,
-		TicketID:   ticketID,
-		CommentIDs: commentIDs,
-	}
-	mock.lockPutTicketCommentsPrompted.Lock()
-	mock.calls.PutTicketCommentsPrompted = append(mock.calls.PutTicketCommentsPrompted, callInfo)
-	mock.lockPutTicketCommentsPrompted.Unlock()
-	if mock.PutTicketCommentsPromptedFunc == nil {
-		var (
-			errOut error
-		)
-		return errOut
-	}
-	return mock.PutTicketCommentsPromptedFunc(ctx, ticketID, commentIDs)
-}
-
-// PutTicketCommentsPromptedCalls gets all the calls that were made to PutTicketCommentsPrompted.
-// Check the length with:
-//
-//	len(mockedRepository.PutTicketCommentsPromptedCalls())
-func (mock *RepositoryMock) PutTicketCommentsPromptedCalls() []struct {
-	Ctx        context.Context
-	TicketID   types.TicketID
-	CommentIDs []types.CommentID
-} {
-	var calls []struct {
-		Ctx        context.Context
-		TicketID   types.TicketID
-		CommentIDs []types.CommentID
-	}
-	mock.lockPutTicketCommentsPrompted.RLock()
-	calls = mock.calls.PutTicketCommentsPrompted
-	mock.lockPutTicketCommentsPrompted.RUnlock()
-	return calls
-}
-
 // PutToken calls PutTokenFunc.
 func (mock *RepositoryMock) PutToken(ctx context.Context, token *auth.Token) error {
 	callInfo := struct {
@@ -8538,6 +8619,135 @@ func (mock *RepositoryMock) PutTokenCalls() []struct {
 	mock.lockPutToken.RLock()
 	calls = mock.calls.PutToken
 	mock.lockPutToken.RUnlock()
+	return calls
+}
+
+// PutTurn calls PutTurnFunc.
+func (mock *RepositoryMock) PutTurn(ctx context.Context, turn *session.Turn) error {
+	callInfo := struct {
+		Ctx  context.Context
+		Turn *session.Turn
+	}{
+		Ctx:  ctx,
+		Turn: turn,
+	}
+	mock.lockPutTurn.Lock()
+	mock.calls.PutTurn = append(mock.calls.PutTurn, callInfo)
+	mock.lockPutTurn.Unlock()
+	if mock.PutTurnFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.PutTurnFunc(ctx, turn)
+}
+
+// PutTurnCalls gets all the calls that were made to PutTurn.
+// Check the length with:
+//
+//	len(mockedRepository.PutTurnCalls())
+func (mock *RepositoryMock) PutTurnCalls() []struct {
+	Ctx  context.Context
+	Turn *session.Turn
+} {
+	var calls []struct {
+		Ctx  context.Context
+		Turn *session.Turn
+	}
+	mock.lockPutTurn.RLock()
+	calls = mock.calls.PutTurn
+	mock.lockPutTurn.RUnlock()
+	return calls
+}
+
+// RefreshSessionLock calls RefreshSessionLockFunc.
+func (mock *RepositoryMock) RefreshSessionLock(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) error {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		HolderID  string
+		TTL       time.Duration
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+		HolderID:  holderID,
+		TTL:       ttl,
+	}
+	mock.lockRefreshSessionLock.Lock()
+	mock.calls.RefreshSessionLock = append(mock.calls.RefreshSessionLock, callInfo)
+	mock.lockRefreshSessionLock.Unlock()
+	if mock.RefreshSessionLockFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.RefreshSessionLockFunc(ctx, sessionID, holderID, ttl)
+}
+
+// RefreshSessionLockCalls gets all the calls that were made to RefreshSessionLock.
+// Check the length with:
+//
+//	len(mockedRepository.RefreshSessionLockCalls())
+func (mock *RepositoryMock) RefreshSessionLockCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+	HolderID  string
+	TTL       time.Duration
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		HolderID  string
+		TTL       time.Duration
+	}
+	mock.lockRefreshSessionLock.RLock()
+	calls = mock.calls.RefreshSessionLock
+	mock.lockRefreshSessionLock.RUnlock()
+	return calls
+}
+
+// ReleaseSessionLock calls ReleaseSessionLockFunc.
+func (mock *RepositoryMock) ReleaseSessionLock(ctx context.Context, sessionID types.SessionID, holderID string) error {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		HolderID  string
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+		HolderID:  holderID,
+	}
+	mock.lockReleaseSessionLock.Lock()
+	mock.calls.ReleaseSessionLock = append(mock.calls.ReleaseSessionLock, callInfo)
+	mock.lockReleaseSessionLock.Unlock()
+	if mock.ReleaseSessionLockFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.ReleaseSessionLockFunc(ctx, sessionID, holderID)
+}
+
+// ReleaseSessionLockCalls gets all the calls that were made to ReleaseSessionLock.
+// Check the length with:
+//
+//	len(mockedRepository.ReleaseSessionLockCalls())
+func (mock *RepositoryMock) ReleaseSessionLockCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+	HolderID  string
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		HolderID  string
+	}
+	mock.lockReleaseSessionLock.RLock()
+	calls = mock.calls.ReleaseSessionLock
+	mock.lockReleaseSessionLock.RUnlock()
 	return calls
 }
 
@@ -8798,6 +9008,54 @@ func (mock *RepositoryMock) SearchQueuedAlertsCalls() []struct {
 	return calls
 }
 
+// SearchSessionMessages calls SearchSessionMessagesFunc.
+func (mock *RepositoryMock) SearchSessionMessages(ctx context.Context, ticketID types.TicketID, query string, limit int) ([]*session.Message, error) {
+	callInfo := struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Query    string
+		Limit    int
+	}{
+		Ctx:      ctx,
+		TicketID: ticketID,
+		Query:    query,
+		Limit:    limit,
+	}
+	mock.lockSearchSessionMessages.Lock()
+	mock.calls.SearchSessionMessages = append(mock.calls.SearchSessionMessages, callInfo)
+	mock.lockSearchSessionMessages.Unlock()
+	if mock.SearchSessionMessagesFunc == nil {
+		var (
+			messagesOut []*session.Message
+			errOut      error
+		)
+		return messagesOut, errOut
+	}
+	return mock.SearchSessionMessagesFunc(ctx, ticketID, query, limit)
+}
+
+// SearchSessionMessagesCalls gets all the calls that were made to SearchSessionMessages.
+// Check the length with:
+//
+//	len(mockedRepository.SearchSessionMessagesCalls())
+func (mock *RepositoryMock) SearchSessionMessagesCalls() []struct {
+	Ctx      context.Context
+	TicketID types.TicketID
+	Query    string
+	Limit    int
+} {
+	var calls []struct {
+		Ctx      context.Context
+		TicketID types.TicketID
+		Query    string
+		Limit    int
+	}
+	mock.lockSearchSessionMessages.RLock()
+	calls = mock.calls.SearchSessionMessages
+	mock.lockSearchSessionMessages.RUnlock()
+	return calls
+}
+
 // UnbindAlertFromTicket calls UnbindAlertFromTicketFunc.
 func (mock *RepositoryMock) UnbindAlertFromTicket(ctx context.Context, alertID types.AlertID) error {
 	callInfo := struct {
@@ -8970,6 +9228,49 @@ func (mock *RepositoryMock) UpdateNoticeCalls() []struct {
 	return calls
 }
 
+// UpdateSessionLastActive calls UpdateSessionLastActiveFunc.
+func (mock *RepositoryMock) UpdateSessionLastActive(ctx context.Context, sessionID types.SessionID, t time.Time) error {
+	callInfo := struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		T         time.Time
+	}{
+		Ctx:       ctx,
+		SessionID: sessionID,
+		T:         t,
+	}
+	mock.lockUpdateSessionLastActive.Lock()
+	mock.calls.UpdateSessionLastActive = append(mock.calls.UpdateSessionLastActive, callInfo)
+	mock.lockUpdateSessionLastActive.Unlock()
+	if mock.UpdateSessionLastActiveFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.UpdateSessionLastActiveFunc(ctx, sessionID, t)
+}
+
+// UpdateSessionLastActiveCalls gets all the calls that were made to UpdateSessionLastActive.
+// Check the length with:
+//
+//	len(mockedRepository.UpdateSessionLastActiveCalls())
+func (mock *RepositoryMock) UpdateSessionLastActiveCalls() []struct {
+	Ctx       context.Context
+	SessionID types.SessionID
+	T         time.Time
+} {
+	var calls []struct {
+		Ctx       context.Context
+		SessionID types.SessionID
+		T         time.Time
+	}
+	mock.lockUpdateSessionLastActive.RLock()
+	calls = mock.calls.UpdateSessionLastActive
+	mock.lockUpdateSessionLastActive.RUnlock()
+	return calls
+}
+
 // UpdateTag calls UpdateTagFunc.
 func (mock *RepositoryMock) UpdateTag(ctx context.Context, tagMoqParam *tag.Tag) error {
 	callInfo := struct {
@@ -9006,6 +9307,96 @@ func (mock *RepositoryMock) UpdateTagCalls() []struct {
 	mock.lockUpdateTag.RLock()
 	calls = mock.calls.UpdateTag
 	mock.lockUpdateTag.RUnlock()
+	return calls
+}
+
+// UpdateTurnIntent calls UpdateTurnIntentFunc.
+func (mock *RepositoryMock) UpdateTurnIntent(ctx context.Context, turnID types.TurnID, intent string) error {
+	callInfo := struct {
+		Ctx    context.Context
+		TurnID types.TurnID
+		Intent string
+	}{
+		Ctx:    ctx,
+		TurnID: turnID,
+		Intent: intent,
+	}
+	mock.lockUpdateTurnIntent.Lock()
+	mock.calls.UpdateTurnIntent = append(mock.calls.UpdateTurnIntent, callInfo)
+	mock.lockUpdateTurnIntent.Unlock()
+	if mock.UpdateTurnIntentFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.UpdateTurnIntentFunc(ctx, turnID, intent)
+}
+
+// UpdateTurnIntentCalls gets all the calls that were made to UpdateTurnIntent.
+// Check the length with:
+//
+//	len(mockedRepository.UpdateTurnIntentCalls())
+func (mock *RepositoryMock) UpdateTurnIntentCalls() []struct {
+	Ctx    context.Context
+	TurnID types.TurnID
+	Intent string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		TurnID types.TurnID
+		Intent string
+	}
+	mock.lockUpdateTurnIntent.RLock()
+	calls = mock.calls.UpdateTurnIntent
+	mock.lockUpdateTurnIntent.RUnlock()
+	return calls
+}
+
+// UpdateTurnStatus calls UpdateTurnStatusFunc.
+func (mock *RepositoryMock) UpdateTurnStatus(ctx context.Context, turnID types.TurnID, status session.TurnStatus, endedAt *time.Time) error {
+	callInfo := struct {
+		Ctx     context.Context
+		TurnID  types.TurnID
+		Status  session.TurnStatus
+		EndedAt *time.Time
+	}{
+		Ctx:     ctx,
+		TurnID:  turnID,
+		Status:  status,
+		EndedAt: endedAt,
+	}
+	mock.lockUpdateTurnStatus.Lock()
+	mock.calls.UpdateTurnStatus = append(mock.calls.UpdateTurnStatus, callInfo)
+	mock.lockUpdateTurnStatus.Unlock()
+	if mock.UpdateTurnStatusFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.UpdateTurnStatusFunc(ctx, turnID, status, endedAt)
+}
+
+// UpdateTurnStatusCalls gets all the calls that were made to UpdateTurnStatus.
+// Check the length with:
+//
+//	len(mockedRepository.UpdateTurnStatusCalls())
+func (mock *RepositoryMock) UpdateTurnStatusCalls() []struct {
+	Ctx     context.Context
+	TurnID  types.TurnID
+	Status  session.TurnStatus
+	EndedAt *time.Time
+} {
+	var calls []struct {
+		Ctx     context.Context
+		TurnID  types.TurnID
+		Status  session.TurnStatus
+		EndedAt *time.Time
+	}
+	mock.lockUpdateTurnStatus.RLock()
+	calls = mock.calls.UpdateTurnStatus
+	mock.lockUpdateTurnStatus.RUnlock()
 	return calls
 }
 
@@ -9265,6 +9656,12 @@ func (mock *EmbeddingClientMock) EmbeddingsCalls() []struct {
 //			CloseFunc: func(ctx context.Context)  {
 //				panic("mock out the Close method")
 //			},
+//			CopyObjectFunc: func(ctx context.Context, src string, dst string) error {
+//				panic("mock out the CopyObject method")
+//			},
+//			DeleteObjectFunc: func(ctx context.Context, object string) error {
+//				panic("mock out the DeleteObject method")
+//			},
 //			GetObjectFunc: func(ctx context.Context, object string) (io.ReadCloser, error) {
 //				panic("mock out the GetObject method")
 //			},
@@ -9281,6 +9678,12 @@ type StorageClientMock struct {
 	// CloseFunc mocks the Close method.
 	CloseFunc func(ctx context.Context)
 
+	// CopyObjectFunc mocks the CopyObject method.
+	CopyObjectFunc func(ctx context.Context, src string, dst string) error
+
+	// DeleteObjectFunc mocks the DeleteObject method.
+	DeleteObjectFunc func(ctx context.Context, object string) error
+
 	// GetObjectFunc mocks the GetObject method.
 	GetObjectFunc func(ctx context.Context, object string) (io.ReadCloser, error)
 
@@ -9293,6 +9696,22 @@ type StorageClientMock struct {
 		Close []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
+		}
+		// CopyObject holds details about calls to the CopyObject method.
+		CopyObject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Src is the src argument value.
+			Src string
+			// Dst is the dst argument value.
+			Dst string
+		}
+		// DeleteObject holds details about calls to the DeleteObject method.
+		DeleteObject []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Object is the object argument value.
+			Object string
 		}
 		// GetObject holds details about calls to the GetObject method.
 		GetObject []struct {
@@ -9309,9 +9728,11 @@ type StorageClientMock struct {
 			Object string
 		}
 	}
-	lockClose     sync.RWMutex
-	lockGetObject sync.RWMutex
-	lockPutObject sync.RWMutex
+	lockClose        sync.RWMutex
+	lockCopyObject   sync.RWMutex
+	lockDeleteObject sync.RWMutex
+	lockGetObject    sync.RWMutex
+	lockPutObject    sync.RWMutex
 }
 
 // Close calls CloseFunc.
@@ -9343,6 +9764,88 @@ func (mock *StorageClientMock) CloseCalls() []struct {
 	mock.lockClose.RLock()
 	calls = mock.calls.Close
 	mock.lockClose.RUnlock()
+	return calls
+}
+
+// CopyObject calls CopyObjectFunc.
+func (mock *StorageClientMock) CopyObject(ctx context.Context, src string, dst string) error {
+	callInfo := struct {
+		Ctx context.Context
+		Src string
+		Dst string
+	}{
+		Ctx: ctx,
+		Src: src,
+		Dst: dst,
+	}
+	mock.lockCopyObject.Lock()
+	mock.calls.CopyObject = append(mock.calls.CopyObject, callInfo)
+	mock.lockCopyObject.Unlock()
+	if mock.CopyObjectFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.CopyObjectFunc(ctx, src, dst)
+}
+
+// CopyObjectCalls gets all the calls that were made to CopyObject.
+// Check the length with:
+//
+//	len(mockedStorageClient.CopyObjectCalls())
+func (mock *StorageClientMock) CopyObjectCalls() []struct {
+	Ctx context.Context
+	Src string
+	Dst string
+} {
+	var calls []struct {
+		Ctx context.Context
+		Src string
+		Dst string
+	}
+	mock.lockCopyObject.RLock()
+	calls = mock.calls.CopyObject
+	mock.lockCopyObject.RUnlock()
+	return calls
+}
+
+// DeleteObject calls DeleteObjectFunc.
+func (mock *StorageClientMock) DeleteObject(ctx context.Context, object string) error {
+	callInfo := struct {
+		Ctx    context.Context
+		Object string
+	}{
+		Ctx:    ctx,
+		Object: object,
+	}
+	mock.lockDeleteObject.Lock()
+	mock.calls.DeleteObject = append(mock.calls.DeleteObject, callInfo)
+	mock.lockDeleteObject.Unlock()
+	if mock.DeleteObjectFunc == nil {
+		var (
+			errOut error
+		)
+		return errOut
+	}
+	return mock.DeleteObjectFunc(ctx, object)
+}
+
+// DeleteObjectCalls gets all the calls that were made to DeleteObject.
+// Check the length with:
+//
+//	len(mockedStorageClient.DeleteObjectCalls())
+func (mock *StorageClientMock) DeleteObjectCalls() []struct {
+	Ctx    context.Context
+	Object string
+} {
+	var calls []struct {
+		Ctx    context.Context
+		Object string
+	}
+	mock.lockDeleteObject.RLock()
+	calls = mock.calls.DeleteObject
+	mock.lockDeleteObject.RUnlock()
 	return calls
 }
 

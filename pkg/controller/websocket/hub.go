@@ -62,6 +62,13 @@ type Client struct {
 	// Unique client ID for this connection
 	clientID string
 
+	// sessionID is the chat-session-redesign Session bound to this
+	// WebSocket connection. The handler resolves it once after the
+	// upgrade succeeds and reuses it for every Turn processed over
+	// the lifetime of the connection, so the whole conversation
+	// shares gollem working memory.
+	sessionID types.SessionID
+
 	// Context for this client
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -69,6 +76,14 @@ type Client struct {
 	// Mutex to protect send channel
 	mu sync.Mutex
 }
+
+// AttachSession binds a resolved Session to the client. Called once
+// by the handler after EnsureWebSession succeeds.
+func (c *Client) AttachSession(id types.SessionID) { c.sessionID = id }
+
+// SessionID returns the Session ID attached to the client, or the
+// zero value when the handler has not resolved one yet.
+func (c *Client) SessionID() types.SessionID { return c.sessionID }
 
 // BroadcastMessage represents a message to be broadcast to all clients of a ticket
 type BroadcastMessage struct {

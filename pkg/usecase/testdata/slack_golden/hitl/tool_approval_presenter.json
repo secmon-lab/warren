@@ -1,0 +1,86 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "block_id": "context_messages",
+          "elements": [
+            {
+              "text": "⏳ *[Fetch evidence]*\n\nWaiting...",
+              "type": "mrkdwn"
+            }
+          ],
+          "type": "context"
+        }
+      ],
+      "channel": "C_TICKET",
+      "thread_ts": "1700000000.000000"
+    }
+  },
+  {
+    "seq": 1,
+    "method": "UpdateMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "text": {
+            "text": "⏳ Approval Required *[Fetch evidence]*\n\n\u003e 🔐 \u003c@U12345\u003e `web_fetch`\n*url:* https://example.com/evidence",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        },
+        {
+          "block_id": "hitl_comment_block",
+          "element": {
+            "action_id": "hitl_comment_input",
+            "placeholder": {
+              "emoji": false,
+              "text": "Enter comment...",
+              "type": "plain_text"
+            },
+            "type": "plain_text_input"
+          },
+          "label": {
+            "emoji": false,
+            "text": "Comment (optional)",
+            "type": "plain_text"
+          },
+          "optional": true,
+          "type": "input"
+        },
+        {
+          "block_id": "hitl_actions",
+          "elements": [
+            {
+              "action_id": "hitl_approve",
+              "style": "primary",
+              "text": {
+                "emoji": false,
+                "text": "Allow ✅",
+                "type": "plain_text"
+              },
+              "type": "button",
+              "value": "HITL_FIXED_0001"
+            },
+            {
+              "action_id": "hitl_deny",
+              "style": "danger",
+              "text": {
+                "emoji": false,
+                "text": "Deny ❌",
+                "type": "plain_text"
+              },
+              "type": "button",
+              "value": "HITL_FIXED_0001"
+            }
+          ],
+          "type": "actions"
+        }
+      ],
+      "channel": "C_TICKET",
+      "timestamp": "1700000000.000001"
+    }
+  }
+]

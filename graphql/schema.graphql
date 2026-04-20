@@ -12,9 +12,7 @@ type Ticket {
   assignee: User
   alerts: [Alert!]!
   alertsPaginated(offset: Int, limit: Int): AlertsResponse!
-  comments: [Comment!]!
   alertsCount: Int!
-  commentsCount: Int!
   conclusion: String
   reason: String
   finding: Finding
@@ -32,14 +30,6 @@ type User {
   id: ID!
   name: String!
   icon: String
-}
-
-type Comment {
-  id: ID!
-  content: String!
-  user: User
-  createdAt: String!
-  updatedAt: String!
 }
 
 enum AlertStatus {
@@ -77,11 +67,6 @@ type Finding {
 
 type TicketsResponse {
   tickets: [Ticket!]!
-  totalCount: Int!
-}
-
-type CommentsResponse {
-  comments: [Comment!]!
   totalCount: Int!
 }
 
@@ -142,7 +127,6 @@ type Query {
     offset: Int
     limit: Int
   ): TicketsResponse!
-  ticketComments(ticketId: ID!, offset: Int, limit: Int): CommentsResponse!
   alert(id: ID!): Alert
   alerts(offset: Int, limit: Int, status: AlertStatus): AlertsResponse!
   unboundAlerts(
@@ -185,6 +169,17 @@ type Mutation {
   deleteTag(id: ID!): Boolean!
   updateTag(input: UpdateTagInput!): TagMetadata!
   declineAlerts(ids: [ID!]!): [Alert!]!
+
+  # chat-session-redesign: respond to a pending HITL request from the
+  # Web UI. approved=true means "approve" for tool_approval requests or
+  # "submit the selected answer" for question requests. answer/comment
+  # are optional. Returns the updated HITLRequest with Status populated.
+  resolveHITLRequest(
+    id: ID!
+    approved: Boolean!
+    answer: String
+    comment: String
+  ): HITLRequest!
 }
 
 input UpdateTagInput {
@@ -205,21 +200,72 @@ type Session {
   intent: String
   createdAt: String!
   updatedAt: String!
+  # chat-session-redesign: source channel (slack/web/cli). Empty when
+  # a pre-redesign Session has not been backfilled yet.
+  source: String!
 }
 
 type SessionMessage {
   id: ID!
   sessionID: ID!
+  turnID: ID
+  ticketID: ID
   type: String!
   content: String!
+  author: MessageAuthor
   createdAt: String!
   updatedAt: String!
+  # Revisions is the chronologically-ordered list of prior content
+  # values for updatable messages (e.g. task progress, HITL prompts).
+  # Empty for messages that have never been updated in-place.
+  revisions: [MessageRevision!]
+}
+
+type MessageRevision {
+  content: String!
+  createdAt: String!
+}
+
+# HITLRequest mirrors the domain hitl.Request model. The payload shape
+# is intentionally a JSON scalar (encoded as String) because it is
+# already transport-shape-specific (tool_approval vs question) and the
+# frontend renders both variants from the same envelope.
+type HITLRequest {
+  id: ID!
+  sessionID: ID!
+  type: String!
+  status: String!
+  userID: String
+  # Payload / response are serialized JSON strings so the frontend can
+  # parse them directly. Having the same wire shape as the
+  # hitl_request_pending envelope avoids a second translation layer.
+  payload: String
+  response: String
+  createdAt: String!
+  respondedAt: String
+}
+
+type MessageAuthor {
+  userID: String!
+  displayName: String!
+  slackUserID: String
+  email: String
 }
 
 extend type Query {
   ticketSessions(ticketId: ID!): [Session!]!
   session(id: ID!): Session
   sessionMessages(sessionId: ID!): [SessionMessage!]!
+  # chat-session-redesign Phase 3.4: unified replacement for the legacy
+  # ticketComments query. Returns messages across every Session bound
+  # to the ticket with optional source/type filters.
+  ticketSessionMessages(
+    ticketId: ID!
+    source: String
+    type: String
+    offset: Int
+    limit: Int
+  ): [SessionMessage!]!
 }
 
 enum SortOrder {

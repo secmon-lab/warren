@@ -33,7 +33,11 @@ Generate a warm and thoughtful conclusion message that acknowledges the responde
 ## Comments
 
 {{ range .comments }}
-- {{ .User.Name }}: {{ .Comment }}
+{{- if .Author }}
+- {{ .Author.DisplayName }}: {{ .Content }}
+{{- else }}
+- {{ .Content }}
+{{- end }}
 {{ end }}
 
 Based on the above ticket information and conversation history, please generate one thoughtful conclusion message that provides satisfying closure while acknowledging the responder's specific efforts and approach.

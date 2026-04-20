@@ -1,0 +1,11 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "channel": "C_TICKET",
+      "text": "🎫 Ticket created: \u003chttps://warren.example.com/tickets/TCKT_FIXED_0001|Suspicious login pattern\u003e",
+      "thread_ts": "1700000000.000000"
+    }
+  }
+]

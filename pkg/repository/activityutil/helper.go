@@ -40,25 +40,6 @@ func createTicketActivityWithType(ctx context.Context, repo interfaces.Repositor
 	return nil
 }
 
-// CreateCommentActivity creates a comment addition activity
-func CreateCommentActivity(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, commentID types.CommentID, title string) error {
-	userID := user.FromContext(ctx)
-	activityID := types.NewActivityID()
-	act := &activity.Activity{
-		ID:        activityID,
-		Type:      types.ActivityTypeCommentAdded,
-		UserID:    userID,
-		TicketID:  ticketID,
-		CommentID: commentID,
-		CreatedAt: time.Now(),
-	}
-
-	if err := repo.PutActivity(ctx, act); err != nil {
-		return goerr.Wrap(err, "failed to put activity")
-	}
-	return nil
-}
-
 // CreateStatusChangeActivity creates a status change activity
 func CreateStatusChangeActivity(ctx context.Context, repo interfaces.Repository, ticketID types.TicketID, title, oldStatus, newStatus string) error {
 	userID := user.FromContext(ctx)

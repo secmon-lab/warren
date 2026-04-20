@@ -33,13 +33,13 @@ func TestSessionMessageOperations(t *testing.T) {
 
 		t.Run("PutSessionMessage and GetSessionMessages", func(t *testing.T) {
 			// Create and save messages with small delays to ensure ordering
-			msg1 := session.NewMessage(ctx, sessionID, session.MessageTypeTrace, "💭 Thinking...")
+			msg1 := session.NewMessageV2(ctx, sessionID, nil, nil, session.MessageTypeTrace, "💭 Thinking...", nil)
 			gt.NoError(t, repo.PutSessionMessage(ctx, msg1))
 
-			msg2 := session.NewMessage(ctx, sessionID, session.MessageTypeTrace, "🤖 Executing tool")
+			msg2 := session.NewMessageV2(ctx, sessionID, nil, nil, session.MessageTypeTrace, "🤖 Executing tool", nil)
 			gt.NoError(t, repo.PutSessionMessage(ctx, msg2))
 
-			msg3 := session.NewMessage(ctx, sessionID, session.MessageTypePlan, "🎯 Goal\n☑️ Task1")
+			msg3 := session.NewMessageV2(ctx, sessionID, nil, nil, session.MessageTypePlan, "🎯 Goal\n☑️ Task1", nil)
 			gt.NoError(t, repo.PutSessionMessage(ctx, msg3))
 
 			// Retrieve messages
@@ -90,13 +90,13 @@ func TestSessionMessageOperations(t *testing.T) {
 			gt.NoError(t, repo.PutSession(ctx, sess2))
 
 			// Add messages of all types
-			trace := session.NewMessage(ctx, sessionID2, session.MessageTypeTrace, "trace msg")
+			trace := session.NewMessageV2(ctx, sessionID2, nil, nil, session.MessageTypeTrace, "trace msg", nil)
 			gt.NoError(t, repo.PutSessionMessage(ctx, trace))
 
-			plan := session.NewMessage(ctx, sessionID2, session.MessageTypePlan, "plan msg")
+			plan := session.NewMessageV2(ctx, sessionID2, nil, nil, session.MessageTypePlan, "plan msg", nil)
 			gt.NoError(t, repo.PutSessionMessage(ctx, plan))
 
-			response := session.NewMessage(ctx, sessionID2, session.MessageTypeResponse, "response msg")
+			response := session.NewMessageV2(ctx, sessionID2, nil, nil, session.MessageTypeResponse, "response msg", nil)
 			gt.NoError(t, repo.PutSessionMessage(ctx, response))
 
 			// Retrieve and verify
@@ -125,7 +125,7 @@ func TestSessionMessageOperations(t *testing.T) {
 
 			// Add many messages and verify ordering by created_at
 			for i := 1; i <= 10; i++ {
-				msg := session.NewMessage(ctx, sessionID3, session.MessageTypeTrace, "msg-"+string(rune('0'+i)))
+				msg := session.NewMessageV2(ctx, sessionID3, nil, nil, session.MessageTypeTrace, "msg-"+string(rune('0'+i)), nil)
 				gt.NoError(t, repo.PutSessionMessage(ctx, msg))
 			}
 

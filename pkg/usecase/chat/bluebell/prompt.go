@@ -14,6 +14,7 @@ import (
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
@@ -85,9 +86,9 @@ type AlertData struct {
 	Count int
 }
 
-// ThreadData holds ticket thread comments.
+// ThreadData holds the session.Message timeline for the current Session.
 type ThreadData struct {
-	Comments []ticket.Comment
+	SessionMessages []*sessModel.Message
 }
 
 // ChannelData holds Slack channel history messages.
@@ -120,7 +121,7 @@ type planningContext struct {
 	resolvedIntent   string
 	lang             lang.Lang
 	requesterID      string
-	threadComments   []ticket.Comment
+	sessionMessages  []*sessModel.Message
 	slackHistory     []model.HistoryMessage
 	knowledgeService *svcknowledge.Service
 }
@@ -153,7 +154,7 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 				Count: alertCount,
 			},
 			Thread: ThreadData{
-				Comments: pc.threadComments,
+				SessionMessages: pc.sessionMessages,
 			},
 		}
 	}

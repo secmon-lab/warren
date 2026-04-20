@@ -75,14 +75,14 @@ No knowledge base is configured.
 ## User System Prompt
 {{ .user_prompt }}
 {{ end }}
-{{ if .thread_comments }}
+{{ if .session_messages }}
 
-## Recent Thread Conversations
+## Recent Session Messages
 
-The following messages were posted in this ticket's Slack thread by team members since your last interaction. Use this context to understand the ongoing discussion.
-{{ range .thread_comments }}
-*{{ .User.Name }}* ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
-{{ .Comment }}
+The following timeline of user inputs and agent responses occurred earlier in this session. Use it to understand the ongoing discussion and avoid repeating work.
+{{ range .session_messages }}
+{{ if .Author }}*{{ .Author.DisplayName }}*{{ else }}*agent*{{ end }} [{{ .Type }}] ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
+{{ .Content }}
 {{ end }}
 {{ end }}
 

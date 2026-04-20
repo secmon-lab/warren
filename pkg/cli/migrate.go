@@ -21,10 +21,20 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+// migrateRuntime bundles the infrastructure handles the migration jobs
+// need. Phase 7 jobs that touch Cloud Storage (history-scope) consult
+// Storage; the index/backfill jobs ignore it.
+type migrateRuntime struct {
+	projectID  string
+	databaseID string
+	storage    *config.Storage
+	dryRun     bool
+}
+
 type migrationJob struct {
 	Name        string
 	Description string
-	Run         func(ctx context.Context, projectID, databaseID string, dryRun bool) error
+	Run         func(ctx context.Context, rt *migrateRuntime) error
 }
 
 const defaultMigrationJob = "index"
@@ -40,6 +50,35 @@ var migrationJobs = []migrationJob{
 		Description: "Backfill Status field on pre-v0.10.0 alerts that lack the field or have the old 'unbound' value, setting them to 'active' so they appear in Firestore queries",
 		Run:         backfillAlertStatus,
 	},
+	// chat-session-redesign Phase 7 jobs. Each job lives in
+	// pkg/usecase/migration; the bodies here are thin wrappers that
+	// construct the Firestore-backed dependencies and invoke the
+	// business-logic Job.
+	{
+		Name:        "session-source-backfill",
+		Description: "Backfill SessionSource and TicketIDPtr on legacy Session rows (chat-session-redesign Phase 7).",
+		Run:         runSessionSourceBackfill,
+	},
+	{
+		Name:        "comment-to-message",
+		Description: "Rewrite ticket.Comment rows as session.Message(type=user) (chat-session-redesign Phase 7). Placeholder; returns 'not yet implemented'.",
+		Run:         runCommentToMessage,
+	},
+	{
+		Name:        "turn-synthesis",
+		Description: "Synthesize Turn entities from legacy Sessions (chat-session-redesign Phase 7). Placeholder.",
+		Run:         runTurnSynthesis,
+	},
+	{
+		Name:        "history-scope",
+		Description: "Server-side copy of legacy Ticket-scoped gollem.History files into Session-scoped destinations (chat-session-redesign Phase 7). Non-destructive; legacy files are left in place.",
+		Run:         runHistoryScope,
+	},
+	{
+		Name:        "session-consolidate",
+		Description: "Materialize the canonical slack_<hash> Session for every Slack-origin Ticket so the Conversation sidebar has a single survivor per thread. Non-destructive; legacy UUID Session rows are left in place and filtered out at read time.",
+		Run:         runSessionConsolidate,
+	},
 }
 
 func findMigrationJob(name string) (*migrationJob, bool) {
@@ -53,6 +92,7 @@ func findMigrationJob(name string) (*migrationJob, bool) {
 
 func cmdMigrate() *cli.Command {
 	var cfg config.Firestore
+	var storageCfg config.Storage
 	var dryRun bool
 	var listJobs bool
 	var jobNames []string
@@ -61,7 +101,7 @@ func cmdMigrate() *cli.Command {
 		Name:    "migrate",
 		Aliases: []string{"m"},
 		Usage:   "Migrate Firestore indexes and configurations",
-		Flags: append(cfg.Flags(),
+		Flags: append(append(cfg.Flags(), storageCfg.Flags()...),
 			&cli.BoolFlag{
 				Name:        "dry-run",
 				Usage:       "Show what would be changed without applying",
@@ -85,7 +125,7 @@ func cmdMigrate() *cli.Command {
 				printMigrationJobs()
 				return nil
 			}
-			return runMigrate(ctx, &cfg, dryRun, jobNames)
+			return runMigrate(ctx, &cfg, &storageCfg, dryRun, jobNames)
 		},
 	}
 }
@@ -123,7 +163,7 @@ func wrapText(text string, width int) []string {
 	return lines
 }
 
-func runMigrate(ctx context.Context, cfg *config.Firestore, dryRun bool, jobNames []string) error {
+func runMigrate(ctx context.Context, cfg *config.Firestore, storageCfg *config.Storage, dryRun bool, jobNames []string) error {
 	logger := logging.From(ctx)
 
 	// Default to index migration when no jobs specified
@@ -159,11 +199,18 @@ func runMigrate(ctx context.Context, cfg *config.Firestore, dryRun bool, jobName
 		"jobs", jobNames,
 	)
 
+	rt := &migrateRuntime{
+		projectID:  projectID,
+		databaseID: databaseID,
+		storage:    storageCfg,
+		dryRun:     dryRun,
+	}
+
 	// Run migration jobs
 	for _, name := range jobNames {
 		job, _ := findMigrationJob(name) // already validated above
 		logger.Info("Running migration job", "job", job.Name)
-		if err := job.Run(ctx, projectID, databaseID, dryRun); err != nil {
+		if err := job.Run(ctx, rt); err != nil {
 			return goerr.Wrap(err, "migration job failed",
 				goerr.V("job", job.Name))
 		}
@@ -173,8 +220,9 @@ func runMigrate(ctx context.Context, cfg *config.Firestore, dryRun bool, jobName
 	return nil
 }
 
-func migrateIndexes(ctx context.Context, projectID, databaseID string, dryRun bool) error {
+func migrateIndexes(ctx context.Context, rt *migrateRuntime) error {
 	logger := logging.From(ctx)
+	projectID, databaseID, dryRun := rt.projectID, rt.databaseID, rt.dryRun
 
 	indexConfig := defineFirestoreIndexes()
 
@@ -465,8 +513,9 @@ func waitForIndexesReady(ctx context.Context, projectID, databaseID string, cfg 
 	}
 }
 
-func backfillAlertStatus(ctx context.Context, projectID, databaseID string, dryRun bool) error {
+func backfillAlertStatus(ctx context.Context, rt *migrateRuntime) error {
 	logger := logging.From(ctx)
+	projectID, databaseID, dryRun := rt.projectID, rt.databaseID, rt.dryRun
 	logger.Info("Starting alert status backfill")
 
 	db, err := firestore.NewClientWithDatabase(ctx, projectID, databaseID)
@@ -644,6 +693,39 @@ func defineFirestoreIndexes() *fireconf.Config {
 			Indexes: indexes,
 		})
 	}
+
+	// chat-session-redesign indexes.
+	//
+	// Turns: list Turns of a Session in time order; also used during
+	// session cleanup queries.
+	firestoreCollections = append(firestoreCollections, fireconf.Collection{
+		Name: "turns",
+		Indexes: []fireconf.Index{
+			{
+				QueryScope: fireconf.QueryScopeCollection,
+				Fields: []fireconf.IndexField{
+					{Path: "session_id", Order: fireconf.OrderAscending},
+					{Path: "started_at", Order: fireconf.OrderAscending},
+				},
+			},
+		},
+	})
+
+	// Session Messages subcollection (sessions/{sid}/messages/{mid}):
+	// turn_id + created_at ASC supports GetMessagesByTurn on a collection
+	// group query.
+	firestoreCollections = append(firestoreCollections, fireconf.Collection{
+		Name: "messages",
+		Indexes: []fireconf.Index{
+			{
+				QueryScope: fireconf.QueryScopeCollectionGroup,
+				Fields: []fireconf.IndexField{
+					{Path: "turn_id", Order: fireconf.OrderAscending},
+					{Path: "created_at", Order: fireconf.OrderAscending},
+				},
+			},
+		},
+	})
 
 	return &fireconf.Config{
 		Collections: firestoreCollections,

@@ -192,6 +192,23 @@ func (uc *UseCases) createTicket(ctx context.Context, opts TicketCreationOptions
 		}
 	}
 
+	// chat-session-redesign: when the new ticket is bound to a Slack
+	// thread, adopt any pre-existing ticketless Session on that thread
+	// so prior @warren mentions and their chat history carry over to
+	// the new ticket. Safe no-op when no ticketless Session exists.
+	if opts.SlackThread != nil && uc.sessionResolver != nil {
+		if prior, ok, lookupErr := uc.sessionResolver.LookupSlackSession(ctx, nil, *opts.SlackThread); lookupErr != nil {
+			errutil.Handle(ctx, goerr.Wrap(lookupErr, "failed to look up ticketless session for promotion",
+				goerr.V("ticket_id", newTicketPtr.ID)))
+		} else if ok {
+			if err := uc.repository.PromoteSessionToTicket(ctx, prior.ID, newTicketPtr.ID); err != nil {
+				errutil.Handle(ctx, goerr.Wrap(err, "failed to promote ticketless session",
+					goerr.V("session_id", prior.ID),
+					goerr.V("ticket_id", newTicketPtr.ID)))
+			}
+		}
+	}
+
 	// Post to Slack if SlackThread is provided
 	if opts.SlackThread != nil && uc.IsSlackEnabled() {
 		messageID, err := uc.postTicketToSlack(ctx, newTicketPtr, *opts.SlackThread, alerts)

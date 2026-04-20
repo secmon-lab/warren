@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/domain/model/refine"
+	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	modelslack "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -123,10 +124,15 @@ func (uc *UseCases) reviewOpenTickets(ctx context.Context) error {
 func (uc *UseCases) reviewSingleTicket(ctx context.Context, t *ticket.Ticket) error {
 	logger := logging.From(ctx)
 
-	// Get ticket comments
-	comments, err := uc.repository.GetTicketComments(ctx, t.ID)
+	// chat-session-redesign Phase 3.3: read user messages from the
+	// unified SessionMessage timeline instead of the legacy Comment
+	// subcollection. Filter to source=slack + type=user to preserve
+	// the "team thread comments" semantic the review prompt expects.
+	slackSource := sessModel.SessionSourceSlack
+	userType := sessModel.MessageTypeUser
+	messages, err := uc.repository.GetTicketSessionMessages(ctx, t.ID, &slackSource, &userType, 0, 0)
 	if err != nil {
-		return goerr.Wrap(err, "failed to get ticket comments", goerr.V("ticket_id", t.ID))
+		return goerr.Wrap(err, "failed to get ticket session messages", goerr.V("ticket_id", t.ID))
 	}
 
 	// Get alerts linked to this ticket
@@ -151,7 +157,7 @@ func (uc *UseCases) reviewSingleTicket(ctx context.Context, t *ticket.Ticket) er
 		"assignee":    assignee,
 		"assignee_id": assigneeID,
 		"alerts":      alerts,
-		"comments":    comments,
+		"comments":    messages,
 		"now":         clock.Now(ctx).Format("2006-01-02 15:04"),
 		"lang":        lang.From(ctx),
 	}

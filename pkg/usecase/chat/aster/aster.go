@@ -14,7 +14,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
-	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
@@ -185,7 +184,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 		userPrompt:       c.userSystemPrompt,
 		lang:             lang.From(ctx),
 		requesterID:      string(types.UserID(user.FromContext(ctx))),
-		threadComments:   chatCtx.ThreadComments,
+		sessionMessages:  chatCtx.SessionMessages,
 		slackHistory:     chatCtx.SlackHistory,
 		knowledgeService: c.knowledgeService,
 	}
@@ -251,7 +250,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 	// Direct response (no tasks)
 	if len(planResult.Tasks) == 0 {
 		if !ticketless {
-			return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+			return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 		}
 		return nil
 	}
@@ -287,7 +286,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 
 			// Handle question again if needed (recursive questions)
 			if replanResult.Question != nil {
-				questionResult, qErr := c.handleQuestion(ctx, replanResult.Question, target, ssn)
+				questionResult, qErr := c.handleQuestion(ctx, replanResult.Question, chatCtx, ssn)
 				if qErr != nil {
 					logger.Error("question failed", "error", qErr, "phase", phase)
 					msg.Warn(ctx, "⚠️ Question failed: %s", qErr.Error())
@@ -306,7 +305,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 		}
 
 		// Execute all tasks in parallel
-		results := c.executePhase(ctx, currentTasks, target, ssn)
+		results := c.executePhase(ctx, currentTasks, chatCtx, ssn)
 		allResults = append(allResults, &phaseResult{
 			phase:   phase,
 			tasks:   currentTasks,
@@ -344,7 +343,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 
 		// Handle question (takes priority over tasks)
 		if replanResult.Question != nil {
-			questionResult, err := c.handleQuestion(ctx, replanResult.Question, target, ssn)
+			questionResult, err := c.handleQuestion(ctx, replanResult.Question, chatCtx, ssn)
 			if err != nil {
 				logger.Error("question failed", "error", err, "phase", phase)
 				msg.Warn(ctx, "⚠️ Question failed: %s", err.Error())
@@ -370,7 +369,7 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 	}
 
 	// Post divider before final response
-	c.postDivider(ctx, target)
+	c.postDivider(ctx, chatCtx)
 
 	// Generate final response
 	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults, systemPrompt)
@@ -391,11 +390,11 @@ func (c *AsterChat) executeAster(ctx context.Context, ssn *session.Session, mess
 	msg.Notify(ctx, "💬 %s", finalResp)
 
 	// Trigger fact knowledge reflection in background
-	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), target)
+	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), chatCtx)
 
 	if !ticketless {
 		logger.Debug("aster executeAster: completed, saving history")
-		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+		return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 	}
 	return nil
 }
@@ -435,7 +434,11 @@ type questionResult struct {
 }
 
 // handleQuestion asks a question to the user via HITL service and returns the result.
-func (c *AsterChat) handleQuestion(ctx context.Context, q *Question, target *ticket.Ticket, ssn *session.Session) (*questionResult, error) {
+// The presenter is resolved per Session.Source: Slack builds an
+// UpdatableBlockMessage in the thread, Web emits a hitl_request_pending
+// envelope tied to a new progress row in the Conversation, CLI rejects
+// (default-deny until interactive CLI HITL is implemented).
+func (c *AsterChat) handleQuestion(ctx context.Context, q *Question, chatCtx *chatModel.ChatContext, ssn *session.Session) (*questionResult, error) {
 	logger := logging.From(ctx)
 	logger.Info("asking question to user",
 		"question", q.Question,
@@ -443,6 +446,7 @@ func (c *AsterChat) handleQuestion(ctx context.Context, q *Question, target *tic
 		"reason", q.Reason,
 	)
 
+	target := chatCtx.Ticket
 	hitlSvc := hitlService.New(c.repository)
 
 	hitlReq := &hitl.Request{
@@ -454,29 +458,32 @@ func (c *AsterChat) handleQuestion(ctx context.Context, q *Question, target *tic
 		UserID:    user.FromContext(ctx),
 		CreatedAt: time.Now(),
 	}
-	if target.SlackThread != nil {
+	if target != nil && target.SlackThread != nil {
 		hitlReq.SlackThread = *target.SlackThread
 	}
 
-	// Build presenter
-	var presenter hitlService.Presenter
-	if c.slackService != nil && target.SlackThread != nil {
-		threadSvc := c.slackService.NewThread(*target.SlackThread).(*slackService.ThreadService)
-		// Use the session title or a generic title for the question message
-		initialMsg := fmt.Sprintf("❓ *Question*\n\n%s", q.Question)
-		ubm := threadSvc.NewUpdatableBlockMessage(ctx, initialMsg)
-		presenter = slackService.NewQuestionPresenter(ubm, "Correlating ...", user.FromContext(ctx))
-	}
+	// Build presenter on a fresh ProgressHandle: the handle hosts the
+	// question UI (Slack block message / Web session message) and
+	// transitions into an answered state once the user responds.
+	initialMsg := fmt.Sprintf("❓ *Question*\n\n%s", q.Question)
+	progress := chat.NewProgressHandle(ctx, chatCtx, c.slackService, c.repository, initialMsg)
+	presenter := chat.NewProgressHandlePresenter(progress, "Correlating ...", user.FromContext(ctx))
 
 	if presenter == nil {
-		return nil, goerr.New("question requires a presenter but none is available")
+		return nil, goerr.New("question requires a presenter but none is available for this session source")
 	}
 
 	msg.Notify(ctx, "❓ %s", q.Reason)
 
 	result, err := hitlSvc.RequestAndWait(ctx, hitlReq, presenter)
 	if err != nil {
+		if chatCtx != nil && chatCtx.OnHITLEvent != nil {
+			chatCtx.OnHITLEvent("resolved", hitlReq, chat.ProgressMessageID(progress))
+		}
 		return nil, goerr.Wrap(err, "failed to get question answer")
+	}
+	if chatCtx != nil && chatCtx.OnHITLEvent != nil {
+		chatCtx.OnHITLEvent("resolved", result, chat.ProgressMessageID(progress))
 	}
 
 	return &questionResult{
@@ -503,13 +510,22 @@ func (c *AsterChat) saveLatestHistory(ctx context.Context, planSession gollem.Se
 	}
 }
 
-// saveSessionHistory extracts history from a gollem Session and saves it via the shared SaveHistory function.
-func (c *AsterChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) error {
+// saveSessionHistory extracts history from a gollem Session and saves it.
+//
+// saveSessionHistory writes gollem working memory into the
+// Session-scoped storage slot. When chatCtx.Session is absent (e.g.
+// the resolver failed), working memory is discarded for this turn —
+// there is no longer a ticket-scoped fallback (see
+// chat-session-redesign Phase 7 confinement).
+func (c *AsterChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, chatCtx chatModel.ChatContext, storageSvc *storage.Service) error {
 	newHistory, err := planSession.History()
 	if err != nil {
 		return goerr.Wrap(err, "failed to get history from planning session")
 	}
-	return chat.SaveHistory(ctx, c.repository, c.storageClient, storageSvc, ticketID, newHistory)
+	if chatCtx.Session == nil {
+		return nil
+	}
+	return chat.SaveSessionHistory(ctx, chatCtx.Session.ID, storageSvc, newHistory)
 }
 
 // checkAborted checks if the context has been cancelled (e.g. by the session

@@ -109,11 +109,12 @@ func (x *Warren) Prompt(ctx context.Context) (string, error) {
 }
 
 const (
-	cmdGetAlerts            = "warren_get_alerts"
-	cmdFindNearestTicket    = "warren_find_nearest_ticket"
-	cmdSearchTicketsByWords = "warren_search_tickets_by_words"
-	cmdUpdateFinding        = "warren_update_finding"
-	cmdGetTicketComments    = "warren_get_ticket_comments"
+	cmdGetAlerts                = "warren_get_alerts"
+	cmdFindNearestTicket        = "warren_find_nearest_ticket"
+	cmdSearchTicketsByWords     = "warren_search_tickets_by_words"
+	cmdUpdateFinding            = "warren_update_finding"
+	cmdGetTicketSessionMessages = "warren_get_ticket_session_messages"
+	cmdSearchSessionMessages    = "warren_search_session_messages"
 
 	// Default values for search operations
 	DefaultSearchTicketsLimit    = 10
@@ -206,16 +207,39 @@ func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        cmdGetTicketComments,
-			Description: "Get comments associated with the current ticket with pagination support",
+			Name:        cmdGetTicketSessionMessages,
+			Description: "Get chat messages (user inputs, AI responses, traces, plans, warnings) from every Session attached to the current ticket. Supersedes warren_get_ticket_comments by returning both human-authored messages and AI-produced outputs across Slack/Web/CLI channels in a unified shape.",
 			Parameters: map[string]*gollem.Parameter{
+				"source": {
+					Type:        gollem.TypeString,
+					Description: "Optional filter by Session source: 'slack', 'web', or 'cli'. Omit to include all sources.",
+				},
+				"type": {
+					Type:        gollem.TypeString,
+					Description: "Optional filter by Message type: 'user', 'trace', 'plan', 'response', or 'warning'. Omit to include all types.",
+				},
 				"limit": {
 					Type:        gollem.TypeInteger,
-					Description: "Maximum number of comments to return (default: 50)",
+					Description: "Maximum number of messages to return (default: 50)",
 				},
 				"offset": {
 					Type:        gollem.TypeInteger,
-					Description: "Number of comments to skip for pagination (default: 0)",
+					Description: "Number of messages to skip for pagination (default: 0)",
+				},
+			},
+		},
+		{
+			Name:        cmdSearchSessionMessages,
+			Description: "Full-text search across every Session.Message attached to the current ticket. Returns the top matching messages (case-insensitive substring match). Use this when you need to look up prior discussion or investigation traces by keyword rather than by source/type.",
+			Parameters: map[string]*gollem.Parameter{
+				"query": {
+					Type:        gollem.TypeString,
+					Description: "Case-insensitive substring to search for across message content.",
+					Required:    true,
+				},
+				"limit": {
+					Type:        gollem.TypeInteger,
+					Description: "Maximum number of messages to return (default: 50)",
 				},
 			},
 		},
@@ -232,8 +256,10 @@ func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map
 		return x.searchTicketsByWords(ctx, args)
 	case cmdUpdateFinding:
 		return x.updateFinding(ctx, args)
-	case cmdGetTicketComments:
-		return x.getTicketComments(ctx, args)
+	case cmdGetTicketSessionMessages:
+		return x.getTicketSessionMessages(ctx, args)
+	case cmdSearchSessionMessages:
+		return x.searchSessionMessages(ctx, args)
 	default:
 		return nil, goerr.New("invalid function name", goerr.V("name", name))
 	}

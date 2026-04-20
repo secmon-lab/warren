@@ -14,6 +14,7 @@ import (
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	model "github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
@@ -48,7 +49,7 @@ type planningContext struct {
 	userPrompt       string
 	lang             lang.Lang
 	requesterID      string
-	threadComments   []ticket.Comment
+	sessionMessages  []*sessModel.Message
 	slackHistory     []model.HistoryMessage
 	knowledgeService *svcknowledge.Service
 }
@@ -65,7 +66,7 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 		"user_prompt":       pc.userPrompt,
 		"lang":              pc.lang,
 		"requester_id":      pc.requesterID,
-		"thread_comments":   pc.threadComments,
+		"session_messages":  pc.sessionMessages,
 		"topic":             pc.ticket.Topic,
 		"history_messages":  pc.slackHistory,
 		"knowledge_tags":    fetchKnowledgeTags(ctx, pc.knowledgeService),
