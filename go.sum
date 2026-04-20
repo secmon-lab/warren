@@ -262,8 +262,8 @@ github.com/likexian/whois v1.15.7 h1:sajjDhi2bVD71AHJhjV7jLYxN92H4AWhTwxM8hmj7c0
 github.com/likexian/whois v1.15.7/go.mod h1:kdPQtYb+7SQVftBEbCblDadUkycN7Mg1k1/Li/rwvmc=
 github.com/m-mizutani/clog v0.2.1 h1:aVOANOeAcHW5HLeGvqepX4zQwkvSbtuBOGH7cyn3AmM=
 github.com/m-mizutani/clog v0.2.1/go.mod h1:pMkePlZ5rNTS8Yzljdqud3sLZ5TTDNs+hiC7vEZhGXo=
-github.com/m-mizutani/fireconf v0.2.2-0.20260420001533-50a6cfbf337f h1:OnMAqKCziJprlNNUTg547LsN9ehdaJiw2+bOF2A3HyI=
-github.com/m-mizutani/fireconf v0.2.2-0.20260420001533-50a6cfbf337f/go.mod h1:6BC0xnXSSZQNAjLy2PC0QttFWjL7DCTxOHxTFrWS1ew=
+github.com/m-mizutani/fireconf v0.3.0 h1:SHWiNHcFhv8WLbG0LGiThHJfrfhgvTmiWzGj7ByQi1g=
+github.com/m-mizutani/fireconf v0.3.0/go.mod h1:6BC0xnXSSZQNAjLy2PC0QttFWjL7DCTxOHxTFrWS1ew=
 github.com/m-mizutani/goerr/v2 v2.0.1 h1:Z0XZiliOcCw/qoPR8dEle0xMQw781UmvlySbDHErU2U=
 github.com/m-mizutani/goerr/v2 v2.0.1/go.mod h1:Ax59zs+j3NmzB/mPLc1w3g4yIutdrwcY7cB6IRO18EU=
 github.com/m-mizutani/gollem v0.24.3-0.20260414085700-70cb3cf18589 h1:wDHhO4naE+8Zqg7awFif5hEqXlXU0O4w5rzvphC6Ot8=

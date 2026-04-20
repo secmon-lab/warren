@@ -19,7 +19,7 @@ require (
 	github.com/lestrrat-go/jwx/v2 v2.1.6
 	github.com/likexian/whois v1.15.7
 	github.com/m-mizutani/clog v0.2.1
-	github.com/m-mizutani/fireconf v0.2.2-0.20260420001533-50a6cfbf337f
+	github.com/m-mizutani/fireconf v0.3.0
 	github.com/m-mizutani/goerr/v2 v2.0.1
 	github.com/m-mizutani/gollem v0.24.3-0.20260414085700-70cb3cf18589
 	github.com/m-mizutani/gt v0.2.1
