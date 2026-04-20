@@ -11,7 +11,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/notice"
+	"github.com/secmon-lab/warren/pkg/repository"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
+	tagService "github.com/secmon-lab/warren/pkg/service/tag"
 	"github.com/secmon-lab/warren/pkg/usecase"
 	"github.com/slack-go/slack"
 )
@@ -351,6 +353,83 @@ func TestProcessAlertPipeline_Basic(t *testing.T) {
 
 		// Should return error when LLM client is not configured
 		gt.Error(t, err)
+	})
+}
+
+func TestProcessAlertPipeline_AutoTagInference(t *testing.T) {
+	t.Run("LLM-inferred tag names are persisted as TagIDs on the alert", func(t *testing.T) {
+		ctx := context.Background()
+
+		// Seed memory repository with existing tags that the LLM may choose from.
+		repo := repository.NewMemory()
+		tagSvc := tagService.New(repo)
+		malwareTag, err := tagSvc.CreateTagWithCustomColor(ctx, "malware", "Malware-related", "", "")
+		gt.NoError(t, err)
+		networkTag, err := tagSvc.CreateTagWithCustomColor(ctx, "network", "Network-related", "", "")
+		gt.NoError(t, err)
+		_, err = tagSvc.CreateTagWithCustomColor(ctx, "phishing", "Phishing-related", "", "")
+		gt.NoError(t, err)
+
+		// Mock LLM: metadata response includes known (malware, network) and
+		// unknown (bogus-tag) tag names. Known ones must survive through
+		// Tag Conversion and land in Alert.TagIDs.
+		mockLLM := &gollem_mock.LLMClientMock{
+			NewSessionFunc: func(ctx context.Context, options ...gollem.SessionOption) (gollem.Session, error) {
+				return &gollem_mock.SessionMock{
+					GenerateFunc: func(ctx context.Context, input []gollem.Input, _ ...gollem.GenerateOption) (*gollem.Response, error) {
+						return &gollem.Response{
+							Texts: []string{`{
+								"title": "Suspicious binary download",
+								"description": "Host downloaded a known malware sample over the network.",
+								"attributes": [],
+								"tags": ["malware", "network", "bogus-tag"]
+							}`},
+						}, nil
+					},
+				}, nil
+			},
+			GenerateEmbeddingFunc: func(ctx context.Context, dimension int, input []string) ([][]float64, error) {
+				result := make([][]float64, len(input))
+				for i := range input {
+					result[i] = []float64{0.1, 0.2, 0.3}
+				}
+				return result, nil
+			},
+		}
+
+		policyClient, err := opaq.New(
+			opaq.Files(
+				"testdata/ingest_no_title.rego",
+				"testdata/enrich_no_tasks.rego",
+				"testdata/triage_simple.rego",
+			),
+		)
+		gt.NoError(t, err)
+
+		uc := usecase.New(
+			usecase.WithRepository(repo),
+			usecase.WithTagService(tagSvc),
+			usecase.WithLLMClient(mockLLM),
+			usecase.WithPolicyClient(policyClient),
+		)
+
+		results, err := uc.ProcessAlertPipeline(ctx, "test_schema", map[string]any{"test": "data"}, &mock.NotifierMock{})
+		gt.NoError(t, err)
+		gt.A(t, results).Length(1)
+
+		a := results[0].Alert
+		// LLM's title/description applied
+		gt.Equal(t, a.Title, "Suspicious binary download")
+
+		// TagIDs must contain the two known tag IDs and nothing else.
+		gt.N(t, len(a.TagIDs)).Equal(2)
+		gt.True(t, a.TagIDs[malwareTag.ID])
+		gt.True(t, a.TagIDs[networkTag.ID])
+
+		// Bogus tag must not have been auto-created or attached.
+		existing, err := repo.GetTagByName(ctx, "bogus-tag")
+		gt.NoError(t, err)
+		gt.Nil(t, existing)
 	})
 }
 

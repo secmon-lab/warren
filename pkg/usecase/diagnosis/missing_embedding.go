@@ -64,7 +64,12 @@ func (r *MissingAlertEmbeddingRule) Fix(ctx context.Context, repo interfaces.Rep
 		return goerr.Wrap(err, "failed to get alert", goerr.V("alert_id", alertID))
 	}
 
-	if err := a.FillMetadata(ctx, r.llmClient); err != nil {
+	availableTags, err := repo.ListAllTags(ctx)
+	if err != nil {
+		return goerr.Wrap(err, "failed to list tags", goerr.V("alert_id", alertID))
+	}
+
+	if err := a.FillMetadata(ctx, r.llmClient, availableTags); err != nil {
 		return goerr.Wrap(err, "failed to fill alert metadata/embedding", goerr.V("alert_id", alertID))
 	}
 
