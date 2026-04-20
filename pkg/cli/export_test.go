@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"io"
+
 	"github.com/m-mizutani/fireconf"
 	"github.com/secmon-lab/warren/pkg/usecase"
 )
@@ -18,4 +20,14 @@ func DisplayPipelineResultForTest(results []*usecase.AlertPipelineResult) error 
 // DefineFirestoreIndexes exposes defineFirestoreIndexes for testing
 func DefineFirestoreIndexes() *fireconf.Config {
 	return defineFirestoreIndexes()
+}
+
+// FormatIndexFieldsForTest exposes formatIndexFields for testing
+func FormatIndexFieldsForTest(fields []fireconf.IndexField) string {
+	return formatIndexFields(fields)
+}
+
+// PrintMigrationPlanForTest exposes printMigrationPlan for testing
+func PrintMigrationPlanForTest(w io.Writer, projectID, databaseID string, dryRun bool, want *fireconf.Config, diff *fireconf.DiffResult) {
+	printMigrationPlan(w, projectID, databaseID, dryRun, want, diff)
 }
