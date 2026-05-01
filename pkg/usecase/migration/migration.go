@@ -63,3 +63,24 @@ func (r *Result) MergeDetails(kv map[string]any) {
 	}
 	maps.Copy(r.Details, kv)
 }
+
+// RunBundle invokes every Job in `jobs` sequentially against `opts`,
+// collecting Results. The first error short-circuits the run; preceding
+// Results are still returned so callers can see how far the bundle got.
+//
+// This is the orchestration primitive shared by the v0.16.0 CLI bundle
+// and the bundle's tests; keeping it in this package means the same
+// ordering logic is exercised by both code paths.
+func RunBundle(ctx context.Context, opts Options, jobs ...Job) ([]*Result, error) {
+	results := make([]*Result, 0, len(jobs))
+	for _, j := range jobs {
+		res, err := j.Run(ctx, opts)
+		if res != nil {
+			results = append(results, res)
+		}
+		if err != nil {
+			return results, err
+		}
+	}
+	return results, nil
+}

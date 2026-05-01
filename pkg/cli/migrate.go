@@ -79,6 +79,40 @@ var migrationJobs = []migrationJob{
 		Description: "Materialize the canonical slack_<hash> Session for every Slack-origin Ticket so the Conversation sidebar has a single survivor per thread. Non-destructive; legacy UUID Session rows are left in place and filtered out at read time.",
 		Run:         runSessionConsolidate,
 	},
+	{
+		Name:        "v0.16.0",
+		Description: "Bundle: run every chat-session-redesign data migration job in the recommended order (session-source-backfill -> session-consolidate -> comment-to-message -> turn-synthesis -> history-scope). All steps are non-destructive and idempotent; safe to re-run.",
+		Run:         runChatSessionRedesignBundle,
+	},
+}
+
+// chatSessionRedesignBundleSteps is the ordered list of non-destructive
+// jobs invoked by `--job v0.16.0`. Declared as a var (not a literal in
+// the run function) so the order is observable from tests via
+// ChatSessionRedesignBundleStepsForTest.
+var chatSessionRedesignBundleSteps = []migrationJob{
+	{Name: "session-source-backfill", Run: runSessionSourceBackfill},
+	{Name: "session-consolidate", Run: runSessionConsolidate},
+	{Name: "comment-to-message", Run: runCommentToMessage},
+	{Name: "turn-synthesis", Run: runTurnSynthesis},
+	{Name: "history-scope", Run: runHistoryScope},
+}
+
+// runChatSessionRedesignBundle invokes the five non-destructive
+// chat-session-redesign jobs in the order specified by
+// doc/migration/v0.16.0.md. cleanup-legacy is intentionally excluded
+// because it is destructive and must only run after a manual soak
+// window verifies the new data on production.
+func runChatSessionRedesignBundle(ctx context.Context, rt *migrateRuntime) error {
+	logger := logging.From(ctx)
+	for _, step := range chatSessionRedesignBundleSteps {
+		logger.Info("Running migration job (v0.16.0 bundle)", "job", step.Name)
+		if err := step.Run(ctx, rt); err != nil {
+			return goerr.Wrap(err, "v0.16.0 bundle step failed",
+				goerr.V("job", step.Name))
+		}
+	}
+	return nil
 }
 
 func findMigrationJob(name string) (*migrationJob, bool) {
