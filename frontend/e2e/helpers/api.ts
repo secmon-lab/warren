@@ -10,9 +10,18 @@ export async function executeGraphQL<T = unknown>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<GraphQLResponse<T>> {
-  const baseURL = page.url().startsWith("http")
-    ? new URL(page.url()).origin
-    : "http://localhost:8080";
+  let baseURL: string;
+  if (page.url().startsWith("http")) {
+    baseURL = new URL(page.url()).origin;
+  } else if (process.env.BASE_URL) {
+    baseURL = process.env.BASE_URL;
+  } else {
+    throw new Error(
+      "executeGraphQL: cannot resolve baseURL — page has no http origin yet " +
+        "and BASE_URL is not set. Make sure the test navigated first, or run " +
+        "via ./frontend/scripts/e2e.sh which exports BASE_URL."
+    );
+  }
 
   const response = await page.request.post(`${baseURL}/graphql`, {
     data: { query, variables },
