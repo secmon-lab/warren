@@ -262,7 +262,7 @@ func (r *Memory) SearchAlerts(ctx context.Context, path, op string, value any, l
 		}
 
 		// For pointer types, get the value
-		if fieldValue.Kind() == reflect.Ptr {
+		if fieldValue.Kind() == reflect.Pointer {
 			if fieldValue.IsNil() {
 				continue
 			}
