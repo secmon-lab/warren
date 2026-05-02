@@ -1,13 +1,13 @@
 import { defineConfig } from "@playwright/test";
 
-if (!process.env.BASE_URL) {
-  throw new Error(
-    "BASE_URL is not set. Run e2e tests via ./frontend/scripts/e2e.sh, " +
-      "or export BASE_URL=http://127.0.0.1:<port> pointing at a running warren server. " +
-      "The previous fallback to http://localhost:8080 was removed to avoid " +
-      "accidentally hitting unrelated services on a commonly used port."
-  );
-}
+// Note: we intentionally do NOT throw at module load when BASE_URL is unset.
+// The Playwright CLI loads this config for non-execution operations too
+// (e.g. `playwright test --list`, the VS Code extension's test discovery),
+// and a top-level throw would break those flows. Instead we leave `baseURL`
+// undefined when BASE_URL is missing — any `page.goto("/")` then fails with
+// a clear relative-URL error, preserving the fail-loud behavior at the
+// point where it actually matters (test execution) without silently
+// falling back to http://localhost:8080.
 
 export default defineConfig({
   testDir: "./e2e/tests",

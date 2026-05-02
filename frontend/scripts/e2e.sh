@@ -118,7 +118,12 @@ fi
 pick_port() {
   local port
   while true; do
-    port=$((RANDOM % (E2E_PORT_MAX - E2E_PORT_MIN + 1) + E2E_PORT_MIN))
+    # Bash's $RANDOM is 15-bit (0..32767). For a range like 49152..60999
+    # (~11848 values) plain modulo introduces a non-trivial bias because
+    # 32768 is not an integer multiple of the range. Combine two RANDOMs
+    # into a 30-bit value first to make the distribution effectively
+    # uniform across the configured range.
+    port=$(( ((RANDOM << 15) | RANDOM) % (E2E_PORT_MAX - E2E_PORT_MIN + 1) + E2E_PORT_MIN ))
     if ! lsof -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1; then
       echo "$port"
       return
