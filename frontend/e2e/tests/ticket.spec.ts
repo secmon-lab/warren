@@ -154,8 +154,13 @@ test.describe("Tickets", () => {
     // Click archive button — dialog opens
     await ticketList.archiveAllResolvedButton.click();
 
-    // Wait for dialog and click the confirm button inside it
-    const confirmButton = page.getByRole("button", { name: "Archive" });
+    // Wait for dialog and click the confirm button inside it.
+    // The trigger ("Archive All Resolved") on the page also matches the
+    // substring "Archive", so we scope the lookup to the alertdialog to
+    // disambiguate and avoid the overlay-intercepts-click race.
+    const confirmButton = page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Archive", exact: true });
     await expect(confirmButton).toBeVisible();
     await confirmButton.click();
 
