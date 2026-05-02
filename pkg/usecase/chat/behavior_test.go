@@ -10,6 +10,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/cli/config/llm"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -141,7 +142,7 @@ func (f *chatUCFactory) buildStrategy(t *testing.T, strategy string) chatuc.Stra
 		if f.knowledgeSvc == nil {
 			f.knowledgeSvc = svcknowledge.New(f.repo, newMockEmbeddingClient())
 		}
-		s, err := bluebell.New(f.repo, f.llm,
+		s, err := bluebell.New(f.repo, llm.SingleClientRegistryForTest(f.llm),
 			bluebell.WithKnowledgeService(f.knowledgeSvc),
 		)
 		gt.NoError(t, err)

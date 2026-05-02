@@ -27,7 +27,7 @@ func TestServeCommand_StrictAlertValidation(t *testing.T) {
 	err := cli.Run(ctx, []string{
 		"warren", "serve",
 		"--strict-alert",
-		"--gemini-project-id", "test-project",
+		"--llm-config", "/nonexistent-for-strict-alert-test.toml",
 		"--firestore-project-id", "test-project",
 	})
 	gt.Error(t, err)

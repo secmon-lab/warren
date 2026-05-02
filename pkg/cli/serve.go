@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
@@ -64,7 +63,6 @@ func cmdServe() *cli.Command {
 		enableGraphiQL      bool
 		noAuthorization     bool
 		disableHTTPLogger   bool
-		disableLLM          bool
 		strictAlert         bool
 		wsAllowedOrigins    []string
 		webUICfg            config.WebUI
@@ -72,7 +70,7 @@ func cmdServe() *cli.Command {
 		genaiCfg            config.GenAI
 		sentryCfg           config.Sentry
 		slackCfg            config.Slack
-		llmCfg              config.LLMCfg
+		llmCfg              config.LLMConfigFile
 		firestoreCfg        config.Firestore
 		storageCfg          config.Storage
 		mcpCfg              config.MCPConfig
@@ -124,13 +122,6 @@ func cmdServe() *cli.Command {
 				Category:    "Logging",
 				Sources:     cli.EnvVars("WARREN_DISABLE_HTTP_LOGGER"),
 				Destination: &disableHTTPLogger,
-			},
-			&cli.BoolFlag{
-				Name:        "disable-llm",
-				Usage:       "Disable LLM initialization and use no-op clients (for E2E testing)",
-				Category:    "LLM",
-				Sources:     cli.EnvVars("WARREN_DISABLE_LLM"),
-				Destination: &disableLLM,
 			},
 			&cli.BoolFlag{
 				Name:        "strict-alert",
@@ -229,19 +220,12 @@ func cmdServe() *cli.Command {
 				return goerr.New("--strict-alert requires at least one policy file to be specified")
 			}
 
-			// Configure LLM client
-			var llmClient gollem.LLMClient
-			if disableLLM {
-				logging.From(ctx).Warn("⚠️  LLM is disabled, using no-op client",
-					"recommendation", "Only use --disable-llm for E2E testing")
-				llmClient = config.NewNoopLLMClient()
-			} else {
-				var err error
-				llmClient, err = llmCfg.Configure(ctx)
-				if err != nil {
-					return err
-				}
+			// Configure LLM registry (loads TOML and runs health check)
+			llmRegistry, err := llmCfg.Load(ctx)
+			if err != nil {
+				return goerr.Wrap(err, "failed to load LLM config")
 			}
+			llmClient := llmRegistry.Main().Client
 
 			if err := sentryCfg.Configure(); err != nil {
 				return err
@@ -283,17 +267,8 @@ func cmdServe() *cli.Command {
 				storageClient = client
 			}
 
-			// Create embedding client
-			var embeddingAdapter interfaces.EmbeddingClient
-			if disableLLM {
-				embeddingAdapter = config.NewNoopEmbeddingClient()
-			} else {
-				var err error
-				embeddingAdapter, err = llmCfg.ConfigureEmbeddingClient(ctx)
-				if err != nil {
-					return err
-				}
-			}
+			// Embedding adapter from registry
+			embeddingAdapter := config.NewEmbeddingClientAdapter(llmRegistry)
 
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(repo, embeddingAdapter)
@@ -353,7 +328,7 @@ func cmdServe() *cli.Command {
 			knowledgeSvc := svcknowledge.New(repo, embeddingAdapter, knowledgeOpts...)
 
 			ucOptions := []usecase.Option{
-				usecase.WithLLMClient(llmClient),
+				usecase.WithLLMRegistry(llmRegistry),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithRepository(repo),
 				usecase.WithStorageClient(storageClient),
@@ -493,7 +468,7 @@ func cmdServe() *cli.Command {
 
 				bluebellOpts = append(bluebellOpts, bluebell.WithHITLTools([]string{"web_fetch"}))
 
-				bluebellStrategy, err := bluebell.New(repo, llmClient, bluebellOpts...)
+				bluebellStrategy, err := bluebell.New(repo, llmRegistry, bluebellOpts...)
 				if err != nil {
 					return goerr.Wrap(err, "failed to create bluebell chat strategy")
 				}
