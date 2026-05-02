@@ -429,17 +429,16 @@ func newEmbeddingClient(ctx context.Context, e *EmbeddingConfig) (gollem.LLMClie
 	case ProviderOpenAI:
 		c, err := openai.New(ctx, e.APIKey,
 			openai.WithEmbeddingModel(e.Model),
-			openai.WithModel(e.Model),
 		)
 		if err != nil {
 			return nil, goerr.Wrap(err, "embedding (openai) client init")
 		}
 		return c, nil
 	}
+	// Embedding-only client; rely on gollem's default content model since we
+	// never invoke Generate on it.
 	c, err := gemini.New(ctx, e.ProjectID, e.Location,
 		gemini.WithEmbeddingModel(e.Model),
-		// content model not used; provide a sane default
-		gemini.WithModel(e.Model),
 	)
 	if err != nil {
 		return nil, goerr.Wrap(err, "embedding (gemini vertex) client init",
