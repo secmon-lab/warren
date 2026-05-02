@@ -34,6 +34,14 @@ provider    = "gemini"
 model       = "gemini-2.5-pro"
 gemini      = { project_id = "my-gcp-project", location = "us-central1", thinking_budget = 1024 }
 
+# OpenAI is supported via API key only. Inject via environment template.
+# [[llm]]
+# id          = "gpt-4o-mini"
+# description = "OpenAI gpt-4o-mini — alternative cheap fast lane."
+# provider    = "openai"
+# model       = "gpt-4o-mini"
+# openai      = { api_key = "{{ .Env.OPENAI_API_KEY }}" }
+
 # Optional Claude entry using direct Anthropic API key instead of Vertex.
 # Mutually exclusive with project_id/location.
 # [[llm]]

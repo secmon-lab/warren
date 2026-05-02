@@ -22,6 +22,7 @@ type LLMConfig struct {
 
 	Claude *ClaudeOptions `toml:"claude"`
 	Gemini *GeminiOptions `toml:"gemini"`
+	OpenAI *OpenAIOptions `toml:"openai"`
 }
 
 // ClaudeOptions holds Claude-specific settings. Vertex and api_key modes are
@@ -41,17 +42,29 @@ type GeminiOptions struct {
 	ThinkingBudget *int   `toml:"thinking_budget"`
 }
 
-// EmbeddingConfig is the embedding client config (Gemini only for now).
+// OpenAIOptions holds OpenAI-specific settings. API key only (gollem does not
+// expose Azure OpenAI in this build).
+type OpenAIOptions struct {
+	APIKey string `toml:"api_key"`
+}
+
+// EmbeddingConfig is the embedding client config.
+// Supports provider = "gemini" (Vertex), "openai", or "noop" (test-only).
 type EmbeddingConfig struct {
 	Provider  string `toml:"provider"`
 	Model     string `toml:"model"`
 	ProjectID string `toml:"project_id"`
 	Location  string `toml:"location"`
-	APIKey    string `toml:"api_key"` // reserved; rejected by validation
+	APIKey    string `toml:"api_key"`
 }
 
 // Provider names.
 const (
 	ProviderClaude = "claude"
 	ProviderGemini = "gemini"
+	ProviderOpenAI = "openai"
+	// ProviderNoop is a test-only provider that returns canned responses and
+	// zero-vector embeddings. Intended for E2E/UI tests where LLM is not the
+	// system under test. Not for production use.
+	ProviderNoop = "noop"
 )

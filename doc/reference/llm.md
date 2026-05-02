@@ -60,10 +60,11 @@ execution time, Warren resolves the id against the registry; ids outside the
 | ------------- | ------ | -------- | ----------------------------------------------------------------- |
 | `id`          | string | yes      | Unique identifier referenced from `[agent]` and the planner.      |
 | `description` | string | yes      | Free-form text shown to the planner — explain when to choose it.  |
-| `provider`    | string | yes      | `"claude"` or `"gemini"`.                                         |
+| `provider`    | string | yes      | `"claude"`, `"gemini"`, `"openai"`, or `"noop"` (test-only).      |
 | `model`       | string | yes      | Provider-specific model name (e.g. `claude-sonnet-4-6`).          |
 | `claude`      | table  | provider | Required when `provider = "claude"`; forbidden otherwise.         |
 | `gemini`      | table  | provider | Required when `provider = "gemini"`; forbidden otherwise.         |
+| `openai`      | table  | provider | Required when `provider = "openai"`; forbidden otherwise.         |
 
 #### `claude = { ... }`
 
@@ -74,6 +75,14 @@ Vertex AI mode and Anthropic API key mode are mutually exclusive.
 | `project_id` | GCP project id (Vertex mode). Pair with `location`.                          |
 | `location`   | Vertex region (e.g. `us-east5`). Pair with `project_id`.                     |
 | `api_key`    | Anthropic API key. Mutually exclusive with `project_id` / `location`.        |
+
+#### `openai = { ... }`
+
+OpenAI direct API only. No Azure / Vertex equivalent in this build.
+
+| field     | description                                                                       |
+| --------- | --------------------------------------------------------------------------------- |
+| `api_key` | OpenAI API key. Required. Inject via `{{ .Env.OPENAI_API_KEY }}` template.        |
 
 #### `gemini = { ... }`
 
@@ -86,17 +95,26 @@ and configs that set `api_key` here are rejected at startup.
 | `location`        | Vertex region (required).                                                                  |
 | `thinking_budget` | Optional integer. Defaults to `0` (thinking disabled, matching prior warren behavior).     |
 
+#### Noop provider (test-only)
+
+`provider = "noop"` registers a stub LLM that returns canned responses and
+zero-vector embeddings. It exists so that integration / E2E test harnesses
+can boot warren via the regular config path without real provider credentials.
+It must not be used in production. Both `[[llm]]` entries and `[embedding]`
+support `provider = "noop"`; nested `claude` / `gemini` tables are forbidden.
+
 ### `[embedding]`
 
-Embeddings are Gemini-only via Vertex.
+Embeddings can be served by Gemini (Vertex), OpenAI (API key), or `noop`
+(test-only, see above).
 
 | field        | description                                                              |
 | ------------ | ------------------------------------------------------------------------ |
-| `provider`   | Must be `"gemini"`.                                                      |
-| `model`      | Embedding model name (e.g. `text-embedding-004`).                        |
-| `project_id` | GCP project id.                                                          |
-| `location`   | Vertex region.                                                           |
-| `api_key`    | Reserved; rejected at validation. Use Vertex.                            |
+| `provider`   | `"gemini"`, `"openai"`, or `"noop"`.                                     |
+| `model`      | Embedding model name (e.g. `text-embedding-004`, `text-embedding-3-small`). |
+| `project_id` | GCP project id (Gemini only).                                            |
+| `location`   | Vertex region (Gemini only).                                             |
+| `api_key`    | Required for `provider = "openai"`. Forbidden for Gemini (use Vertex).   |
 
 ## Picking models in practice
 

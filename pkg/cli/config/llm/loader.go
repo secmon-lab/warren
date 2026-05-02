@@ -14,6 +14,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/llm/claude"
 	"github.com/m-mizutani/gollem/llm/gemini"
+	"github.com/m-mizutani/gollem/llm/openai"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 )
 
@@ -178,6 +179,9 @@ func validateLLMEntry(e *LLMConfig) error {
 		if e.Gemini != nil {
 			errs = append(errs, goerr.New("[[llm]] provider=claude must not include gemini section", tag))
 		}
+		if e.OpenAI != nil {
+			errs = append(errs, goerr.New("[[llm]] provider=claude must not include openai section", tag))
+		}
 		if e.Claude == nil {
 			errs = append(errs, goerr.New("[[llm]] provider=claude requires claude section", tag))
 		} else {
@@ -189,6 +193,9 @@ func validateLLMEntry(e *LLMConfig) error {
 		if e.Claude != nil {
 			errs = append(errs, goerr.New("[[llm]] provider=gemini must not include claude section", tag))
 		}
+		if e.OpenAI != nil {
+			errs = append(errs, goerr.New("[[llm]] provider=gemini must not include openai section", tag))
+		}
 		if e.Gemini == nil {
 			errs = append(errs, goerr.New("[[llm]] provider=gemini requires gemini section", tag))
 		} else {
@@ -196,8 +203,21 @@ func validateLLMEntry(e *LLMConfig) error {
 				errs = append(errs, goerr.Wrap(err, "[[llm]] gemini section invalid", tag))
 			}
 		}
+	case ProviderOpenAI:
+		if e.Claude != nil || e.Gemini != nil {
+			errs = append(errs, goerr.New("[[llm]] provider=openai must not include claude/gemini sections", tag))
+		}
+		if e.OpenAI == nil {
+			errs = append(errs, goerr.New("[[llm]] provider=openai requires openai section", tag))
+		} else if e.OpenAI.APIKey == "" {
+			errs = append(errs, goerr.New("[[llm]] openai.api_key is required", tag))
+		}
+	case ProviderNoop:
+		if e.Claude != nil || e.Gemini != nil || e.OpenAI != nil {
+			errs = append(errs, goerr.New("[[llm]] provider=noop must not include claude/gemini/openai sections", tag))
+		}
 	default:
-		errs = append(errs, goerr.New("[[llm]] provider must be 'claude' or 'gemini'", tag, goerr.V("provider", e.Provider)))
+		errs = append(errs, goerr.New("[[llm]] provider must be 'claude', 'gemini', 'openai' or 'noop'", tag, goerr.V("provider", e.Provider)))
 	}
 
 	if len(errs) == 0 {
@@ -255,22 +275,34 @@ func validateGemini(g *GeminiOptions) error {
 
 func validateEmbedding(e *EmbeddingConfig) []error {
 	var errs []error
-	if e.Provider != ProviderGemini {
-		errs = append(errs, goerr.New("[embedding] provider must be 'gemini'", goerr.V("provider", e.Provider)))
-	}
-	if e.Model == "" {
-		errs = append(errs, goerr.New("[embedding] model is required"))
-	}
-	if e.APIKey != "" {
-		errs = append(errs, goerr.New("[embedding] api_key mode is not supported; use vertex (project_id, location)"))
-	}
-	if e.APIKey == "" {
+	switch e.Provider {
+	case ProviderGemini:
+		if e.Model == "" {
+			errs = append(errs, goerr.New("[embedding] model is required"))
+		}
+		if e.APIKey != "" {
+			errs = append(errs, goerr.New("[embedding] gemini api_key mode is not supported; use vertex (project_id, location)"))
+		}
 		if e.ProjectID == "" {
 			errs = append(errs, goerr.New("[embedding] project_id is required"))
 		}
 		if e.Location == "" {
 			errs = append(errs, goerr.New("[embedding] location is required"))
 		}
+	case ProviderOpenAI:
+		if e.Model == "" {
+			errs = append(errs, goerr.New("[embedding] model is required"))
+		}
+		if e.APIKey == "" {
+			errs = append(errs, goerr.New("[embedding] api_key is required for provider=openai"))
+		}
+		if e.ProjectID != "" || e.Location != "" {
+			errs = append(errs, goerr.New("[embedding] project_id/location must not be set for provider=openai"))
+		}
+	case ProviderNoop:
+		// noop embedding requires no extra config
+	default:
+		errs = append(errs, goerr.New("[embedding] provider must be 'gemini', 'openai' or 'noop'", goerr.V("provider", e.Provider)))
 	}
 	return errs
 }
@@ -339,6 +371,10 @@ func newClient(ctx context.Context, cfg *LLMConfig) (gollem.LLMClient, error) {
 		return newClaudeClient(ctx, cfg.Model, cfg.Claude)
 	case ProviderGemini:
 		return newGeminiClient(ctx, cfg.Model, cfg.Gemini)
+	case ProviderOpenAI:
+		return newOpenAIClient(ctx, cfg.Model, cfg.OpenAI)
+	case ProviderNoop:
+		return &noopLLMClient{}, nil
 	default:
 		return nil, goerr.New("unsupported provider", goerr.V("provider", cfg.Provider))
 	}
@@ -378,7 +414,28 @@ func newGeminiClient(ctx context.Context, model string, opts *GeminiOptions) (go
 	return c, nil
 }
 
+func newOpenAIClient(ctx context.Context, model string, opts *OpenAIOptions) (gollem.LLMClient, error) {
+	c, err := openai.New(ctx, opts.APIKey, openai.WithModel(model))
+	if err != nil {
+		return nil, goerr.Wrap(err, "openai client init")
+	}
+	return c, nil
+}
+
 func newEmbeddingClient(ctx context.Context, e *EmbeddingConfig) (gollem.LLMClient, error) {
+	switch e.Provider {
+	case ProviderNoop:
+		return &noopLLMClient{}, nil
+	case ProviderOpenAI:
+		c, err := openai.New(ctx, e.APIKey,
+			openai.WithEmbeddingModel(e.Model),
+			openai.WithModel(e.Model),
+		)
+		if err != nil {
+			return nil, goerr.Wrap(err, "embedding (openai) client init")
+		}
+		return c, nil
+	}
 	c, err := gemini.New(ctx, e.ProjectID, e.Location,
 		gemini.WithEmbeddingModel(e.Model),
 		// content model not used; provide a sane default

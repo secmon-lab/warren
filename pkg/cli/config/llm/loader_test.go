@@ -793,3 +793,90 @@ model = ""
 	gt.True(t, strings.Contains(msg, "[embedding]"))
 	gt.True(t, strings.Contains(msg, "task"))
 }
+
+func TestValidate_OKNoopProvider(t *testing.T) {
+	f := parseFile(t, `
+[agent]
+main = "n"
+task = ["n"]
+
+[[llm]]
+id          = "n"
+description = "test"
+provider    = "noop"
+model       = "noop"
+
+[embedding]
+provider = "noop"
+model    = "noop"
+`)
+	gt.NoError(t, llm.ValidateForTest(f))
+}
+
+func TestValidate_NoopRejectsNestedSections(t *testing.T) {
+	f := parseFile(t, `
+[agent]
+main = "n"
+task = ["n"]
+
+[[llm]]
+id          = "n"
+description = "test"
+provider    = "noop"
+model       = "noop"
+claude      = { api_key = "x" }
+
+[embedding]
+provider = "noop"
+model    = "noop"
+`)
+	err := llm.ValidateForTest(f)
+	gt.Error(t, err)
+	gt.True(t, strings.Contains(err.Error(), "noop"))
+}
+
+func TestValidate_OKOpenAI(t *testing.T) {
+	t.Setenv("WARREN_TEST_OPENAI_KEY", "sk-test")
+	out, err := llm.RenderTemplateForTest([]byte(`
+[agent]
+main = "o"
+task = ["o"]
+
+[[llm]]
+id          = "o"
+description = "openai"
+provider    = "openai"
+model       = "gpt-4o-mini"
+openai      = { api_key = "{{ .Env.WARREN_TEST_OPENAI_KEY }}" }
+
+[embedding]
+provider = "openai"
+model    = "text-embedding-3-small"
+api_key  = "{{ .Env.WARREN_TEST_OPENAI_KEY }}"
+`))
+	gt.NoError(t, err)
+	f := parseFile(t, string(out))
+	gt.NoError(t, llm.ValidateForTest(f))
+}
+
+func TestValidate_OpenAIRequiresAPIKey(t *testing.T) {
+	f := parseFile(t, `
+[agent]
+main = "o"
+task = ["o"]
+
+[[llm]]
+id          = "o"
+description = "openai"
+provider    = "openai"
+model       = "gpt-4o"
+openai      = { api_key = "" }
+
+[embedding]
+provider = "noop"
+model    = "noop"
+`)
+	err := llm.ValidateForTest(f)
+	gt.Error(t, err)
+	gt.True(t, strings.Contains(err.Error(), "openai.api_key"))
+}
