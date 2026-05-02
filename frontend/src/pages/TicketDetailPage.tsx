@@ -84,10 +84,8 @@ import {
 import { EditConclusionModal } from "@/components/ui/edit-conclusion-modal";
 import { EditTicketModal } from "@/components/EditTicketModal";
 import { SimilarTickets } from "@/components/SimilarTickets";
-import { TicketComments } from "@/components/TicketComments";
+import { TicketConversation } from "@/components/TicketConversation";
 import { SalvageModal } from "@/components/SalvageModal";
-import { TicketChat } from "@/components/TicketChat";
-import { SessionsList } from "@/components/SessionsList";
 
 const ALERTS_PER_PAGE = 5;
 
@@ -107,23 +105,8 @@ export default function TicketDetailPage() {
   const [resolveReason, setResolveReason] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   
-  // Initialize chat open state from localStorage
-  const [isChatOpen, setIsChatOpen] = useState(() => {
-    if (!id) return false;
-    const saved = localStorage.getItem(`ticket-chat-open-${id}`);
-    return saved === 'true';
-  });
-
   const errorToast = useErrorToast();
   const successToast = useSuccessToast();
-
-  // Handle opening chat and persisting state
-  const handleStartChat = () => {
-    setIsChatOpen(true);
-    if (id) {
-      localStorage.setItem(`ticket-chat-open-${id}`, 'true');
-    }
-  };
 
   const formatAbsoluteTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -536,35 +519,12 @@ export default function TicketDetailPage() {
             onEditConclusion={handleEditConclusion}
           />
 
-          {/* Comments Section */}
-          <TicketComments ticketId={ticket.id} />
-
-          {/* Chat Section */}
-          {!isChatOpen ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    AI Chat Assistant
-                  </div>
-                  <Button
-                    onClick={handleStartChat}
-                    className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    Start Chat
-                  </Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Click "Start Chat" to begin a conversation with the AI assistant about this ticket.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <TicketChat ticketId={ticket.id} />
-          )}
+          {/* chat-session-redesign Phase 6: unified Conversation card
+              replaces the legacy Comments list. Slack thread comments
+              written before the Phase 7 migration are rendered through
+              the same SessionMessage timeline (the migration copies
+              them as type=user messages). */}
+          <TicketConversation ticketId={ticket.id} />
 
           {/* Alerts Section with Pagination */}
           <Card>
@@ -938,9 +898,6 @@ export default function TicketDetailPage() {
               </div>
             </CardContent>
           </Card>
-
-          {/* Sessions */}
-          <SessionsList ticketId={ticket.id} />
 
           {/* Similar Tickets */}
           <SimilarTickets ticketId={ticket.id} />

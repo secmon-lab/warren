@@ -1,0 +1,12 @@
+[
+  {
+    "seq": 0,
+    "method": "AuthTest",
+    "args": {}
+  },
+  {
+    "seq": 1,
+    "method": "GetTeamInfo",
+    "args": {}
+  }
+]

@@ -11,6 +11,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
+	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -219,19 +220,22 @@ func (uc *UseCases) generateResolveMessage(ctx context.Context, ticket *ticket.T
 		reasonText = "No reason provided"
 	}
 
-	// Get ticket comments
-	comments, err := uc.repository.GetTicketComments(ctx, ticket.ID)
+	// chat-session-redesign Phase 3.3: read user messages from the
+	// unified SessionMessage timeline.
+	slackSource := sessModel.SessionSourceSlack
+	userType := sessModel.MessageTypeUser
+	messages, err := uc.repository.GetTicketSessionMessages(ctx, ticket.ID, &slackSource, &userType, 0, 0)
 	if err != nil {
-		// Continue without comments if there's an error
-		comments = nil
+		// Continue without messages if there's an error
+		messages = nil
 	}
 
-	// Generate prompt with ticket information including comments
+	// Generate prompt with ticket information including session messages
 	resolvePrompt, err := prompt.GenerateWithStruct(ctx, resolveMessagePromptTemplate, map[string]any{
 		"title":      ticket.Title,
 		"conclusion": conclusionText,
 		"reason":     reasonText,
-		"comments":   comments,
+		"comments":   messages,
 		"lang":       lang.From(ctx),
 	})
 	if err != nil {

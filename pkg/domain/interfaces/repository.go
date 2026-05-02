@@ -45,13 +45,11 @@ type Repository interface {
 	GetTicketsBySpan(ctx context.Context, begin, end time.Time) ([]*ticket.Ticket, error)
 	GetTicketsByStatusAndSpan(ctx context.Context, status types.TicketStatus, begin, end time.Time) ([]*ticket.Ticket, error)
 
-	// For comment management
-	PutTicketComment(ctx context.Context, comment ticket.Comment) error
-	GetTicketComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
-	GetTicketCommentsPaginated(ctx context.Context, ticketID types.TicketID, offset, limit int) ([]ticket.Comment, error)
-	CountTicketComments(ctx context.Context, ticketID types.TicketID) (int, error)
-	GetTicketUnpromptedComments(ctx context.Context, ticketID types.TicketID) ([]ticket.Comment, error)
-	PutTicketCommentsPrompted(ctx context.Context, ticketID types.TicketID, commentIDs []types.CommentID) error
+	// chat-session-redesign Phase 7 (confinement): the pre-redesign
+	// ticket.Comment subcollection is accessed only by the migration
+	// package via raw Firestore reads (see pkg/usecase/migration). The
+	// main application reads and writes Session.Message exclusively, so
+	// the Repository interface no longer surfaces Comment CRUD.
 
 	BindAlertsToTicket(ctx context.Context, alertIDs []types.AlertID, ticketID types.TicketID) error
 	UnbindAlertFromTicket(ctx context.Context, alertID types.AlertID) error
@@ -71,8 +69,12 @@ type Repository interface {
 	BatchGetAlerts(ctx context.Context, alertIDs []types.AlertID) (alert.Alerts, error)
 	FindNearestAlerts(ctx context.Context, embedding []float32, limit int) (alert.Alerts, error)
 
-	GetLatestHistory(ctx context.Context, ticketID types.TicketID) (*ticket.History, error)
-	PutHistory(ctx context.Context, ticketID types.TicketID, history *ticket.History) error
+	// chat-session-redesign Phase 7 (confinement): the legacy
+	// Firestore history record sub-collection (pre-redesign
+	// GetLatestHistory / PutHistory) has been removed from the
+	// Repository interface. Session-scoped working memory lives at
+	// `sessions/{sid}/history.json` in Cloud Storage and is reached
+	// via chat.LoadSessionHistory / SaveSessionHistory.
 
 	// For list management
 	GetAlertList(ctx context.Context, listID types.AlertListID) (*alert.List, error)
@@ -134,9 +136,48 @@ type Repository interface {
 	GetSessionsByTicket(ctx context.Context, ticketID types.TicketID) ([]*session.Session, error)
 	DeleteSession(ctx context.Context, sessionID types.SessionID) error
 
+	// Session management (chat-session-redesign additions).
+	//
+	// CreateSession writes a new Session only if no document exists at its
+	// ID. Returns ErrSessionAlreadyExists when a document already exists.
+	// This is the precondition used by SessionResolver to realize
+	// deterministic Slack Session IDs without duplicates across instances.
+	CreateSession(ctx context.Context, session *session.Session) error
+	// UpdateSessionLastActive stamps Session.LastActiveAt.
+	UpdateSessionLastActive(ctx context.Context, sessionID types.SessionID, t time.Time) error
+	// PromoteSessionToTicket sets the Session's TicketID (both legacy and
+	// TicketIDPtr) so a ticketless Slack Session can be adopted once the
+	// thread is escalated into a Ticket.
+	PromoteSessionToTicket(ctx context.Context, sessionID types.SessionID, ticketID types.TicketID) error
+
+	// Session activity lock (chat-session-redesign). The lock is embedded in
+	// the Session document (Session.Lock), so acquire/refresh/release
+	// operate transactionally on that sub-field.
+	AcquireSessionLock(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) (bool, error)
+	RefreshSessionLock(ctx context.Context, sessionID types.SessionID, holderID string, ttl time.Duration) error
+	ReleaseSessionLock(ctx context.Context, sessionID types.SessionID, holderID string) error
+
+	// Session Turn management (chat-session-redesign).
+	PutTurn(ctx context.Context, turn *session.Turn) error
+	GetTurn(ctx context.Context, turnID types.TurnID) (*session.Turn, error)
+	GetTurnsBySession(ctx context.Context, sessionID types.SessionID) ([]*session.Turn, error)
+	UpdateTurnStatus(ctx context.Context, turnID types.TurnID, status session.TurnStatus, endedAt *time.Time) error
+	UpdateTurnIntent(ctx context.Context, turnID types.TurnID, intent string) error
+
 	// Session message management
 	PutSessionMessage(ctx context.Context, message *session.Message) error
 	GetSessionMessages(ctx context.Context, sessionID types.SessionID) ([]*session.Message, error)
+	// GetMessagesByTurn returns messages belonging to a specific Turn
+	// (TurnID match). Messages with nil TurnID are not returned.
+	GetMessagesByTurn(ctx context.Context, turnID types.TurnID) ([]*session.Message, error)
+	// SearchSessionMessages performs a full-text search across all Sessions
+	// of a Ticket. Initial implementation may scan-and-filter; later
+	// iterations can swap in vector search.
+	SearchSessionMessages(ctx context.Context, ticketID types.TicketID, query string, limit int) ([]*session.Message, error)
+	// GetTicketSessionMessages returns Messages from every Session tied to
+	// ticketID. source and msgType are optional filters (nil = no filter).
+	// This is the replacement query for the deprecated ticket.Comment APIs.
+	GetTicketSessionMessages(ctx context.Context, ticketID types.TicketID, source *session.SessionSource, msgType *session.MessageType, limit, offset int) ([]*session.Message, error)
 
 	// Diagnosis management
 	// PutDiagnosis saves or updates a diagnosis header record.

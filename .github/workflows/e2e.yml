@@ -59,11 +59,36 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
-      - name: Install Playwright browsers
+      - name: Install frontend dependencies
         run: |
           cd frontend
           pnpm install --frozen-lockfile
-          npx playwright install --with-deps chromium
+
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: |
+          cd frontend
+          version=$(node -p "require('@playwright/test/package.json').version")
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        # `--with-deps` triggers an apt-get install for CJK / Asian font
+        # packages (fonts-ipafont-gothic, fonts-wqy-zenhei, etc.). The
+        # Azure Ubuntu mirror has been returning Ign: for these packages
+        # since late April 2026, causing the step to hang for the full
+        # job timeout. The ubuntu-latest runner already has every system
+        # library Chromium needs to run E2E tests, so we install just
+        # the browser binary itself.
+        run: |
+          cd frontend
+          npx playwright install chromium
 
       - name: Run E2E tests
         run: ./frontend/scripts/e2e.sh

@@ -64,7 +64,8 @@ export default function SessionDetailPage() {
     return format(new Date(dateString), "HH:mm");
   };
 
-  // Message type configurations
+  // Message type configurations (chat-session-redesign Phase 6: added
+  // `user` and `warning` variants alongside the original trio).
   const messageTypeConfig = {
     trace: {
       wrapperClass: "hover:bg-gray-100/60",
@@ -82,6 +83,18 @@ export default function SessionDetailPage() {
       wrapperClass: "hover:bg-gray-100/60",
       timeClass: "",
       separatorClass: "border-gray-300/70",
+      separatorPadding: "pb-2",
+    },
+    user: {
+      wrapperClass: "hover:bg-sky-50/60",
+      timeClass: "",
+      separatorClass: "border-sky-200/70",
+      separatorPadding: "pb-2",
+    },
+    warning: {
+      wrapperClass: "hover:bg-amber-50/60",
+      timeClass: "",
+      separatorClass: "border-amber-300/70",
       separatorPadding: "pb-2",
     },
   } as const;
@@ -113,6 +126,40 @@ export default function SessionDetailPage() {
       return (
         <div className="flex-1 min-w-0">
           <div className="px-4 py-3 rounded-lg bg-white shadow-sm ring-1 ring-gray-200/50">
+            <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // chat-session-redesign Phase 6: user messages come from a human
+    // operator (Slack thread comment / Web chat input / CLI). Surface
+    // the author so the timeline reads as a conversation.
+    if (message.type === "user") {
+      return (
+        <div className="flex-1 min-w-0">
+          <div className="px-4 py-3 rounded-lg bg-sky-50 shadow-sm ring-1 ring-sky-200/60">
+            {message.author && (
+              <div className="text-xs font-medium text-sky-800 mb-1">
+                {message.author.displayName}
+              </div>
+            )}
+            <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5 whitespace-pre-wrap">
+              {message.content}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // chat-session-redesign Phase 6: warnings are soft-failure notices
+    // emitted by the agent (e.g. "history incompatible, starting fresh").
+    if (message.type === "warning") {
+      return (
+        <div className="flex-1 min-w-0">
+          <div className="px-4 py-3 rounded-lg bg-amber-50 shadow-sm ring-1 ring-amber-200/60">
             <div className="text-sm prose prose-sm max-w-none prose-p:my-2 prose-ul:my-2 prose-li:my-0.5">
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </div>

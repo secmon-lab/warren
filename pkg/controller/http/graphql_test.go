@@ -14,7 +14,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/activity"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
-	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -211,72 +210,11 @@ func TestGraphQLQueries(t *testing.T) {
 		gt.Value(t, alert["title"]).Equal("Orphan Alert")
 	})
 
-	t.Run("query ticket with comments", func(t *testing.T) {
-		repo := repository.NewMemory()
-		ticketID := types.NewTicketID()
-		ticketObj := &ticket.Ticket{
-			ID:        ticketID,
-			Status:    types.TicketStatusOpen,
-			CreatedAt: time.Now(),
-		}
-		gt.NoError(t, repo.PutTicket(context.Background(), *ticketObj))
-
-		// Add a comment with Slack markdown
-		comment := ticket.Comment{
-			ID:       types.NewCommentID(),
-			TicketID: ticketID,
-			Comment:  "This is a *bold* comment with <@U123456> mention",
-			User: &slack.User{
-				ID:   "U123456",
-				Name: "Test User",
-			},
-			CreatedAt: time.Now(),
-		}
-		gt.NoError(t, repo.PutTicketComment(context.Background(), comment))
-
-		server := httptest.NewServer(graphqlHandler(repo, nil, nil, nil))
-		defer server.Close()
-
-		req := graphqlRequest{
-			Query: `
-				query($id: ID!) {
-					ticket(id: $id) {
-						id
-						comments {
-							id
-							content
-							user {
-								id
-								name
-							}
-						}
-					}
-				}
-			`,
-			Variables: map[string]interface{}{
-				"id": ticketID.String(),
-			},
-		}
-
-		resp, err := sendGraphQLRequest(server.URL, req)
-		gt.NoError(t, err)
-		gt.Array(t, resp.Errors).Length(0)
-
-		data, ok := resp.Data.(map[string]interface{})
-		gt.True(t, ok)
-
-		ticket, ok := data["ticket"].(map[string]interface{})
-		gt.True(t, ok)
-
-		comments, ok := ticket["comments"].([]interface{})
-		gt.True(t, ok)
-		gt.Array(t, comments).Length(1)
-
-		commentData, ok := comments[0].(map[string]interface{})
-		gt.True(t, ok)
-		// Since slack service is nil, content should be returned as-is
-		gt.Value(t, commentData["content"]).Equal("This is a *bold* comment with <@U123456> mention")
-	})
+	// chat-session-redesign Phase 7 (confinement): the legacy
+	// "ticket with comments" GraphQL query (Ticket.comments +
+	// ticketComments) was removed along with Repository Comment CRUD.
+	// SessionMessage is the canonical timeline going forward; coverage
+	// for that surface lives under ticketSessionMessages tests.
 }
 
 func sendGraphQLRequest(url string, req graphqlRequest) (*graphqlResponse, error) {

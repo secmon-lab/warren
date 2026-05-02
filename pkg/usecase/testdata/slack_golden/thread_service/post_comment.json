@@ -1,0 +1,11 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "channel": "C_TICKET",
+      "text": "final analysis result",
+      "thread_ts": "1700000000.000000"
+    }
+  }
+]

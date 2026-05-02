@@ -29,4 +29,13 @@ export class TicketDetailPage extends BasePage {
   get archiveButton() {
     return this.page.getByRole("button", { name: "Archive" });
   }
+
+  // chat-session-redesign Phase 6: Conversation card selectors.
+  get conversationHeading() {
+    return this.page.getByRole("heading", { name: /^Conversation/ });
+  }
+
+  get conversationNewChatButton() {
+    return this.page.getByRole("button", { name: "New Chat" });
+  }
 }

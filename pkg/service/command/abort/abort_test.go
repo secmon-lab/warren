@@ -139,8 +139,9 @@ func TestAbortCommand(t *testing.T) {
 		t.Fatalf("Failed to put ticket: %v", err)
 	}
 
-	// Create running session
-	sess := session.NewSession(ctx, tk.ID, "", "", "")
+	// Create running session (legacy API — the test asserts on
+	// session.Status which only the pre-redesign constructor sets).
+	sess := session.NewSession(ctx, tk.ID, "", "", "") //nolint:staticcheck // legacy Session status tested here
 	if err := repo.PutSession(ctx, sess); err != nil {
 		t.Fatalf("Failed to put session: %v", err)
 	}

@@ -89,14 +89,14 @@ No knowledge base is configured.
 ## Investigation Directive
 {{ .ResolvedIntent }}
 {{ end }}
-{{ if .Context.Thread.Comments }}
+{{ if .Context.Thread.SessionMessages }}
 
-## Recent Thread Conversations
+## Recent Session Messages
 
-The following messages were posted in this ticket's Slack thread by team members since your last interaction. Use this context to understand the ongoing discussion.
-{{ range .Context.Thread.Comments }}
-*{{ .User.Name }}* ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
-{{ .Comment }}
+The following timeline of user inputs and agent responses occurred earlier in this session. Use it to understand the ongoing discussion and avoid repeating work.
+{{ range .Context.Thread.SessionMessages }}
+{{ if .Author }}*{{ .Author.DisplayName }}*{{ else }}*agent*{{ end }} [{{ .Type }}] ({{ .CreatedAt.Format "2006-01-02 15:04:05" }}):
+{{ .Content }}
 {{ end }}
 {{ end }}
 

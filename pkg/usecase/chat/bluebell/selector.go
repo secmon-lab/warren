@@ -178,7 +178,7 @@ func (c *BluebellChat) resolveIntentWithSelection(ctx context.Context, selectorP
 }
 
 // buildSelectorContext creates context data for the selector template.
-// Uses ThreadComments and SlackHistory but NOT chatCtx.History (LLM session history).
+// Uses SessionMessages and SlackHistory but NOT chatCtx.History (LLM session history).
 func buildSelectorContext(chatCtx *chatModel.ChatContext) ContextData {
 	var ctxData ContextData
 
@@ -195,7 +195,7 @@ func buildSelectorContext(chatCtx *chatModel.ChatContext) ContextData {
 		}
 
 		ctxData.Thread = ThreadData{
-			Comments: chatCtx.ThreadComments,
+			SessionMessages: chatCtx.SessionMessages,
 		}
 	}
 

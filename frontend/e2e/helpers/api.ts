@@ -55,6 +55,25 @@ export async function createTicketViaAPI(
   return result.data.createTicket;
 }
 
+export async function archiveTicketViaAPI(
+  page: Page,
+  ticketId: string
+): Promise<void> {
+  const result = await executeGraphQL(
+    page,
+    `mutation ArchiveTicket($id: ID!) {
+      archiveTicket(id: $id) {
+        id
+      }
+    }`,
+    { id: ticketId }
+  );
+  if (result.errors && result.errors.length > 0) {
+    const errorMessages = result.errors.map((e) => e.message).join(", ");
+    throw new Error(`GraphQL error archiving ticket: ${errorMessages}`);
+  }
+}
+
 export async function resolveTicketViaAPI(
   page: Page,
   ticketId: string,

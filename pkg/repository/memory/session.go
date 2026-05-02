@@ -77,7 +77,18 @@ func (r *Memory) PutSessionMessage(ctx context.Context, message *session.Message
 
 	// Deep copy to prevent external modification
 	copied := *message
-	r.session.messages[message.SessionID] = append(r.session.messages[message.SessionID], &copied)
+	// Upsert by ID so repeat writes (e.g. TurnID stamp in the
+	// turn-synthesis migration) replace the stored copy instead of
+	// creating duplicates.
+	list := r.session.messages[message.SessionID]
+	for i, m := range list {
+		if m.ID == message.ID {
+			list[i] = &copied
+			r.session.messages[message.SessionID] = list
+			return nil
+		}
+	}
+	r.session.messages[message.SessionID] = append(list, &copied)
 
 	return nil
 }

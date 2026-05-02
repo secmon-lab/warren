@@ -17,6 +17,7 @@ import (
 
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/service/notifier"
+	sessSvc "github.com/secmon-lab/warren/pkg/service/session"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/tag"
 	chatuc "github.com/secmon-lab/warren/pkg/usecase/chat"
@@ -62,6 +63,10 @@ type UseCases struct {
 
 	// notifiers
 	consoleNotifier interfaces.Notifier
+
+	// chat-session-redesign services (lazily constructed from repository)
+	sessionResolver *sessSvc.Resolver
+	lockService     *sessSvc.LockService
 }
 
 var _ interfaces.AlertUsecases = &UseCases{}
@@ -260,6 +265,16 @@ func New(opts ...Option) *UseCases {
 	// Initialize tag use case if tag service is available
 	if u.tagService != nil {
 		u.TagUC = NewTagUseCase(u.tagService)
+	}
+
+	// chat-session-redesign: construct SessionResolver and LockService
+	// lazily so Phase 2+ code paths have them available. Both services
+	// only depend on the repository and hold no per-Session state.
+	if u.sessionResolver == nil {
+		u.sessionResolver = sessSvc.NewResolver(u.repository)
+	}
+	if u.lockService == nil {
+		u.lockService = sessSvc.NewLockService(u.repository)
 	}
 
 	return u

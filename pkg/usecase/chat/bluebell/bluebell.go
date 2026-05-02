@@ -16,7 +16,6 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
 	"github.com/secmon-lab/warren/pkg/domain/model/lang"
 	"github.com/secmon-lab/warren/pkg/domain/model/session"
-	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	hitlService "github.com/secmon-lab/warren/pkg/service/hitl"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
@@ -200,8 +199,8 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 	if resolved != nil {
 		resolvedIntent = resolved.Intent
 		// Post context blocks showing execution status and intent
-		if c.slackService != nil && target.SlackThread != nil {
-			threadSvc := c.slackService.NewThread(*target.SlackThread)
+		// through the active transport sink so Web/CLI also see them.
+		if sink := chat.ResolveSink(chatCtx, c.slackService, c.repository); sink != nil {
 			promptLabel := resolved.PromptName
 			if promptLabel == "" {
 				promptLabel = "(default)"
@@ -211,11 +210,11 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 				"Engaging as", "Launching as", "Activating as", "Invoking as",
 			}
 			verb := verbs[rand.IntN(len(verbs))] // #nosec G404 -- not security-sensitive, just picking a random UI verb
-			if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("%s `%s` ... (ID: `%s`)", verb, promptLabel, requestID)); postErr != nil {
+			if postErr := sink.PostContextBlock(ctx, fmt.Sprintf("%s `%s` ... (ID: `%s`)", verb, promptLabel, requestID)); postErr != nil {
 				logging.From(ctx).Error("failed to post execution status", "error", postErr)
 			}
 			if resolvedIntent != "" {
-				if postErr := threadSvc.PostContextBlock(ctx, fmt.Sprintf("💬 %s", resolvedIntent)); postErr != nil {
+				if postErr := sink.PostContextBlock(ctx, fmt.Sprintf("💬 %s", resolvedIntent)); postErr != nil {
 					logging.From(ctx).Error("failed to post intent", "error", postErr)
 				}
 			}
@@ -232,7 +231,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 		resolvedIntent:   resolvedIntent,
 		lang:             lang.From(ctx),
 		requesterID:      string(types.UserID(user.FromContext(ctx))),
-		threadComments:   chatCtx.ThreadComments,
+		sessionMessages:  chatCtx.SessionMessages,
 		slackHistory:     chatCtx.SlackHistory,
 		knowledgeService: c.knowledgeService,
 	}
@@ -278,7 +277,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 	// Direct response (no tasks)
 	if len(planResult.Tasks) == 0 {
 		if !ticketless {
-			return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+			return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 		}
 		return nil
 	}
@@ -311,7 +310,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 			}
 
 			if replanResult.Question != nil {
-				questionResult, qErr := c.handleQuestion(ctx, replanResult.Question, target, ssn)
+				questionResult, qErr := c.handleQuestion(ctx, replanResult.Question, chatCtx, ssn)
 				if qErr != nil {
 					logger.Error("question failed", "error", qErr, "phase", phase)
 					msg.Warn(ctx, "⚠️ Question failed: %s", qErr.Error())
@@ -329,7 +328,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 			continue
 		}
 
-		results := c.executePhase(ctx, currentTasks, target, ssn)
+		results := c.executePhase(ctx, currentTasks, chatCtx, ssn)
 		allResults = append(allResults, &phaseResult{
 			phase:   phase,
 			tasks:   currentTasks,
@@ -363,7 +362,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 		}
 
 		if replanResult.Question != nil {
-			questionResult, err := c.handleQuestion(ctx, replanResult.Question, target, ssn)
+			questionResult, err := c.handleQuestion(ctx, replanResult.Question, chatCtx, ssn)
 			if err != nil {
 				logger.Error("question failed", "error", err, "phase", phase)
 				msg.Warn(ctx, "⚠️ Question failed: %s", err.Error())
@@ -386,7 +385,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 		msg.Warn(ctx, "⚠️ Maximum phase limit (%d) reached. Proceeding to final response.", c.maxPhases)
 	}
 
-	c.postDivider(ctx, target)
+	c.postDivider(ctx, chatCtx)
 
 	finalResp, err := c.generateFinalResponse(ctx, planSession, planCtx, allResults, systemPrompt)
 	if err != nil {
@@ -405,11 +404,11 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 
 	msg.Notify(ctx, "💬 %s", finalResp)
 
-	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), target)
+	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), chatCtx)
 
 	if !ticketless {
 		logger.Debug("bluebell executeBluebell: completed, saving history")
-		return c.saveSessionHistory(ctx, planSession, target.ID, storageSvc)
+		return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 	}
 	return nil
 }
@@ -449,7 +448,8 @@ type questionResult struct {
 }
 
 // handleQuestion asks a question to the user via HITL service and returns the result.
-func (c *BluebellChat) handleQuestion(ctx context.Context, q *Question, target *ticket.Ticket, ssn *session.Session) (*questionResult, error) {
+// The presenter is resolved per Session.Source via chat.NewProgressHandle.
+func (c *BluebellChat) handleQuestion(ctx context.Context, q *Question, chatCtx *chatModel.ChatContext, ssn *session.Session) (*questionResult, error) {
 	logger := logging.From(ctx)
 	logger.Info("asking question to user",
 		"question", q.Question,
@@ -457,6 +457,7 @@ func (c *BluebellChat) handleQuestion(ctx context.Context, q *Question, target *
 		"reason", q.Reason,
 	)
 
+	target := chatCtx.Ticket
 	hitlSvc := hitlService.New(c.repository)
 
 	hitlReq := &hitl.Request{
@@ -468,29 +469,35 @@ func (c *BluebellChat) handleQuestion(ctx context.Context, q *Question, target *
 		UserID:    user.FromContext(ctx),
 		CreatedAt: time.Now(),
 	}
-	if target.SlackThread != nil {
+	if target != nil && target.SlackThread != nil {
 		hitlReq.SlackThread = *target.SlackThread
 	}
 
+	initialMsg := fmt.Sprintf("❓ *Question*\n\n%s", q.Question)
+	progress := chat.NewProgressHandle(ctx, chatCtx, c.slackService, c.repository, initialMsg)
 	var presenter hitlService.Presenter
-	if c.slackService != nil && target.SlackThread != nil {
-		threadSvc := c.slackService.NewThread(*target.SlackThread).(*slackService.ThreadService)
-		initialMsg := fmt.Sprintf("❓ *Question*\n\n%s", q.Question)
-		ubm := threadSvc.NewUpdatableBlockMessage(ctx, initialMsg)
-		presenter = slackService.NewQuestionPresenter(ubm, "Correlating ...", user.FromContext(ctx))
+	if progress != nil {
+		presenter = chat.NewProgressHandlePresenter(progress, "Correlating ...", user.FromContext(ctx))
 	}
 
 	msg.Notify(ctx, "❓ %s", q.Reason)
 
-	// Use a no-op presenter when Slack is not available, so the HITL request
-	// is still saved to the repository and can be answered via Web UI or API.
+	// Use a no-op presenter when no transport is available — the HITL
+	// request is still saved to the repository and can be answered via
+	// Web UI or API. This preserves legacy CLI/ticketless behavior.
 	if presenter == nil {
 		presenter = hitlService.NoOpPresenter()
 	}
 
 	result, err := hitlSvc.RequestAndWait(ctx, hitlReq, presenter)
 	if err != nil {
+		if chatCtx != nil && chatCtx.OnHITLEvent != nil {
+			chatCtx.OnHITLEvent("resolved", hitlReq, chat.ProgressMessageID(progress))
+		}
 		return nil, goerr.Wrap(err, "failed to get question answer")
+	}
+	if chatCtx != nil && chatCtx.OnHITLEvent != nil {
+		chatCtx.OnHITLEvent("resolved", result, chat.ProgressMessageID(progress))
 	}
 
 	return &questionResult{
@@ -516,13 +523,19 @@ func (c *BluebellChat) saveLatestHistory(ctx context.Context, planSession gollem
 	}
 }
 
-// saveSessionHistory extracts history from a gollem Session and saves it.
-func (c *BluebellChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, ticketID types.TicketID, storageSvc *storage.Service) error {
+// saveSessionHistory writes gollem working memory into the
+// Session-scoped storage slot. When chatCtx.Session is absent, working
+// memory is discarded for this turn (post-confinement: no ticket-scoped
+// fallback).
+func (c *BluebellChat) saveSessionHistory(ctx context.Context, planSession gollem.Session, chatCtx chatModel.ChatContext, storageSvc *storage.Service) error {
 	newHistory, err := planSession.History()
 	if err != nil {
 		return goerr.Wrap(err, "failed to get history from planning session")
 	}
-	return chat.SaveHistory(ctx, c.repository, c.storageClient, storageSvc, ticketID, newHistory)
+	if chatCtx.Session == nil {
+		return nil
+	}
+	return chat.SaveSessionHistory(ctx, chatCtx.Session.ID, storageSvc, newHistory)
 }
 
 // checkAborted checks if the context has been cancelled.

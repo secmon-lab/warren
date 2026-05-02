@@ -60,3 +60,29 @@ func CopyTo(dst context.Context, src context.Context) context.Context {
 	dst = context.WithValue(dst, ctxWarnFuncKey{}, src.Value(ctxWarnFuncKey{}))
 	return dst
 }
+
+// Funcs returns the currently registered notify/trace/warn handlers
+// or nil for any handler that was not set. Used by the chat pipeline
+// to wrap outer display handlers with a persistence layer without
+// losing the original behavior.
+func Funcs(ctx context.Context) (NotifyFunc, TraceFunc, WarnFunc) {
+	var notify NotifyFunc
+	if v := ctx.Value(ctxNotifyFuncKey{}); v != nil {
+		if fn, ok := v.(NotifyFunc); ok {
+			notify = fn
+		}
+	}
+	var trace TraceFunc
+	if v := ctx.Value(ctxTraceFuncKey{}); v != nil {
+		if fn, ok := v.(TraceFunc); ok {
+			trace = fn
+		}
+	}
+	var warn WarnFunc
+	if v := ctx.Value(ctxWarnFuncKey{}); v != nil {
+		if fn, ok := v.(WarnFunc); ok {
+			warn = fn
+		}
+	}
+	return notify, trace, warn
+}

@@ -1,0 +1,33 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "text": {
+            "text": "✅ *Ticket Resolved*",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        },
+        {
+          "text": {
+            "text": "*Conclusion:* 🚨 True Positive",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        },
+        {
+          "text": {
+            "text": "*Comment:* Confirmed real attack, credentials rotated.",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        }
+      ],
+      "channel": "C_TICKET",
+      "thread_ts": "1700000000.000000"
+    }
+  }
+]

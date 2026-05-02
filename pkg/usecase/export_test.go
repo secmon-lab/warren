@@ -7,11 +7,8 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/auth"
-	"github.com/secmon-lab/warren/pkg/domain/model/session"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
-	"github.com/secmon-lab/warren/pkg/domain/types"
 	chatcommon "github.com/secmon-lab/warren/pkg/usecase/chat"
-	chatpkg "github.com/secmon-lab/warren/pkg/usecase/chat/aster"
 )
 
 // Export private types and functions for testing
@@ -74,11 +71,6 @@ func (uc *AuthUseCase) TestGetCache() *TestAuthCache {
 	return uc.cache
 }
 
-// CollectThreadComments exports the chat package's CollectThreadComments for testing
-func (uc *UseCases) CollectThreadComments(ctx context.Context, ticketID types.TicketID, currentSession *session.Session) []ticket.Comment {
-	return chatcommon.CollectThreadComments(ctx, uc.repository, ticketID, currentSession)
-}
-
 // GenerateInitialTicketComment exports the private generateInitialTicketComment method for testing
 func (uc *UseCases) GenerateInitialTicketCommentForTest(ctx context.Context, ticketData *ticket.Ticket, alerts alert.Alerts) (string, error) {
 	return uc.generateInitialTicketComment(ctx, ticketData, alerts)
@@ -97,5 +89,8 @@ func (uc *UseCases) AuthorizeAgentRequest(ctx context.Context, message string) e
 // ErrAgentAuthPolicyNotDefined exports the chat package error for testing
 var ErrAgentAuthPolicyNotDefined = chatcommon.ErrAgentAuthPolicyNotDefined
 
-// ErrSessionAborted exports the chat package error for testing
-var ErrSessionAborted = chatpkg.ErrSessionAborted
+// ErrSessionAborted exports the canonical chat-package error for testing.
+// Sourced from pkg/usecase/chat so this file does not pull in a
+// concrete chat agent implementation (which would introduce an import
+// cycle via pkg/cli/config → pkg/usecase).
+var ErrSessionAborted = chatcommon.ErrSessionAborted

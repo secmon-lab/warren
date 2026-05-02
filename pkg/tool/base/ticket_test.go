@@ -162,49 +162,31 @@ func TestWarren_Specs(t *testing.T) {
 		"warren_find_nearest_ticket",
 		"warren_search_tickets_by_words",
 		"warren_update_finding",
-		"warren_get_ticket_comments",
+		"warren_get_ticket_session_messages",
+		"warren_search_session_messages",
 	}
 	gt.Value(t, len(specs)).Equal(len(expectedCommands))
 
-	// Find the update_finding command spec
 	var updateFindingSpec *gollem.ToolSpec
-	var getCommentsSpec *gollem.ToolSpec
 	for i, spec := range specs {
 		if spec.Name == "warren_update_finding" {
 			updateFindingSpec = &specs[i]
-		}
-		if spec.Name == "warren_get_ticket_comments" {
-			getCommentsSpec = &specs[i]
 		}
 	}
 
 	gt.NotNil(t, updateFindingSpec)
 	gt.Value(t, updateFindingSpec.Name).Equal("warren_update_finding")
 
-	// Check description contains expected text
 	description := updateFindingSpec.Description
 	if description == "" {
 		t.Error("Description should not be empty")
 	}
 
-	// Check required parameters
 	requiredParams := []string{"summary", "severity", "reason", "recommendation"}
 	for _, param := range requiredParams {
 		gt.NotNil(t, updateFindingSpec.Parameters[param])
 		gt.True(t, updateFindingSpec.Parameters[param].Required)
 	}
-
-	// Test get_ticket_comments spec
-	gt.NotNil(t, getCommentsSpec)
-	gt.Value(t, getCommentsSpec.Name).Equal("warren_get_ticket_comments")
-
-	// Check it has the expected parameters
-	gt.NotNil(t, getCommentsSpec.Parameters["limit"])
-	gt.NotNil(t, getCommentsSpec.Parameters["offset"])
-
-	// Check that limit and offset are not required (should be optional)
-	gt.False(t, getCommentsSpec.Parameters["limit"].Required)
-	gt.False(t, getCommentsSpec.Parameters["offset"].Required)
 }
 
 func TestWarren_UpdateFindingDryRun(t *testing.T) {
@@ -303,146 +285,6 @@ func TestWarren_UpdateFindingDryRun(t *testing.T) {
 		expectRepoUpdate:  true, // Should update repository
 		expectSlackUpdate: true, // Should update Slack
 	}))
-}
-
-func TestWarren_GetTicketComments(t *testing.T) {
-	repo := repository.NewMemory()
-	ctx := context.Background()
-
-	// Create a test ticket
-	testTicket := ticket.Ticket{
-		ID:     types.NewTicketID(),
-		Status: types.TicketStatusOpen,
-		Metadata: ticket.Metadata{
-			Title:             "Test Ticket",
-			Description:       "Test Description",
-			Summary:           "Test Summary",
-			TitleSource:       types.SourceHuman,
-			DescriptionSource: types.SourceHuman,
-		},
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-	}
-
-	// Save ticket to repository
-	gt.NoError(t, repo.PutTicket(ctx, testTicket))
-
-	// Create test comments with different timestamps to ensure proper ordering
-	user1 := &slack.User{ID: "U12345", Name: "Test User 1"}
-	user2 := &slack.User{ID: "U67890", Name: "Test User 2"}
-
-	comment1 := testTicket.NewComment(ctx, "First comment", user1, "1234567890.123456")
-	time.Sleep(1 * time.Millisecond) // Ensure different timestamps
-	comment2 := testTicket.NewComment(ctx, "Second comment", user2, "1234567890.123457")
-	time.Sleep(1 * time.Millisecond) // Ensure different timestamps
-	comment3 := testTicket.NewComment(ctx, "Third comment", user1, "")
-
-	// Save comments to repository
-	gt.NoError(t, repo.PutTicketComment(ctx, comment1))
-	gt.NoError(t, repo.PutTicketComment(ctx, comment2))
-	gt.NoError(t, repo.PutTicketComment(ctx, comment3))
-
-	// Create Warren tool
-	warren := base.New(repo, testTicket.ID)
-
-	t.Run("get all comments with default pagination", func(t *testing.T) {
-		args := map[string]any{}
-
-		result, err := warren.Run(ctx, "warren_get_ticket_comments", args)
-		gt.NoError(t, err)
-
-		// Verify result structure
-		comments, ok := result["comments"].([]map[string]any)
-		gt.Value(t, ok).Equal(true)
-		gt.Value(t, len(comments)).Equal(3)
-		gt.Value(t, result["total_count"].(int)).Equal(3)
-		gt.Value(t, result["offset"].(int)).Equal(0)
-		gt.Value(t, result["limit"].(int)).Equal(50)
-		gt.Value(t, result["has_more"].(bool)).Equal(false)
-
-		// Verify comment content - should be in reverse chronological order (newest first)
-		gt.Value(t, comments[0]["comment"].(string)).Equal("Third comment")
-		gt.Value(t, comments[0]["user"].(map[string]any)["name"].(string)).Equal("Test User 1")
-		_, hasSlackID := comments[0]["slack_message_id"]
-		gt.Value(t, hasSlackID).Equal(false) // Should not have slack_message_id when empty
-
-		gt.Value(t, comments[1]["comment"].(string)).Equal("Second comment")
-		gt.Value(t, comments[1]["user"].(map[string]any)["name"].(string)).Equal("Test User 2")
-		gt.Value(t, comments[1]["slack_message_id"].(string)).Equal("1234567890.123457")
-
-		gt.Value(t, comments[2]["comment"].(string)).Equal("First comment")
-		gt.Value(t, comments[2]["user"].(map[string]any)["name"].(string)).Equal("Test User 1")
-		gt.Value(t, comments[2]["slack_message_id"].(string)).Equal("1234567890.123456")
-	})
-
-	t.Run("get comments with custom pagination", func(t *testing.T) {
-		args := map[string]any{
-			"limit":  float64(2), // JSON numbers are float64
-			"offset": float64(1),
-		}
-
-		result, err := warren.Run(ctx, "warren_get_ticket_comments", args)
-		gt.NoError(t, err)
-
-		// Verify pagination
-		comments, ok := result["comments"].([]map[string]any)
-		gt.Value(t, ok).Equal(true)
-		gt.Value(t, len(comments)).Equal(2)
-		gt.Value(t, result["total_count"].(int)).Equal(3)
-		gt.Value(t, result["offset"].(int)).Equal(1)
-		gt.Value(t, result["limit"].(int)).Equal(2)
-		gt.Value(t, result["has_more"].(bool)).Equal(false)
-
-		// Should skip first comment (Third) and get second (Second) and third (First)
-		gt.Value(t, comments[0]["comment"].(string)).Equal("Second comment")
-		gt.Value(t, comments[1]["comment"].(string)).Equal("First comment")
-	})
-
-	t.Run("get comments with limit smaller than total", func(t *testing.T) {
-		args := map[string]any{
-			"limit":  float64(2),
-			"offset": float64(0),
-		}
-
-		result, err := warren.Run(ctx, "warren_get_ticket_comments", args)
-		gt.NoError(t, err)
-
-		// Verify has_more is true
-		comments, ok := result["comments"].([]map[string]any)
-		gt.Value(t, ok).Equal(true)
-		gt.Value(t, len(comments)).Equal(2)
-		gt.Value(t, result["total_count"].(int)).Equal(3)
-		gt.Value(t, result["has_more"].(bool)).Equal(true)
-	})
-
-	t.Run("ticket with no comments", func(t *testing.T) {
-		// Create another ticket with no comments
-		emptyTicket := ticket.Ticket{
-			ID:     types.NewTicketID(),
-			Status: types.TicketStatusOpen,
-			Metadata: ticket.Metadata{
-				Title:             "Empty Ticket",
-				TitleSource:       types.SourceHuman,
-				DescriptionSource: types.SourceHuman,
-			},
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
-		}
-		gt.NoError(t, repo.PutTicket(ctx, emptyTicket))
-
-		warren := base.New(repo, emptyTicket.ID)
-		args := map[string]any{}
-
-		result, err := warren.Run(ctx, "warren_get_ticket_comments", args)
-		gt.NoError(t, err)
-
-		// Should return empty comments array
-		comments, ok := result["comments"].([]map[string]any)
-		gt.Value(t, ok).Equal(true)
-		gt.Value(t, len(comments)).Equal(0)
-		gt.Value(t, result["total_count"].(int)).Equal(0)
-		gt.Value(t, result["has_more"].(bool)).Equal(false)
-	})
 }
 
 func TestWarren_SearchTicketsByWords(t *testing.T) {

@@ -1,0 +1,9 @@
+[
+  {
+    "seq": 0,
+    "method": "GetUserInfo",
+    "args": {
+      "user_id": "U_USER"
+    }
+  }
+]

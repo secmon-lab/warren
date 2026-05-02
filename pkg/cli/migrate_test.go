@@ -14,11 +14,11 @@ func TestDefineFirestoreIndexes(t *testing.T) {
 	config := cli.DefineFirestoreIndexes()
 
 	gt.Value(t, config).NotNil()
-	// Only alerts and tickets carry explicit index declarations. The
-	// previously-declared lists / memories / records entries were dropped
-	// because no query targets them and the target Firestore databases
-	// carry no residual indexes for those collections.
-	gt.Equal(t, len(config.Collections), 2)
+	// alerts and tickets carry vector/composite index declarations; turns
+	// and messages were added by chat-session-redesign and are actively
+	// queried. The previously-declared lists / memories / records entries
+	// were dropped on main because no query targets them.
+	gt.Equal(t, len(config.Collections), 4)
 
 	findCollection := func(name string) *fireconf.Collection {
 		for _, col := range config.Collections {
@@ -263,4 +263,46 @@ func TestPrintMigrationPlan(t *testing.T) {
 		gt.True(t, strings.Contains(out, "Collection: memories"))
 		gt.True(t, strings.Contains(out, "  (no indexes declared, no existing indexes to remove)"))
 	})
+}
+
+func TestMigrationRegistryHasV0_16_0Bundle(t *testing.T) {
+	names := cli.MigrationJobNamesForTest()
+	want := map[string]bool{
+		"session-source-backfill": false,
+		"session-consolidate":     false,
+		"comment-to-message":      false,
+		"turn-synthesis":          false,
+		"history-scope":           false,
+		"v0.16.0":                 false,
+	}
+	for _, n := range names {
+		if _, ok := want[n]; ok {
+			want[n] = true
+		}
+	}
+	for n, seen := range want {
+		gt.True(t, seen).Required()
+		_ = n
+	}
+
+	desc := cli.MigrationJobDescriptionForTest("v0.16.0")
+	gt.S(t, desc).Contains("session-source-backfill")
+	gt.S(t, desc).Contains("session-consolidate")
+	gt.S(t, desc).Contains("comment-to-message")
+	gt.S(t, desc).Contains("turn-synthesis")
+	gt.S(t, desc).Contains("history-scope")
+
+	// The bundle must invoke its steps in the documented order.
+	wantOrder := []string{
+		"session-source-backfill",
+		"session-consolidate",
+		"comment-to-message",
+		"turn-synthesis",
+		"history-scope",
+	}
+	gotOrder := cli.ChatSessionRedesignBundleStepsForTest()
+	gt.A(t, gotOrder).Equal(wantOrder)
+	for _, n := range gotOrder {
+		gt.V(t, n == "cleanup-legacy").Equal(false)
+	}
 }

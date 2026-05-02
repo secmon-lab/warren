@@ -24,7 +24,7 @@ import { UserWithAvatar } from "@/components/ui/user-name";
 import { CreateTicketModal } from "@/components/CreateTicketModal";
 import { GET_TICKETS, GET_TAGS, ARCHIVE_ALL_RESOLVED_TICKETS } from "@/lib/graphql/queries";
 import { Ticket, TicketStatus, TagMetadata } from "@/lib/types";
-import { AlertCircle, MessageSquare, Plus, Tag, Archive, CircleDot, CheckCircle2, ArchiveIcon, Search, X } from "lucide-react";
+import { AlertCircle, Plus, Tag, Archive, CircleDot, CheckCircle2, ArchiveIcon, Search, X } from "lucide-react";
 import { generateTagColor } from "@/lib/tag-colors";
 
 const ITEMS_PER_PAGE = 10;
@@ -420,12 +420,6 @@ export default function TicketsPage() {
                           <span className="flex items-center gap-1">
                             <AlertCircle className="h-3.5 w-3.5" />
                             {ticket.alertsCount}
-                          </span>
-                        )}
-                        {ticket.commentsCount > 0 && (
-                          <span className="flex items-center gap-1">
-                            <MessageSquare className="h-3.5 w-3.5" />
-                            {ticket.commentsCount}
                           </span>
                         )}
                       </div>

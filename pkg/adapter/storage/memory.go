@@ -43,6 +43,30 @@ func (m *MemoryClient) GetObject(ctx context.Context, object string) (io.ReadClo
 	return io.NopCloser(bytes.NewReader(data)), nil
 }
 
+func (m *MemoryClient) DeleteObject(_ context.Context, object string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.objects, object)
+	return nil
+}
+
+// CopyObject copies the in-memory object bytes. The test helper does not
+// attempt to mimic GCS's "stage-then-commit" semantics; it just duplicates
+// the byte slice so the destination is independent of later writes to
+// the source.
+func (m *MemoryClient) CopyObject(_ context.Context, src, dst string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	data, ok := m.objects[src]
+	if !ok {
+		return goerr.New("source object not found", goerr.V("src", src))
+	}
+	buf := make([]byte, len(data))
+	copy(buf, data)
+	m.objects[dst] = buf
+	return nil
+}
+
 func (m *MemoryClient) Close(ctx context.Context) {
 	// Nothing to do for development purposes
 }

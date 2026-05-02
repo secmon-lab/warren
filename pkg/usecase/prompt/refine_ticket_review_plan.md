@@ -41,7 +41,11 @@ Analyze the ticket's current state, conversation history, and linked alerts. Dec
 ## Comment History
 
 {{ range .comments -}}
-[{{ .CreatedAt.Format "2006-01-02 15:04" }}] {{ .User.Name }} (<@{{ .User.ID }}>): {{ .Comment }}
+{{- if .Author -}}
+[{{ .CreatedAt.Format "2006-01-02 15:04" }}] {{ .Author.DisplayName }}{{ if .Author.SlackUserID }} (<@{{ .Author.SlackUserID }}>){{ end }}: {{ .Content }}
+{{ else -}}
+[{{ .CreatedAt.Format "2006-01-02 15:04" }}]: {{ .Content }}
+{{ end -}}
 {{ end }}
 
 {{- if not .comments }}

@@ -53,6 +53,20 @@ Pipeline stages in `pkg/usecase/alert_pipeline.go`:
 - Complexity is not an excuse - implement everything thoroughly
 - Long code is acceptable - incomplete code is NOT
 
+### Multi-Instance Safety (Stateless Design)
+- **Warren is designed to run as multiple concurrent instances** (horizontal scaling). Any design that assumes single-instance will break in production
+- **NEVER hold cross-request state in process memory**. State that must survive across separate requests, goroutines that originated elsewhere, or instance boundaries MUST be persisted to a shared backend (Firestore / GCS / Pub/Sub / Redis)
+- **Allowed in-memory state**: only within a single continuous processing flow (e.g. variables within one HTTP request, one goroutine's local variables, one WebSocket connection's live buffer for the duration of that connection). As soon as the flow ends, the state must be gone or persisted
+- **Forbidden patterns**:
+  - In-memory registry/map keyed by ID that other requests lookup (e.g. `map[SessionID]*Handler` at package level)
+  - Singleton caches of business data without a shared backend
+  - Cross-goroutine coordination via channels at package scope
+  - Assuming a WebSocket client is always on the same instance as the goroutine publishing to it
+- **Required patterns**:
+  - Firestore (or equivalent) as source of truth for all persistent state
+  - Pub/Sub or Firestore snapshot listener for cross-instance event fan-out
+  - Design reviews must explicitly verify multi-instance correctness for any new stateful component
+
 ### Test Requirements
 - **EVERY code change MUST be accompanied by tests that verify the change**
 - When adding new functionality, write tests that cover the new behavior
@@ -120,6 +134,9 @@ When making changes, before finishing the task, always:
 - All comment and character literal in source code must be in English
 - All git commit messages must be in English
 - All PR titles and descriptions must be in English
+
+### Git Commits
+- **Commit messages must be a single line.** No body paragraphs. State the change in one sentence. Explanation goes in the PR description, not the commit.
 
 ### Directory
 - When you are mentioned about `tmp` directory, you SHOULD NOT see `/tmp`. You need to check `./tmp` directory from root of the repository.

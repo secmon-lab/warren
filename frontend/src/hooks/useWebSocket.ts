@@ -2,9 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import {
   ChatResponse,
+  EventEnvelope,
   createChatMessage,
   createPingMessage,
   isChatResponse,
+  isEventEnvelope,
 } from '@/lib/websocket-types';
 import { wsManager } from '@/lib/websocket-manager';
 
@@ -13,6 +15,10 @@ export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'err
 interface UseWebSocketOptions {
   onMessage?: (message: ChatResponse) => void;
   onStatusChange?: (status: WebSocketStatus) => void;
+  // onHITLEvent fires when the backend emits a hitl_request_pending
+  // or hitl_request_resolved envelope. The HITLPanel consumer listens
+  // for these events; ChatResponse-level consumers ignore them.
+  onHITLEvent?: (kind: 'pending' | 'resolved', hitl: import('@/lib/websocket-types').HITLView) => void;
   reconnectInterval?: number;
   maxReconnectAttempts?: number;
 }
@@ -36,11 +42,13 @@ function getOrCreateTabId(ticketId: string): string {
 
 export function useWebSocket(
   ticketId: string,
-  options: UseWebSocketOptions = {}
+  options: UseWebSocketOptions = {},
+  sessionId?: string
 ) {
   const {
     onMessage,
     onStatusChange,
+    onHITLEvent,
     reconnectInterval = 8000, // Increased to 8 seconds to reduce frequency
     maxReconnectAttempts = 3, // Limited to 3 attempts
   } = options;
@@ -48,16 +56,46 @@ export function useWebSocket(
   const { user } = useAuth();
   const [status, setStatus] = useState<WebSocketStatus>('disconnected');
   const [messages, setMessages] = useState<ChatResponse[]>([]);
-  
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectCountRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  // Use persistent tab ID for this ticket
-  const tabIdRef = useRef<string>(getOrCreateTabId(ticketId));
+  // Use persistent tab ID for this ticket. The chat-session-redesign
+  // binds one Session per connection, so we suffix the tab ID with
+  // the Session key ("new" when the user clicked "New Chat", the
+  // session ID when resuming). Different sessions therefore get
+  // different cache buckets in wsManager and no longer pollute each
+  // other's live message buffer.
+  const sessionKey = sessionId ?? 'new';
+  const tabIdRef = useRef<string>(
+    `${getOrCreateTabId(ticketId)}:${sessionKey}`,
+  );
+  // Keep the ref in sync when the caller switches sessions: we rely
+  // on wsManager to close the previous socket on key change and on
+  // the setMessages([]) reset below to flush stale content.
+  useEffect(() => {
+    const nextKey = `${getOrCreateTabId(ticketId)}:${sessionKey}`;
+    if (tabIdRef.current !== nextKey) {
+      // Close the previous connection so its onmessage handler
+      // stops firing into this hook's state.
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+        } catch {
+          /* ignore */
+        }
+        wsRef.current = null;
+      }
+      tabIdRef.current = nextKey;
+      setMessages([]);
+      setStatus('disconnected');
+    }
+  }, [ticketId, sessionKey]);
 
   const onStatusChangeRef = useRef(onStatusChange);
   const onMessageRef = useRef(onMessage);
+  const onHITLEventRef = useRef(onHITLEvent);
   
   // Initialize messages from cache on mount
   useEffect(() => {
@@ -76,7 +114,8 @@ export function useWebSocket(
   useEffect(() => {
     onStatusChangeRef.current = onStatusChange;
     onMessageRef.current = onMessage;
-  }, [onStatusChange, onMessage]);
+    onHITLEventRef.current = onHITLEvent;
+  }, [onStatusChange, onMessage, onHITLEvent]);
 
   const updateStatus = useCallback((newStatus: WebSocketStatus) => {
     setStatus(newStatus);
@@ -123,7 +162,11 @@ export function useWebSocket(
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.host;
     // Include tab ID in the URL as a query parameter
-    const url = `${protocol}//${host}/ws/chat/ticket/${ticketId}?tab=${tabIdRef.current}`;
+    // Append session_id when caller wants to resume a specific Session
+    // (chat-session-redesign: backend binds that Session to the
+    // connection instead of creating a fresh Web one).
+    const sessionParam = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : "";
+    const url = `${protocol}//${host}/ws/chat/ticket/${ticketId}?tab=${tabIdRef.current}${sessionParam}`;
 
     console.log('Creating new WebSocket connection to:', url);
     console.log('User:', user);
@@ -164,14 +207,58 @@ export function useWebSocket(
       try {
         const data = JSON.parse(event.data);
         console.log('Parsed WebSocket message:', data);
-        
+
+        // Phase 6: new discriminated envelope from the chat-session
+        // redesign backend. Translate into the legacy ChatResponse
+        // shape so existing render paths keep working while the UI is
+        // migrated incrementally.
+        if (isEventEnvelope(data)) {
+          // HITL events bypass the ChatResponse stream — they drive
+          // approval / question UI instead of the message timeline.
+          if (data.event === 'hitl_request_pending' && data.hitl) {
+            onHITLEventRef.current?.('pending', data.hitl);
+            return;
+          }
+          if (data.event === 'hitl_request_resolved' && data.hitl) {
+            onHITLEventRef.current?.('resolved', data.hitl);
+            return;
+          }
+          // session_message_updated replaces an existing entry in
+          // place. The receiver is expected to identify the row by
+          // message_id and swap the content; if no existing entry
+          // matches (e.g. the client joined mid-turn), append as a
+          // fresh message so the user still sees it.
+          if (data.event === 'session_message_updated') {
+            const translated = translateEventToChatResponse(data);
+            if (translated && translated.message_id) {
+              setMessages(prev => {
+                const idx = prev.findIndex(x => x.message_id === translated.message_id);
+                if (idx < 0) return [...prev, translated];
+                const next = prev.slice();
+                next[idx] = translated;
+                return next;
+              });
+              wsManager.addMessage(ticketId, tabIdRef.current, translated);
+              onMessageRef.current?.(translated);
+            }
+            return;
+          }
+          const translated = translateEventToChatResponse(data);
+          if (translated) {
+            setMessages(prev => [...prev, translated]);
+            wsManager.addMessage(ticketId, tabIdRef.current, translated);
+            onMessageRef.current?.(translated);
+          }
+          return;
+        }
+
         if (isChatResponse(data)) {
           // Add to messages array and cache (except pong messages)
           if (data.type !== 'pong') {
             setMessages(prev => [...prev, data]);
             wsManager.addMessage(ticketId, tabIdRef.current, data);
           }
-          
+
           // Call the message handler
           onMessageRef.current?.(data);
         } else {
@@ -333,14 +420,47 @@ export function useWebSocket(
         try {
           const data = JSON.parse(event.data);
           console.log('Parsed WebSocket message:', data);
-          
+
+          if (isEventEnvelope(data)) {
+            if (data.event === 'hitl_request_pending' && data.hitl) {
+              onHITLEventRef.current?.('pending', data.hitl);
+              return;
+            }
+            if (data.event === 'hitl_request_resolved' && data.hitl) {
+              onHITLEventRef.current?.('resolved', data.hitl);
+              return;
+            }
+            if (data.event === 'session_message_updated') {
+              const translated = translateEventToChatResponse(data);
+              if (translated && translated.message_id) {
+                setMessages(prev => {
+                  const idx = prev.findIndex(x => x.message_id === translated.message_id);
+                  if (idx < 0) return [...prev, translated];
+                  const next = prev.slice();
+                  next[idx] = translated;
+                  return next;
+                });
+                wsManager.addMessage(ticketId, tabIdRef.current, translated);
+                onMessageRef.current?.(translated);
+              }
+              return;
+            }
+            const translated = translateEventToChatResponse(data);
+            if (translated) {
+              setMessages(prev => [...prev, translated]);
+              wsManager.addMessage(ticketId, tabIdRef.current, translated);
+              onMessageRef.current?.(translated);
+            }
+            return;
+          }
+
           if (isChatResponse(data)) {
             // Add to messages array and cache (except pong messages)
             if (data.type !== 'pong') {
               setMessages(prev => [...prev, data]);
               wsManager.addMessage(ticketId, tabIdRef.current, data);
             }
-            
+
             // Call the message handler
             onMessageRef.current?.(data);
           } else {
@@ -409,4 +529,82 @@ export function useWebSocket(
     cleanup, // For explicit cleanup when needed
     clearMessages, // For clearing message history
   };
+}
+
+// translateEventToChatResponse adapts the new EventEnvelope to the
+// legacy ChatResponse shape so Phase 6 can roll out without breaking
+// the TicketChat render path. Non-message events map to status rows;
+// user input that originated from a different surface (Slack, CLI)
+// renders with its source prefix.
+function translateEventToChatResponse(env: EventEnvelope): ChatResponse | null {
+  const timestamp = env.timestamp ? new Date(env.timestamp).getTime() : Date.now();
+  switch (env.event) {
+    case 'session_message_added': {
+      const m = env.message;
+      if (!m) return null;
+      // user-typed Session Messages are already echoed locally by
+      // the sender's WebChatPane immediately on send. Emitting the
+      // envelope back as a 'message' would double-render the same
+      // text on the sender's screen. Suppress it here; other
+      // surfaces (e.g. persisted refetch) will still pick it up
+      // via the ticketSessionMessages query.
+      if (m.type === 'user') return null;
+      const isTrace = m.type === 'trace';
+      return {
+        type: isTrace ? 'trace' : 'message',
+        content: m.content,
+        timestamp,
+        message_id: m.id,
+        user: m.author
+          ? { id: m.author.user_id, name: m.author.display_name }
+          : undefined,
+      };
+    }
+    case 'session_message_updated': {
+      // Updated messages carry the same ID as an earlier
+      // session_message_added row; the consumer replaces the
+      // existing entry in place (handled by ID matching in the
+      // live buffer) rather than appending a new one.
+      const m = env.message;
+      if (!m) return null;
+      if (m.type === 'user') return null;
+      const isTrace = m.type === 'trace';
+      return {
+        type: isTrace ? 'trace' : 'message',
+        content: m.content,
+        timestamp,
+        message_id: m.id,
+        user: m.author
+          ? { id: m.author.user_id, name: m.author.display_name }
+          : undefined,
+      };
+    }
+    case 'session_created':
+      return {
+        type: 'status',
+        content: 'Session started.',
+        timestamp,
+      };
+    case 'turn_started':
+      return {
+        type: 'status',
+        content: 'Turn started.',
+        timestamp,
+      };
+    case 'turn_ended':
+      return {
+        type: 'status',
+        content: `Turn ${env.status ?? 'completed'}.`,
+        timestamp,
+      };
+    case 'hitl_request_pending':
+    case 'hitl_request_resolved':
+      // HITL events are handled by a dedicated subscriber
+      // (see useHITLRequests) rather than the ChatResponse
+      // stream — they require their own UI (approval buttons,
+      // radio options) that doesn't fit the message timeline.
+      return null;
+    default:
+      return null;
+  }
 }

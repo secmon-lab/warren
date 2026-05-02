@@ -1,0 +1,41 @@
+[
+  {
+    "seq": 0,
+    "method": "PostMessageContext",
+    "args": {
+      "blocks": [
+        {
+          "text": {
+            "emoji": false,
+            "text": "Severity: high",
+            "type": "plain_text"
+          },
+          "type": "header"
+        },
+        {
+          "text": {
+            "text": "*Summary:*\nSuspicious login from new geography",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        },
+        {
+          "text": {
+            "text": "*Reason:*\nThe source IP is in an unusual region and authentication succeeded on the first try.",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        },
+        {
+          "text": {
+            "text": "*Recommendation:*\nForce password reset and enable MFA.",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        }
+      ],
+      "channel": "C_TICKET",
+      "thread_ts": "1700000000.000000"
+    }
+  }
+]

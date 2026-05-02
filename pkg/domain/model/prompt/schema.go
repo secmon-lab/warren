@@ -74,7 +74,7 @@ func getFieldSchema(field reflect.StructField, processedTypes map[reflect.Type]*
 
 	// If the field is a pointer, get the element type
 	fieldType := field.Type
-	if fieldType.Kind() == reflect.Ptr {
+	if fieldType.Kind() == reflect.Pointer {
 		fieldType = fieldType.Elem()
 	}
 
