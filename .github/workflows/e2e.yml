@@ -11,7 +11,7 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -79,13 +79,16 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
       - name: Install Playwright browsers
+        # `--with-deps` triggers an apt-get install for CJK / Asian font
+        # packages (fonts-ipafont-gothic, fonts-wqy-zenhei, etc.). The
+        # Azure Ubuntu mirror has been returning Ign: for these packages
+        # since late April 2026, causing the step to hang for the full
+        # job timeout. The ubuntu-latest runner already has every system
+        # library Chromium needs to run E2E tests, so we install just
+        # the browser binary itself.
         run: |
           cd frontend
-          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
-            npx playwright install-deps chromium
-          else
-            npx playwright install --with-deps chromium
-          fi
+          npx playwright install chromium
 
       - name: Run E2E tests
         run: ./frontend/scripts/e2e.sh
