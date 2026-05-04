@@ -2,6 +2,7 @@ package firestore
 
 import (
 	"context"
+	"sort"
 
 	"cloud.google.com/go/firestore"
 	"github.com/m-mizutani/goerr/v2"
@@ -112,23 +113,13 @@ func (r *Firestore) ListDiagnosisIssues(ctx context.Context, diagnosisID types.D
 		q = q.Where("RuleID", "==", string(*ruleID))
 	}
 
-	// Count matching total
-	aggResult, err := q.NewAggregationQuery().WithCount("total").Get(ctx)
-	if err != nil {
-		return nil, 0, r.eb.Wrap(err, "failed to count diagnosis issues", goerr.V("diagnosis_id", diagnosisID))
-	}
-	total, err := extractCountFromAggregationResult(aggResult, "total")
-	if err != nil {
-		return nil, 0, r.eb.Wrap(err, "failed to extract issue count", goerr.V("diagnosis_id", diagnosisID))
-	}
+	// In-memory sort/paginate to avoid composite index on (Status, RuleID, CreatedAt).
+	// Total count is derived from the same fetch — saves a round-trip vs. a separate
+	// aggregation query.
+	iter := q.Documents(ctx)
+	defer iter.Stop()
 
-	// Fetch paginated
-	iter := q.OrderBy("CreatedAt", firestore.Asc).
-		Offset(offset).
-		Limit(limit).
-		Documents(ctx)
-
-	var result []*diagnosis.Issue
+	var all []*diagnosis.Issue
 	for {
 		doc, err := iter.Next()
 		if err == iterator.Done {
@@ -141,10 +132,24 @@ func (r *Firestore) ListDiagnosisIssues(ctx context.Context, diagnosisID types.D
 		if err := doc.DataTo(&iss); err != nil {
 			return nil, 0, r.eb.Wrap(err, "failed to unmarshal diagnosis issue", goerr.V("id", doc.Ref.ID))
 		}
-		result = append(result, &iss)
+		all = append(all, &iss)
 	}
 
-	return result, total, nil
+	total := len(all)
+	sort.Slice(all, func(i, j int) bool { return all[i].CreatedAt.Before(all[j].CreatedAt) })
+
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= len(all) {
+		return []*diagnosis.Issue{}, total, nil
+	}
+	all = all[offset:]
+	if limit > 0 && limit < len(all) {
+		all = all[:limit]
+	}
+
+	return all, total, nil
 }
 
 // GetDiagnosisIssue retrieves a specific issue by diagnosisID and issueID.

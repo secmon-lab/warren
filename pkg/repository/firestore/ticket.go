@@ -2,6 +2,7 @@ package firestore
 
 import (
 	"context"
+	"sort"
 	"strings"
 	"time"
 
@@ -207,11 +208,13 @@ func filterTicketsByKeyword(tickets []*ticket.Ticket, keyword string) []*ticket.
 	return result
 }
 
-// fetchAllByQuery retrieves all documents for the given query without offset/limit.
+// fetchAllByQuery retrieves all documents for the given query without offset/limit,
+// sorted by CreatedAt DESC in-memory. Sorting is done in Go to avoid requiring a
+// composite index on (Status, Assignee.ID, CreatedAt).
 func (r *Firestore) fetchAllByQuery(ctx context.Context, q firestore.Query) ([]*ticket.Ticket, error) {
-	q = q.OrderBy("CreatedAt", firestore.Desc)
 	var tickets []*ticket.Ticket
 	iter := q.Documents(ctx)
+	defer iter.Stop()
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -227,58 +230,31 @@ func (r *Firestore) fetchAllByQuery(ctx context.Context, q firestore.Query) ([]*
 		t.NormalizeLegacyStatus()
 		tickets = append(tickets, &t)
 	}
+	sort.Slice(tickets, func(i, j int) bool { return tickets[i].CreatedAt.After(tickets[j].CreatedAt) })
 	return tickets, nil
 }
 
 func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string, offset, limit int) ([]*ticket.Ticket, error) {
 	q := r.buildTicketBaseQuery(statuses, assigneeID)
 
-	// keyword requires Go-side filtering: fetch all DB-filtered docs first.
+	// In-memory sort/paginate to avoid composite index on (Status, Assignee.ID, CreatedAt).
+	all, err := r.fetchAllByQuery(ctx, q)
+	if err != nil {
+		return nil, err
+	}
 	if keyword != "" {
-		all, err := r.fetchAllByQuery(ctx, q)
-		if err != nil {
-			return nil, err
-		}
-		filtered := filterTicketsByKeyword(all, keyword)
-		if offset > 0 {
-			if offset >= len(filtered) {
-				return []*ticket.Ticket{}, nil
-			}
-			filtered = filtered[offset:]
-		}
-		if limit > 0 && limit < len(filtered) {
-			filtered = filtered[:limit]
-		}
-		return filtered, nil
+		all = filterTicketsByKeyword(all, keyword)
 	}
-
-	// Fast path: push ordering and pagination entirely to Firestore.
-	q = q.OrderBy("CreatedAt", firestore.Desc)
 	if offset > 0 {
-		q = q.Offset(offset)
-	}
-	if limit > 0 {
-		q = q.Limit(limit)
-	}
-
-	var tickets []*ticket.Ticket
-	iter := q.Documents(ctx)
-	for {
-		doc, err := iter.Next()
-		if err != nil {
-			if err == iterator.Done {
-				break
-			}
-			return nil, goerr.Wrap(err, "failed to get offset documents")
+		if offset >= len(all) {
+			return []*ticket.Ticket{}, nil
 		}
-		var t ticket.Ticket
-		if err := doc.DataTo(&t); err != nil {
-			return nil, goerr.Wrap(err, "failed to convert data to ticket")
-		}
-		t.NormalizeLegacyStatus()
-		tickets = append(tickets, &t)
+		all = all[offset:]
 	}
-	return tickets, nil
+	if limit > 0 && limit < len(all) {
+		all = all[:limit]
+	}
+	return all, nil
 }
 
 func (r *Firestore) CountTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string) (int, error) {
