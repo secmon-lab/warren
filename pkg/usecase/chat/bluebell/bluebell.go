@@ -11,6 +11,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/cli/config"
+	llmconfig "github.com/secmon-lab/warren/pkg/cli/config/llm"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/domain/model/hitl"
@@ -36,7 +37,8 @@ const defaultMaxPhases = 10
 // and always runs in agent mode (knowledge service is required).
 type BluebellChat struct {
 	repository          interfaces.Repository
-	llmClient           gollem.LLMClient
+	llmClient           gollem.LLMClient // = llmRegistry.Main().Client (control plane)
+	llmRegistry         *llmconfig.Registry
 	storageClient       interfaces.StorageClient
 	slackService        *slackService.Service
 	knowledgeService    *svcknowledge.Service
@@ -119,10 +121,20 @@ func WithPromptEntries(entries []config.PromptEntry) Option {
 
 // New creates a new BluebellChat with the given dependencies and options.
 // Returns error if knowledge service is not configured (required for bluebell).
-func New(repo interfaces.Repository, llmClient gollem.LLMClient, opts ...Option) (*BluebellChat, error) {
+// The registry's Main client serves the control plane (planner/replan/final/selector);
+// task execution uses registry.Resolve(task.LLMID) per task.
+func New(repo interfaces.Repository, registry *llmconfig.Registry, opts ...Option) (*BluebellChat, error) {
+	if registry == nil {
+		return nil, goerr.New("bluebell requires a non-nil LLM registry")
+	}
+	main := registry.Main()
+	if main == nil {
+		return nil, goerr.New("LLM registry has no main entry")
+	}
 	c := &BluebellChat{
 		repository:          repo,
-		llmClient:           llmClient,
+		llmClient:           main.Client,
+		llmRegistry:         registry,
 		maxPhases:           defaultMaxPhases,
 		monitorPollInterval: 10 * time.Second,
 	}
@@ -234,6 +246,7 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 		sessionMessages:  chatCtx.SessionMessages,
 		slackHistory:     chatCtx.SlackHistory,
 		knowledgeService: c.knowledgeService,
+		availableLLMs:    c.llmRegistry.Catalog(),
 	}
 
 	// Generate system prompt once (shared across plan/replan/final sessions)

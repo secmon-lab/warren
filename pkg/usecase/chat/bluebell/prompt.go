@@ -9,6 +9,7 @@ import (
 
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gollem"
+	llmconfig "github.com/secmon-lab/warren/pkg/cli/config/llm"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
@@ -124,6 +125,7 @@ type planningContext struct {
 	sessionMessages  []*sessModel.Message
 	slackHistory     []model.HistoryMessage
 	knowledgeService *svcknowledge.Service
+	availableLLMs    []llmconfig.CatalogEntry
 }
 
 // generateSystemPrompt generates the shared system prompt.
@@ -172,7 +174,8 @@ func generateSystemPrompt(ctx context.Context, pc *planningContext) (string, err
 // generatePlanPrompt generates the planning user message prompt.
 func generatePlanPrompt(ctx context.Context, pc *planningContext) (string, error) {
 	return prompt.Generate(ctx, planPromptTemplate, map[string]any{
-		"message": pc.message,
+		"message":        pc.message,
+		"available_llms": formatAvailableLLMs(pc.availableLLMs),
 	})
 }
 
@@ -182,7 +185,23 @@ func generateReplanPrompt(ctx context.Context, pc *planningContext, allResults [
 		"message":           pc.message,
 		"completed_results": formatCompletedResults(allResults),
 		"current_phase":     currentPhase,
+		"available_llms":    formatAvailableLLMs(pc.availableLLMs),
 	})
+}
+
+// formatAvailableLLMs renders the planner-visible LLM catalog as a markdown
+// list, one entry per line. Returns "(none)" if catalog is empty (this should
+// not happen in practice — validate() rejects empty [agent].task — but a
+// graceful degradation keeps templates safe in tests).
+func formatAvailableLLMs(catalog []llmconfig.CatalogEntry) string {
+	if len(catalog) == 0 {
+		return "(none configured)"
+	}
+	var b strings.Builder
+	for _, e := range catalog {
+		fmt.Fprintf(&b, "- `%s` (%s/%s): %s\n", e.ID, e.Provider, e.Model, e.Description)
+	}
+	return strings.TrimRight(b.String(), "\n")
 }
 
 // generateTaskPrompt generates the system prompt for a task agent.
@@ -331,6 +350,11 @@ var taskSchema = &gollem.Parameter{
 			Type:        gollem.TypeArray,
 			Items:       &gollem.Parameter{Type: gollem.TypeString},
 			Description: "ToolSet names to make available for this task",
+			Required:    true,
+		},
+		"llm_id": {
+			Type:        gollem.TypeString,
+			Description: "ID of the LLM to use for this task. Must match one of the IDs listed in the 'Available LLMs' section of the planner instructions. Choose based on task complexity, expected token volume, and tool usage.",
 			Required:    true,
 		},
 	},

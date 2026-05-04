@@ -8,6 +8,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gollem/trace"
 	"github.com/m-mizutani/opaq"
+	llmconfig "github.com/secmon-lab/warren/pkg/cli/config/llm"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -35,6 +36,7 @@ type UseCases struct {
 	hitlService     *hitlService.Service
 	cbService       *cbService.Service
 	llmClient       gollem.LLMClient
+	llmRegistry     *llmconfig.Registry
 	embeddingClient interfaces.EmbeddingClient
 	repository      interfaces.Repository
 	storageClient   interfaces.StorageClient
@@ -76,9 +78,27 @@ var _ interfaces.ApiUsecases = &UseCases{}
 
 type Option func(*UseCases)
 
+// WithLLMClient is retained for tests that wire a single mock LLM client.
+// Production CLI paths use WithLLMRegistry, which also sets llmClient to
+// registry.Main().Client.
 func WithLLMClient(llmClient gollem.LLMClient) Option {
 	return func(u *UseCases) {
 		u.llmClient = llmClient
+	}
+}
+
+// WithLLMRegistry installs the registry and uses its main client as the
+// default llmClient for usecase-level operations (single-shot Ask/Summary
+// helpers, ticket fill, etc.). Bluebell receives the registry directly via
+// its own constructor so it can resolve task-level llm_id.
+func WithLLMRegistry(registry *llmconfig.Registry) Option {
+	return func(u *UseCases) {
+		u.llmRegistry = registry
+		if registry != nil {
+			if main := registry.Main(); main != nil {
+				u.llmClient = main.Client
+			}
+		}
 	}
 }
 

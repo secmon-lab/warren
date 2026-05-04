@@ -35,25 +35,54 @@ gcloud services enable aiplatform.googleapis.com --project=$PROJECT_ID
 ### Step 2: Run Warren with Docker (1 minute)
 
 ```bash
+cat > llm.toml << EOF
+[agent]
+main = "gemini-pro"
+task = ["gemini-pro", "gemini-flash"]
+
+[[llm]]
+id          = "gemini-pro"
+description = "Default reasoning model."
+provider    = "gemini"
+model       = "gemini-2.5-pro"
+gemini      = { project_id = "your-project-id", location = "us-central1" }
+
+[[llm]]
+id          = "gemini-flash"
+description = "Cheap fast lane for simple lookups."
+provider    = "gemini"
+model       = "gemini-2.5-flash"
+gemini      = { project_id = "your-project-id", location = "us-central1" }
+
+[embedding]
+provider   = "gemini"
+model      = "text-embedding-004"
+project_id = "your-project-id"
+location   = "us-central1"
+EOF
+sed -i.bak "s/your-project-id/$PROJECT_ID/g" llm.toml && rm llm.toml.bak
+
 cat > warren.env << EOF
-WARREN_GEMINI_PROJECT_ID=your-project-id
-WARREN_GEMINI_LOCATION=us-central1
+WARREN_LLM_CONFIG=/etc/warren/llm.toml
 WARREN_NO_AUTHENTICATION=true
 WARREN_NO_AUTHORIZATION=true
 WARREN_ADDR=0.0.0.0:8080
 EOF
 
-sed -i.bak "s/your-project-id/$PROJECT_ID/g" warren.env && rm warren.env.bak
-
 docker run -d \
   --name warren \
   -p 8080:8080 \
   -v ~/.config/gcloud:/home/nonroot/.config/gcloud:ro \
+  -v "$PWD/llm.toml:/etc/warren/llm.toml:ro" \
   --env-file warren.env \
   ghcr.io/secmon-lab/warren:latest serve
 
 docker logs warren
 ```
+
+See [`doc/reference/llm.md`](./reference/llm.md) for the full TOML schema,
+including how to mix Claude entries and inject API keys via
+`{{ .Env.VAR }}` template substitution.
 
 Warren is now running at http://localhost:8080
 

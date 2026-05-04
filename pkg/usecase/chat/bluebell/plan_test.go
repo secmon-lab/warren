@@ -9,6 +9,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	gollemtrace "github.com/m-mizutani/gollem/trace"
 	"github.com/m-mizutani/gt"
+	"github.com/secmon-lab/warren/pkg/cli/config/llm"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	"github.com/secmon-lab/warren/pkg/repository"
@@ -115,7 +116,7 @@ func TestBluebellChat_PlannerTraceNotOverwritten(t *testing.T) {
 	var mu sync.Mutex
 	sessionCount := 0
 
-	planJSON := `{"message": "Analyzing.", "tasks": [{"id": "t1", "title": "Check IP", "description": "Look up IP", "tools": []}]}`
+	planJSON := `{"message": "Analyzing.", "tasks": [{"id": "t1", "title": "Check IP", "description": "Look up IP", "tools": [], "llm_id": "test"}]}`
 
 	mockLLM := &mock.LLMClientMock{
 		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
@@ -156,7 +157,7 @@ func TestBluebellChat_PlannerTraceNotOverwritten(t *testing.T) {
 	}
 
 	traceRepo := &mockTraceRepo{}
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithTraceRepository(traceRepo),
 	)

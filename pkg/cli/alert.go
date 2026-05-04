@@ -22,7 +22,7 @@ func cmdAlert() *cli.Command {
 	var (
 		policyCfg config.Policy
 		genaiCfg  config.GenAI
-		llmCfg    config.LLMCfg
+		llmCfg    config.LLMConfigFile
 		schema    string
 		inputFile string
 	)
@@ -58,7 +58,7 @@ func cmdAlert() *cli.Command {
 	}
 }
 
-func runAlertPipeline(ctx context.Context, policyCfg *config.Policy, genaiCfg *config.GenAI, llmCfg *config.LLMCfg, schemaStr string, inputFile string) error {
+func runAlertPipeline(ctx context.Context, policyCfg *config.Policy, genaiCfg *config.GenAI, llmCfg *config.LLMConfigFile, schemaStr string, inputFile string) error {
 	// Read alert data from file or stdin
 	alertData, err := readAlertData(inputFile)
 	if err != nil {
@@ -73,10 +73,10 @@ func runAlertPipeline(ctx context.Context, policyCfg *config.Policy, genaiCfg *c
 		return goerr.Wrap(err, "failed to create policy client")
 	}
 
-	// Setup LLM client
-	llmClient, err := llmCfg.Configure(ctx)
+	// Load LLM registry
+	llmRegistry, err := llmCfg.Load(ctx)
 	if err != nil {
-		return goerr.Wrap(err, "failed to create LLM client")
+		return goerr.Wrap(err, "failed to load LLM config")
 	}
 
 	// Setup prompt service (if configured)
@@ -92,7 +92,7 @@ func runAlertPipeline(ctx context.Context, policyCfg *config.Policy, genaiCfg *c
 	// Create use case
 	uc := usecase.New(
 		usecase.WithPolicyClient(policyClient),
-		usecase.WithLLMClient(llmClient),
+		usecase.WithLLMRegistry(llmRegistry),
 		usecase.WithPromptService(promptService),
 	)
 

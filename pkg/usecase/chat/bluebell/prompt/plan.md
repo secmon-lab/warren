@@ -14,6 +14,18 @@ Create an execution plan for the following user request.
 7. **Tool assignment**: Each task must specify which ToolSet names it needs. Only specified ToolSets will be available to that task.
 8. **Clear purpose**: Each task must have a clear, specific purpose. The description should be detailed enough for an independent agent to execute it.
 9. **Acceptance criteria per task**: Each task MUST have clear acceptance criteria that specify the concrete conditions under which that task is considered complete. This helps evaluate progress during replanning.
+10. **LLM selection per task**: Each task MUST set `llm_id` to one of the entries in the "Available LLMs" section below. Choose the cheapest LLM whose description fits the task — do not always pick the most powerful one. Routing tasks to lighter LLMs is the primary cost control.
+
+# Available LLMs
+
+You MUST select one LLM for each task by setting `llm_id`. Choose based on the task's complexity, expected token volume, and tool usage. Read each entry's description carefully — descriptions document when to use that entry and when to avoid it.
+
+{{ .available_llms }}
+
+Selection guidelines:
+- Lightweight summaries / single-tool lookups / simple yes-or-no checks → pick the cheapest entry whose description matches
+- Multi-step tool use, deep reasoning, security incident triage → pick a high-capability entry
+- When two entries are functionally equivalent (e.g. quota distribution variants), distribute load across them so no single quota pool is exhausted
 
 # Response Format
 
@@ -27,3 +39,4 @@ Each task must have:
 - `description`: Detailed instructions for the task agent
 - `acceptance_criteria`: A single clear, measurable condition that defines when this task is complete (required). Must be a concrete, verifiable statement (e.g., "Determine whether the source IP is malicious or benign", "Confirm or rule out data exfiltration").
 - `tools`: Array of ToolSet names this task needs
+- `llm_id`: ID of the LLM to use (must match one of the entries in the "Available LLMs" section)

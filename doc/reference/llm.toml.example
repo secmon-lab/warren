@@ -1,0 +1,59 @@
+# Example LLM configuration for warren.
+#
+# Pass this file via --llm-config /path/to/llm.toml or WARREN_LLM_CONFIG env var.
+#
+# - {{ .Env.VAR }} is rendered with text/template before TOML parsing.
+#   Use this to inject API keys / project IDs from environment variables and
+#   keep the file itself free of secrets.
+# - Missing env vars cause startup to fail loud (no silent empty substitution).
+
+[agent]
+# id of the [[llm]] entry that drives the bluebell planner / replan / final.
+main = "claude-sonnet"
+# id allow-list the planner may pick from for individual tasks.
+task = ["claude-sonnet", "gemini-flash", "gemini-pro"]
+
+[[llm]]
+id          = "claude-sonnet"
+description = "Anthropic Claude Sonnet 4.6 — strong reasoning for planning and final synthesis."
+provider    = "claude"
+model       = "claude-sonnet-4-6"
+claude      = { project_id = "my-gcp-project", location = "us-east5" }
+
+[[llm]]
+id          = "gemini-flash"
+description = "Gemini 2.5 Flash — cheap and fast; use for one-shot lookups and summaries."
+provider    = "gemini"
+model       = "gemini-2.5-flash"
+gemini      = { project_id = "my-gcp-project", location = "us-central1" }
+
+[[llm]]
+id          = "gemini-pro"
+description = "Gemini 2.5 Pro — multi-step reasoning when a heavier model is justified."
+provider    = "gemini"
+model       = "gemini-2.5-pro"
+gemini      = { project_id = "my-gcp-project", location = "us-central1", thinking_budget = 1024 }
+
+# OpenAI is supported via API key only. Inject via environment template.
+# [[llm]]
+# id          = "gpt-4o-mini"
+# description = "OpenAI gpt-4o-mini — alternative cheap fast lane."
+# provider    = "openai"
+# model       = "gpt-4o-mini"
+# openai      = { api_key = "{{ .Env.OPENAI_API_KEY }}" }
+
+# Optional Claude entry using direct Anthropic API key instead of Vertex.
+# Mutually exclusive with project_id/location.
+# [[llm]]
+# id          = "claude-haiku"
+# description = "Claude Haiku via Anthropic API key."
+# provider    = "claude"
+# model       = "claude-haiku-4-5"
+# claude      = { api_key = "{{ .Env.ANTHROPIC_API_KEY }}" }
+
+[embedding]
+# Embeddings are Gemini-only (Vertex). API key mode is not supported.
+provider   = "gemini"
+model      = "text-embedding-004"
+project_id = "my-gcp-project"
+location   = "us-central1"
