@@ -214,6 +214,7 @@ func filterTicketsByKeyword(tickets []*ticket.Ticket, keyword string) []*ticket.
 func (r *Firestore) fetchAllByQuery(ctx context.Context, q firestore.Query) ([]*ticket.Ticket, error) {
 	var tickets []*ticket.Ticket
 	iter := q.Documents(ctx)
+	defer iter.Stop()
 	for {
 		doc, err := iter.Next()
 		if err != nil {
@@ -236,29 +237,13 @@ func (r *Firestore) fetchAllByQuery(ctx context.Context, q firestore.Query) ([]*
 func (r *Firestore) GetTicketsByStatus(ctx context.Context, statuses []types.TicketStatus, keyword, assigneeID string, offset, limit int) ([]*ticket.Ticket, error) {
 	q := r.buildTicketBaseQuery(statuses, assigneeID)
 
-	// keyword requires Go-side filtering: fetch all DB-filtered docs first.
-	if keyword != "" {
-		all, err := r.fetchAllByQuery(ctx, q)
-		if err != nil {
-			return nil, err
-		}
-		filtered := filterTicketsByKeyword(all, keyword)
-		if offset > 0 {
-			if offset >= len(filtered) {
-				return []*ticket.Ticket{}, nil
-			}
-			filtered = filtered[offset:]
-		}
-		if limit > 0 && limit < len(filtered) {
-			filtered = filtered[:limit]
-		}
-		return filtered, nil
-	}
-
 	// In-memory sort/paginate to avoid composite index on (Status, Assignee.ID, CreatedAt).
 	all, err := r.fetchAllByQuery(ctx, q)
 	if err != nil {
 		return nil, err
+	}
+	if keyword != "" {
+		all = filterTicketsByKeyword(all, keyword)
 	}
 	if offset > 0 {
 		if offset >= len(all) {

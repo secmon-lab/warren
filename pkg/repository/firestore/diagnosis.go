@@ -113,18 +113,11 @@ func (r *Firestore) ListDiagnosisIssues(ctx context.Context, diagnosisID types.D
 		q = q.Where("RuleID", "==", string(*ruleID))
 	}
 
-	// Count matching total
-	aggResult, err := q.NewAggregationQuery().WithCount("total").Get(ctx)
-	if err != nil {
-		return nil, 0, r.eb.Wrap(err, "failed to count diagnosis issues", goerr.V("diagnosis_id", diagnosisID))
-	}
-	total, err := extractCountFromAggregationResult(aggResult, "total")
-	if err != nil {
-		return nil, 0, r.eb.Wrap(err, "failed to extract issue count", goerr.V("diagnosis_id", diagnosisID))
-	}
-
 	// In-memory sort/paginate to avoid composite index on (Status, RuleID, CreatedAt).
+	// Total count is derived from the same fetch — saves a round-trip vs. a separate
+	// aggregation query.
 	iter := q.Documents(ctx)
+	defer iter.Stop()
 
 	var all []*diagnosis.Issue
 	for {
@@ -142,6 +135,7 @@ func (r *Firestore) ListDiagnosisIssues(ctx context.Context, diagnosisID types.D
 		all = append(all, &iss)
 	}
 
+	total := len(all)
 	sort.Slice(all, func(i, j int) bool { return all[i].CreatedAt.Before(all[j].CreatedAt) })
 
 	if offset < 0 {
