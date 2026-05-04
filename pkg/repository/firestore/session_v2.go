@@ -169,9 +169,10 @@ func (r *Firestore) GetTurn(ctx context.Context, turnID types.TurnID) (*session.
 }
 
 func (r *Firestore) GetTurnsBySession(ctx context.Context, sessionID types.SessionID) ([]*session.Turn, error) {
+	// Single-field Where + in-memory sort to avoid requiring a composite
+	// index on (session_id, started_at).
 	query := r.db.Collection(collectionTurns).
-		Where("session_id", "==", sessionID.String()).
-		OrderBy("started_at", firestore.Asc)
+		Where("session_id", "==", sessionID.String())
 
 	iter := query.Documents(ctx)
 	defer iter.Stop()
@@ -194,6 +195,7 @@ func (r *Firestore) GetTurnsBySession(ctx context.Context, sessionID types.Sessi
 		}
 		turns = append(turns, &t)
 	}
+	sort.Slice(turns, func(i, j int) bool { return turns[i].StartedAt.Before(turns[j].StartedAt) })
 	return turns, nil
 }
 
@@ -232,11 +234,17 @@ func (r *Firestore) UpdateTurnIntent(ctx context.Context, turnID types.TurnID, i
 // sessions/{sessionID}/messages/{messageID}; looking up by turn_id therefore
 // requires a collection group query.
 func (r *Firestore) GetMessagesByTurn(ctx context.Context, turnID types.TurnID) ([]*session.Message, error) {
+	// Single-field Where + in-memory sort to avoid requiring a composite
+	// index on (turn_id, created_at) for the messages collection group.
 	query := r.db.CollectionGroup("messages").
-		Where("turn_id", "==", turnID.String()).
-		OrderBy("created_at", firestore.Asc)
+		Where("turn_id", "==", turnID.String())
 
-	return queryMessages(ctx, r, query)
+	msgs, err := queryMessages(ctx, r, query)
+	if err != nil {
+		return nil, err
+	}
+	sort.Slice(msgs, func(i, j int) bool { return msgs[i].CreatedAt.Before(msgs[j].CreatedAt) })
+	return msgs, nil
 }
 
 func (r *Firestore) SearchSessionMessages(ctx context.Context, ticketID types.TicketID, query string, limit int) ([]*session.Message, error) {
