@@ -470,7 +470,7 @@ func buildResolveTicketModalViewRequest(callbackID model.CallbackID, ticket *tic
 		}
 
 		tagElement := slack.NewOptionsMultiSelectBlockElement(
-			slack.OptTypeStatic,
+			slack.MultiOptTypeStatic,
 			slack.NewTextBlockObject(slack.PlainTextType, "Select tags", false, false),
 			model.BlockActionIDTicketTags.String(),
 			tagOptions...,
