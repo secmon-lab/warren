@@ -10,6 +10,7 @@ import (
 	"github.com/m-mizutani/gollem"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/cli/config"
+	"github.com/secmon-lab/warren/pkg/cli/config/llm"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
@@ -94,7 +95,7 @@ func TestBluebellChat_NewRequiresKnowledgeService(t *testing.T) {
 	repo := repository.NewMemory()
 	mockLLM := &mock.LLMClientMock{}
 
-	_, err := bluebell.New(repo, mockLLM)
+	_, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM))
 	gt.V(t, err).NotNil()
 	gt.True(t, strings.Contains(err.Error(), "requires knowledge service"))
 }
@@ -117,7 +118,7 @@ func TestBluebellChat_DirectResponse(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 	)
 	gt.NoError(t, err)
@@ -159,7 +160,7 @@ func TestBluebellChat_SinglePhaseWithTasks(t *testing.T) {
 											"id": "task-1",
 											"title": "Analyze source IP",
 											"description": "Look up the source IP",
-											"tools": []
+											"tools": [], "llm_id": "test"
 										}
 									]
 								}`},
@@ -181,7 +182,7 @@ func TestBluebellChat_SinglePhaseWithTasks(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 	)
 	gt.NoError(t, err)
@@ -236,7 +237,7 @@ func TestBluebellChat_WithPromptEntries_IntentInjected(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithPromptEntries(entries),
 	)
@@ -270,7 +271,7 @@ func TestBluebellChat_MaxPhasesLimit(t *testing.T) {
 										"id": "task-loop",
 										"title": "Infinite task",
 										"description": "This task keeps generating more tasks",
-										"tools": []
+										"tools": [], "llm_id": "test"
 									}
 								]
 							}`},
@@ -283,7 +284,7 @@ func TestBluebellChat_MaxPhasesLimit(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithMaxPhases(2),
 	)
@@ -323,8 +324,8 @@ func TestBluebellChat_ErrorIsolation(t *testing.T) {
 								Texts: []string{`{
 									"message": "Analyzing...",
 									"tasks": [
-										{"id": "t-ok", "title": "Succeeding task", "description": "This will succeed", "tools": []},
-										{"id": "t-fail", "title": "Failing task", "description": "This will fail", "tools": []}
+										{"id": "t-ok", "title": "Succeeding task", "description": "This will succeed", "tools": [], "llm_id": "test"},
+										{"id": "t-fail", "title": "Failing task", "description": "This will fail", "tools": [], "llm_id": "test"}
 									]
 								}`},
 							}, nil
@@ -348,7 +349,7 @@ func TestBluebellChat_ErrorIsolation(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 	)
 	gt.NoError(t, err)
@@ -458,7 +459,7 @@ func TestBluebellChat_ContextBlock_ZeroEntries(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithSlackService(slackSvc),
 		// No WithPromptEntries — 0 entries, resolver still runs
@@ -524,7 +525,7 @@ func TestBluebellChat_ContextBlock_WithPromptEntry(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithSlackService(slackSvc),
 		bluebell.WithPromptEntries(entries),
@@ -570,7 +571,7 @@ func TestBluebellChat_ContextBlock_NoSlackThread(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 		bluebell.WithSlackService(slackSvc),
 	)
@@ -613,7 +614,7 @@ func TestBluebellChat_Ticketless(t *testing.T) {
 		},
 	}
 
-	chatUC, err := bluebell.New(repo, mockLLM,
+	chatUC, err := bluebell.New(repo, llm.SingleClientRegistryForTest(mockLLM),
 		bluebell.WithKnowledgeService(knowledgeSvc),
 	)
 	gt.NoError(t, err)

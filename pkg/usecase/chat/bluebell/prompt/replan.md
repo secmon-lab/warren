@@ -19,6 +19,11 @@ Current phase: {{ .current_phase }}
 6. If any tasks failed, decide whether to retry with a different approach or proceed without that information
 7. Each new task must specify which ToolSet names it needs
 8. If execution is difficult (e.g., all approaches have failed, results are inconclusive), try a different approach or proceed with the best available information.
+9. **LLM selection**: Each new task MUST set `llm_id` to one of the entries listed in "Available LLMs" below. If a previous task failed on a lighter LLM, consider retrying with a stronger one (and vice versa).
+
+# Available LLMs
+
+{{ .available_llms }}
 
 # Asking the Security Operator (Question)
 
@@ -43,6 +48,7 @@ Each task must have:
 - `title`: Short descriptive title
 - `description`: Detailed instructions
 - `tools`: Array of ToolSet names
+- `llm_id`: ID of the LLM to use (must match one of the "Available LLMs" entries)
 
 # Budget-Exceeded Tasks
 

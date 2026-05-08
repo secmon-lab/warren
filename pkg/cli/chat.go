@@ -28,7 +28,7 @@ func cmdChat() *cli.Command {
 		ticketID            types.TicketID
 		noAuthorization     bool
 		firestoreDB         config.Firestore
-		llmCfg              config.LLMCfg
+		llmCfg              config.LLMConfigFile
 		policyCfg           config.Policy
 		storageCfg          config.Storage
 		mcpCfg              config.MCPConfig
@@ -85,10 +85,10 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure firestore")
 			}
 
-			// Configure LLM client (automatically selects Claude if available, otherwise Gemini)
-			llmClient, err := llmCfg.Configure(ctx)
+			// Load LLM registry (TOML + health check)
+			llmRegistry, err := llmCfg.Load(ctx)
 			if err != nil {
-				return goerr.Wrap(err, "failed to configure LLM client")
+				return goerr.Wrap(err, "failed to load LLM config")
 			}
 
 			// Configure policy client
@@ -103,11 +103,8 @@ func cmdChat() *cli.Command {
 				return goerr.Wrap(err, "failed to configure storage")
 			}
 
-			// Create embedding client using unified LLM configuration
-			embeddingClient, err := llmCfg.ConfigureEmbeddingClient(ctx)
-			if err != nil {
-				return err
-			}
+			// Embedding adapter from registry
+			embeddingClient := config.NewEmbeddingClientAdapter(llmRegistry)
 
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(repo, embeddingClient)
@@ -168,7 +165,7 @@ func cmdChat() *cli.Command {
 			// Create usecase options
 			ucOptions := []usecase.Option{
 				usecase.WithRepository(repo),
-				usecase.WithLLMClient(llmClient),
+				usecase.WithLLMRegistry(llmRegistry),
 				usecase.WithPolicyClient(policyClient),
 				usecase.WithStorageClient(storageClient),
 				usecase.WithTools(allToolSets),

@@ -13,7 +13,7 @@ import (
 
 func cmdRefine() *cli.Command {
 	var (
-		llmCfg       config.LLMCfg
+		llmCfg       config.LLMConfigFile
 		firestoreCfg config.Firestore
 		slackCfg     config.Slack
 	)
@@ -34,17 +34,16 @@ func cmdRefine() *cli.Command {
 	}
 }
 
-func runRefine(ctx context.Context, llmCfg *config.LLMCfg, firestoreCfg *config.Firestore, slackCfg *config.Slack) error {
+func runRefine(ctx context.Context, llmCfg *config.LLMConfigFile, firestoreCfg *config.Firestore, slackCfg *config.Slack) error {
 	logger := logging.From(ctx)
 
-	// Setup LLM client (required)
-	llmClient, err := llmCfg.Configure(ctx)
+	llmRegistry, err := llmCfg.Load(ctx)
 	if err != nil {
-		return goerr.Wrap(err, "failed to create LLM client")
+		return goerr.Wrap(err, "failed to load LLM config")
 	}
 
 	var ucOptions []usecase.Option
-	ucOptions = append(ucOptions, usecase.WithLLMClient(llmClient))
+	ucOptions = append(ucOptions, usecase.WithLLMRegistry(llmRegistry))
 
 	// Setup Firestore (optional)
 	if firestoreCfg.IsConfigured() {

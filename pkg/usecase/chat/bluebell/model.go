@@ -7,6 +7,10 @@ type TaskPlan struct {
 	Description        string   `json:"description"`
 	AcceptanceCriteria string   `json:"acceptance_criteria"`
 	Tools              []string `json:"tools"`
+	// LLMID selects which LLM (from [agent].task) executes this task.
+	// Required at the schema level. Empty values are rejected at execution
+	// time via Registry.Resolve.
+	LLMID string `json:"llm_id"`
 }
 
 // PlanResult represents the LLM planning response.

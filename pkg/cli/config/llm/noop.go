@@ -1,13 +1,17 @@
-package config
+package llm
 
 import (
 	"context"
 
 	"github.com/m-mizutani/gollem"
-	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 )
 
-// noopLLMClient is a no-op LLM client for E2E testing and development without LLM access.
+// noopLLMClient is a no-op LLM client used by the "noop" provider. It exists
+// so that test environments (e2e, local development without GCP credentials)
+// can boot warren via a regular TOML config without special-casing in CLI code.
+//
+// The LLM is REQUIRED in production; "noop" is only for non-LLM integration
+// paths such as Playwright UI tests.
 type noopLLMClient struct{}
 
 func (n *noopLLMClient) NewSession(_ context.Context, _ ...gollem.SessionOption) (gollem.Session, error) {
@@ -46,35 +50,8 @@ func (n *noopSession) GenerateStream(_ context.Context, _ ...gollem.Input) (<-ch
 	return ch, nil
 }
 
-func (n *noopSession) History() (*gollem.History, error) {
-	return nil, nil
-}
+func (n *noopSession) History() (*gollem.History, error) { return nil, nil }
 
-func (n *noopSession) AppendHistory(_ *gollem.History) error {
-	return nil
-}
+func (n *noopSession) AppendHistory(_ *gollem.History) error { return nil }
 
-func (n *noopSession) CountToken(_ context.Context, _ ...gollem.Input) (int, error) {
-	return 0, nil
-}
-
-// noopEmbeddingClient is a no-op embedding client that returns zero vectors.
-type noopEmbeddingClient struct{}
-
-func (n *noopEmbeddingClient) Embeddings(_ context.Context, texts []string, dimensionality int) ([][]float32, error) {
-	result := make([][]float32, len(texts))
-	for i := range texts {
-		result[i] = make([]float32, dimensionality)
-	}
-	return result, nil
-}
-
-// NewNoopLLMClient returns a no-op LLM client.
-func NewNoopLLMClient() gollem.LLMClient {
-	return &noopLLMClient{}
-}
-
-// NewNoopEmbeddingClient returns a no-op embedding client.
-func NewNoopEmbeddingClient() interfaces.EmbeddingClient {
-	return &noopEmbeddingClient{}
-}
+func (n *noopSession) CountToken(_ context.Context, _ ...gollem.Input) (int, error) { return 0, nil }

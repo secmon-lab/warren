@@ -115,6 +115,19 @@ func (c *BluebellChat) executeTask(ctx context.Context, task TaskPlan, chatCtx *
 
 	msg.Trace(taskCtx, "Starting...")
 
+	// Resolve the LLM selected by the planner before doing any other work.
+	// On failure (unknown id, empty id, not in [agent].task), the task fails
+	// fast and the error is surfaced to replan — no fallback to main, since
+	// silently swapping LLMs would mask planner bugs and skew cost reports.
+	llmEntry, err := c.llmRegistry.Resolve(task.LLMID)
+	if err != nil {
+		result.Error = goerr.Wrap(err, "failed to resolve LLM for task",
+			goerr.V("task_id", task.ID), goerr.V("llm_id", task.LLMID))
+		msg.Trace(taskCtx, "❌ LLM resolve failed: %s", err.Error())
+		return result
+	}
+	msg.Trace(taskCtx, "Using LLM: %s (%s/%s)", llmEntry.ID, llmEntry.Provider, llmEntry.Model)
+
 	// Generate task system prompt
 	taskPrompt, err := generateTaskPrompt(ctx, task, c.knowledgeService)
 	if err != nil {
@@ -235,8 +248,8 @@ func (c *BluebellChat) executeTask(ctx context.Context, task TaskPlan, chatCtx *
 
 	agentOpts = append(agentOpts, gollem.WithToolMiddleware(newTaskToolMiddleware(taskCtx, traceState)))
 
-	// Create and execute agent
-	gollemAgent := gollem.New(c.llmClient, agentOpts...)
+	// Create and execute agent using the LLM resolved from the planner's selection.
+	gollemAgent := gollem.New(llmEntry.Client, agentOpts...)
 
 	resp, err := gollemAgent.Execute(taskCtx, gollem.Text(task.Description))
 	if err != nil {

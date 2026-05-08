@@ -24,22 +24,23 @@ Warren uses the following precedence (highest to lowest):
 | `WARREN_LOG_OUTPUT` | `--log-output` | `stderr` | Log output destination |
 | `WARREN_ASYNC_ALERT_HOOK` | `--async-alert-hook` | - | Async webhook processing (raw, pubsub, sns, all) |
 
-### LLM — Gemini (Vertex AI)
+### LLM
 
-| Environment Variable | CLI Flag | Default | Description |
-|---|---|---|---|
-| `WARREN_GEMINI_PROJECT_ID` | `--gemini-project-id` | - | **Required** — GCP project ID for Vertex AI |
-| `WARREN_GEMINI_LOCATION` | `--gemini-location` | `us-central1` | Vertex AI region |
-| `WARREN_GEMINI_MODEL` | `--gemini-model` | `gemini-2.5-flash` | Gemini model name |
-| `WARREN_GEMINI_EMBEDDING_MODEL` | `--gemini-embedding-model` | - | Embedding model (optional) |
+LLM provider/model configuration moved to a dedicated TOML file. The legacy
+`--gemini-*` / `--claude-*` flags and `--disable-llm` were removed; LLM is
+required.
 
-### LLM — Claude (Vertex AI)
+| Environment Variable | CLI Flag       | Default | Description                                         |
+| -------------------- | -------------- | ------- | --------------------------------------------------- |
+| `WARREN_LLM_CONFIG`  | `--llm-config` | -       | **Required** — path to the LLM TOML config file.    |
 
-| Environment Variable | CLI Flag | Default | Description |
-|---|---|---|---|
-| `WARREN_CLAUDE_PROJECT_ID` | `--claude-project-id` | - | GCP project ID for Claude on Vertex AI |
-| `WARREN_CLAUDE_MODEL` | `--claude-model` | `claude-sonnet-4@20250514` | Claude model name |
-| `WARREN_CLAUDE_LOCATION` | `--claude-location` | `us-east5` | GCP region for Claude |
+See [`llm.md`](./llm.md) for the full TOML schema and
+[`llm.toml.example`](./llm.toml.example) for a working sample. The file
+declares one `[agent]` block (planner + task allow-list), one or more `[[llm]]`
+entries (Claude on Vertex / API key, Gemini on Vertex), and a single
+`[embedding]` block (Gemini Vertex only). API keys can be injected via
+`{{ .Env.VAR }}` template substitution so the file itself stays free of
+secrets.
 
 ### Firestore
 

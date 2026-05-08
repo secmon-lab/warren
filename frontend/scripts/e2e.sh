@@ -61,6 +61,9 @@ cleanup() {
   if [ -n "$WARREN_BIN_TMP" ] && [ -f "$WARREN_BIN_TMP" ]; then
     rm -f "$WARREN_BIN_TMP"
   fi
+  if [ -n "${E2E_LLM_CONFIG:-}" ] && [ -f "$E2E_LLM_CONFIG" ]; then
+    rm -f "$E2E_LLM_CONFIG"
+  fi
 }
 trap cleanup EXIT
 
@@ -131,6 +134,26 @@ pick_port() {
   done
 }
 
+# Write a minimal noop LLM config so e2e tests can boot warren without
+# real GCP / Anthropic credentials. The "noop" provider returns canned
+# responses; LLM is not the system under test for Playwright UI tests.
+E2E_LLM_CONFIG=$(mktemp "${TMPDIR:-/tmp}/warren-e2e-llm.XXXXXX.toml")
+cat > "$E2E_LLM_CONFIG" <<'EOF'
+[agent]
+main = "noop"
+task = ["noop"]
+
+[[llm]]
+id          = "noop"
+description = "Test-only no-op LLM."
+provider    = "noop"
+model       = "noop"
+
+[embedding]
+provider = "noop"
+model    = "noop"
+EOF
+
 # Start backend; retry on a fresh port if it fails to come up.
 MAX_RETRIES=3
 E2E_PORT=""
@@ -143,7 +166,7 @@ for i in $(seq 1 $MAX_RETRIES); do
     --no-authn \
     --no-authz \
     --enable-graphql \
-    --disable-llm \
+    --llm-config="$E2E_LLM_CONFIG" \
     --log-level=error &
   BACKEND_PID=$!
 
