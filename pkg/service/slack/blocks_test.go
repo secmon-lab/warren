@@ -101,7 +101,7 @@ func TestBuildResolveTicketModalViewRequest_WithTags(t *testing.T) {
 		// Verify it uses multi-select, not checkboxes
 		multiSelect, ok := inputBlock.Element.(*slack_sdk.MultiSelectBlockElement)
 		gt.V(t, ok).Equal(true)
-		gt.V(t, multiSelect.Type).Equal(string(slack_sdk.OptTypeStatic))
+		gt.V(t, multiSelect.Type).Equal(slack_sdk.MultiOptTypeStatic)
 		gt.V(t, len(multiSelect.Options)).Equal(3)
 		gt.V(t, multiSelect.Options[0].Value).Equal("tag-1")
 		gt.V(t, multiSelect.Options[0].Text.Text).Equal("double check")
@@ -147,6 +147,10 @@ func TestBuildResolveTicketModalViewRequest_WithExistingTags(t *testing.T) {
 
 		multiSelect, ok := inputBlock.Element.(*slack_sdk.MultiSelectBlockElement)
 		gt.V(t, ok).Equal(true)
+		// Slack rejects the request with `invalid_arguments` if the type is
+		// `static_select` while `initial_options` (plural) is set. The element
+		// type must be `multi_static_select`.
+		gt.V(t, multiSelect.Type).Equal(slack_sdk.MultiOptTypeStatic)
 
 		// All 3 tags should be available as options
 		gt.V(t, len(multiSelect.Options)).Equal(3)
