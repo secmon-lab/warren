@@ -96,8 +96,14 @@ export default function TicketsPage() {
   const [archiveAllResolved, { loading: archiving }] = useMutation(ARCHIVE_ALL_RESOLVED_TICKETS);
   const [fetchResolvedCount] = useLazyQuery(GET_TICKETS, { fetchPolicy: "network-only" });
 
+  // Independent of the visible status filter so the "Archive All Resolved"
+  // button still surfaces resolved tickets that are currently filtered out.
+  const { data: resolvedCountData, refetch: refetchResolvedCount } = useQuery(GET_TICKETS, {
+    variables: { statuses: ["resolved"] as TicketStatus[], offset: 0, limit: 1 },
+  });
+  const resolvedTotalCount: number = resolvedCountData?.tickets?.totalCount ?? 0;
+
   const tickets: Ticket[] = ticketsData?.tickets?.tickets || [];
-  const resolvedTickets = tickets.filter(t => t.status === "resolved");
 
   // Collect unique assignees from current result set for the dropdown
   const assigneeOptions = useMemo(() => {
@@ -159,7 +165,7 @@ export default function TicketsPage() {
     });
     if (!ok) return;
     await archiveAllResolved();
-    await refetch();
+    await Promise.all([refetch(), refetchResolvedCount()]);
   };
 
   if (ticketsLoading) {
@@ -218,7 +224,7 @@ export default function TicketsPage() {
             <TabsTrigger value="archived" className="text-sm px-3 h-7">Archived</TabsTrigger>
           </TabsList>
 
-          {activeTab === "active" && resolvedTickets.length > 0 && (
+          {activeTab === "active" && resolvedTotalCount > 0 && (
             <Button
               variant="outline"
               size="sm"

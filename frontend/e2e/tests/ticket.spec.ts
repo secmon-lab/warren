@@ -216,8 +216,9 @@ test.describe("Tickets", () => {
     await expect(ticketList.ticketItemById(openTicket.id)).toBeVisible();
     await expect(ticketList.ticketItemById(resolvedTicket.id)).toHaveCount(0);
 
-    // Cleanup
+    // Cleanup — only the resolved ticket is archivable directly.
     await archiveTicketViaAPI(page, resolvedTicket.id);
+    await resolveTicketViaAPI(page, openTicket.id);
     await archiveTicketViaAPI(page, openTicket.id);
   });
 
@@ -243,6 +244,7 @@ test.describe("Tickets", () => {
     await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
 
     // Cleanup
+    await resolveTicketViaAPI(page, ticket.id);
     await archiveTicketViaAPI(page, ticket.id);
   });
 
@@ -272,6 +274,7 @@ test.describe("Tickets", () => {
     await newPage.close();
 
     // Cleanup
+    await resolveTicketViaAPI(page, ticket.id);
     await archiveTicketViaAPI(page, ticket.id);
   });
 });
