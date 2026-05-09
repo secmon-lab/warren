@@ -46,7 +46,19 @@ export class TicketListPage extends BasePage {
     return this.page.locator("[data-testid^='ticket-item-']");
   }
 
+  ticketItemById(id: string) {
+    return this.page.getByTestId(`ticket-item-${id}`);
+  }
+
   ticketItemByTitle(title: string) {
     return this.page.getByText(title);
+  }
+
+  get statusFilterTrigger() {
+    return this.page.getByTestId("status-filter-trigger");
+  }
+
+  statusFilterOption(name: "All Status" | "Open" | "Resolved") {
+    return this.page.getByRole("option", { name });
   }
 }

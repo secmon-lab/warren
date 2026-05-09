@@ -1,6 +1,6 @@
 import { useQuery, useLazyQuery, useMutation } from "@apollo/client";
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useConfirm } from "@/hooks/use-confirm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,12 +62,10 @@ export default function TicketsPage() {
   const confirm = useConfirm();
 
   // Filter state
-  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved">("open");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [keywordFilter, setKeywordFilter] = useState<string>("");
   const [keywordInput, setKeywordInput] = useState<string>("");
-
-  const navigate = useNavigate();
 
   // Compute the statuses to query based on tab + status filter
   const selectedStatuses = useMemo(() => {
@@ -98,8 +96,14 @@ export default function TicketsPage() {
   const [archiveAllResolved, { loading: archiving }] = useMutation(ARCHIVE_ALL_RESOLVED_TICKETS);
   const [fetchResolvedCount] = useLazyQuery(GET_TICKETS, { fetchPolicy: "network-only" });
 
+  // Independent of the visible status filter so the "Archive All Resolved"
+  // button still surfaces resolved tickets that are currently filtered out.
+  const { data: resolvedCountData, refetch: refetchResolvedCount } = useQuery(GET_TICKETS, {
+    variables: { statuses: ["resolved"] as TicketStatus[], offset: 0, limit: 1 },
+  });
+  const resolvedTotalCount: number = resolvedCountData?.tickets?.totalCount ?? 0;
+
   const tickets: Ticket[] = ticketsData?.tickets?.tickets || [];
-  const resolvedTickets = tickets.filter(t => t.status === "resolved");
 
   // Collect unique assignees from current result set for the dropdown
   const assigneeOptions = useMemo(() => {
@@ -115,7 +119,7 @@ export default function TicketsPage() {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab as ActiveTab);
     setCurrentPage(1);
-    setStatusFilter("all");
+    setStatusFilter("open");
     setAssigneeFilter("all");
     setKeywordFilter("");
     setKeywordInput("");
@@ -161,7 +165,7 @@ export default function TicketsPage() {
     });
     if (!ok) return;
     await archiveAllResolved();
-    await refetch();
+    await Promise.all([refetch(), refetchResolvedCount()]);
   };
 
   if (ticketsLoading) {
@@ -220,7 +224,7 @@ export default function TicketsPage() {
             <TabsTrigger value="archived" className="text-sm px-3 h-7">Archived</TabsTrigger>
           </TabsList>
 
-          {activeTab === "active" && resolvedTickets.length > 0 && (
+          {activeTab === "active" && resolvedTotalCount > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -239,11 +243,13 @@ export default function TicketsPage() {
           {/* Status filter — only shown in Active tab */}
           {activeTab === "active" && (
             <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-              <SelectTrigger className={`h-8 w-36 text-xs transition-colors ${
-                statusFilter !== "all"
-                  ? "border-blue-500 bg-blue-50 text-blue-700 font-medium"
-                  : ""
-              }`}>
+              <SelectTrigger
+                data-testid="status-filter-trigger"
+                className={`h-8 w-36 text-xs transition-colors ${
+                  statusFilter !== "open"
+                    ? "border-blue-500 bg-blue-50 text-blue-700 font-medium"
+                    : ""
+                }`}>
                 {statusFilter === "open" ? (
                   <span className="flex items-center gap-1.5">
                     <CircleDot className="h-3.5 w-3.5 text-blue-500 shrink-0" />
@@ -330,10 +336,10 @@ export default function TicketsPage() {
           </div>
 
           {/* Clear all filters button — shown when any filter is active */}
-          {(statusFilter !== "all" || assigneeFilter !== "all" || keywordFilter) && (
+          {(statusFilter !== "open" || assigneeFilter !== "all" || keywordFilter) && (
             <button
               onClick={() => {
-                setStatusFilter("all");
+                setStatusFilter("open");
                 setAssigneeFilter("all");
                 setKeywordFilter("");
                 setKeywordInput("");
@@ -357,10 +363,11 @@ export default function TicketsPage() {
                 {tickets.map((ticket) => {
                   const conclusion = ticket.conclusion ? CONCLUSION_CONFIG[ticket.conclusion.toLowerCase()] : null;
                   return (
-                    <div
+                    <Link
                       key={ticket.id}
-                      className="flex items-start gap-3 px-4 py-3.5 hover:bg-muted/40 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/tickets/${ticket.id}`)}>
+                      to={`/tickets/${ticket.id}`}
+                      data-testid={`ticket-item-${ticket.id}`}
+                      className="flex items-start gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-inherit no-underline">
                       {/* Status icon */}
                       {getStatusIcon(ticket.status as TicketStatus)}
 
@@ -423,7 +430,7 @@ export default function TicketsPage() {
                           </span>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
