@@ -1,6 +1,7 @@
 import { test, expect } from "../fixtures";
 import { TicketListPage } from "../pages/TicketListPage";
 import {
+  archiveTicketViaAPI,
   createTicketViaAPI,
   resolveTicketViaAPI,
 } from "../helpers/api";
@@ -172,5 +173,97 @@ test.describe("Tickets", () => {
     await expect(page.getByText(`ToArchive-${suffix}`)).not.toBeVisible();
     // Open ticket should still be visible
     await expect(page.getByText(`StayOpen-${suffix}`).first()).toBeVisible();
+  });
+
+  test("should default the Active tab status filter to Open", async ({
+    authenticatedPage: page,
+  }) => {
+    const suffix = Date.now().toString();
+
+    const openTicket = await createTicketViaAPI(
+      page,
+      `DefaultFilterOpen-${suffix}`,
+      "Open ticket should be visible by default"
+    );
+    const resolvedTicket = await createTicketViaAPI(
+      page,
+      `DefaultFilterResolved-${suffix}`,
+      "Resolved ticket should be hidden by default"
+    );
+    await resolveTicketViaAPI(page, resolvedTicket.id);
+
+    const ticketList = new TicketListPage(page);
+    await ticketList.goto();
+
+    // The status trigger reflects the default filter
+    await expect(ticketList.statusFilterTrigger).toHaveText(/Open/);
+
+    // Open ticket is visible, resolved ticket is filtered out
+    await expect(ticketList.ticketItemById(openTicket.id)).toBeVisible();
+    await expect(ticketList.ticketItemById(resolvedTicket.id)).toHaveCount(0);
+
+    // Switching to All Status surfaces the resolved ticket too
+    await ticketList.statusFilterTrigger.click();
+    await ticketList.statusFilterOption("All Status").click();
+    await expect(ticketList.ticketItemById(openTicket.id)).toBeVisible();
+    await expect(ticketList.ticketItemById(resolvedTicket.id)).toBeVisible();
+
+    // Cleanup
+    await archiveTicketViaAPI(page, resolvedTicket.id);
+    await archiveTicketViaAPI(page, openTicket.id);
+  });
+
+  test("should expose ticket rows as anchor links with href", async ({
+    authenticatedPage: page,
+  }) => {
+    const suffix = Date.now().toString();
+    const ticket = await createTicketViaAPI(
+      page,
+      `RowAnchor-${suffix}`,
+      "Row should render as a real <a> with href"
+    );
+
+    const ticketList = new TicketListPage(page);
+    await ticketList.goto();
+
+    const row = ticketList.ticketItemById(ticket.id);
+    await expect(row).toBeVisible();
+    await expect(row).toHaveAttribute("href", `/tickets/${ticket.id}`);
+
+    // Plain click still routes via SPA without a full page reload
+    await row.click();
+    await expect(page).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+
+    // Cleanup
+    await archiveTicketViaAPI(page, ticket.id);
+  });
+
+  test("should open ticket detail in a new tab on Cmd/Ctrl+Click", async ({
+    authenticatedPage: page,
+  }) => {
+    const suffix = Date.now().toString();
+    const ticket = await createTicketViaAPI(
+      page,
+      `RowNewTab-${suffix}`,
+      "Cmd/Ctrl+Click should open in a new tab"
+    );
+
+    const ticketList = new TicketListPage(page);
+    await ticketList.goto();
+
+    const row = ticketList.ticketItemById(ticket.id);
+    await expect(row).toBeVisible();
+
+    const context = page.context();
+    const [newPage] = await Promise.all([
+      context.waitForEvent("page"),
+      row.click({ modifiers: ["ControlOrMeta"] }),
+    ]);
+    await newPage.waitForLoadState("domcontentloaded");
+    await expect(newPage).toHaveURL(new RegExp(`/tickets/${ticket.id}$`));
+    await newPage.close();
+
+    // Cleanup
+    await archiveTicketViaAPI(page, ticket.id);
   });
 });

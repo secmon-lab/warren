@@ -1,6 +1,6 @@
 import { useQuery, useLazyQuery, useMutation } from "@apollo/client";
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useConfirm } from "@/hooks/use-confirm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,12 +62,10 @@ export default function TicketsPage() {
   const confirm = useConfirm();
 
   // Filter state
-  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "open" | "resolved">("open");
   const [assigneeFilter, setAssigneeFilter] = useState<string>("all");
   const [keywordFilter, setKeywordFilter] = useState<string>("");
   const [keywordInput, setKeywordInput] = useState<string>("");
-
-  const navigate = useNavigate();
 
   // Compute the statuses to query based on tab + status filter
   const selectedStatuses = useMemo(() => {
@@ -357,10 +355,11 @@ export default function TicketsPage() {
                 {tickets.map((ticket) => {
                   const conclusion = ticket.conclusion ? CONCLUSION_CONFIG[ticket.conclusion.toLowerCase()] : null;
                   return (
-                    <div
+                    <Link
                       key={ticket.id}
-                      className="flex items-start gap-3 px-4 py-3.5 hover:bg-muted/40 cursor-pointer transition-colors"
-                      onClick={() => navigate(`/tickets/${ticket.id}`)}>
+                      to={`/tickets/${ticket.id}`}
+                      data-testid={`ticket-item-${ticket.id}`}
+                      className="flex items-start gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-inherit no-underline">
                       {/* Status icon */}
                       {getStatusIcon(ticket.status as TicketStatus)}
 
@@ -423,7 +422,7 @@ export default function TicketsPage() {
                           </span>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>

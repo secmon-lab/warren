@@ -46,7 +46,21 @@ export class TicketListPage extends BasePage {
     return this.page.locator("[data-testid^='ticket-item-']");
   }
 
+  ticketItemById(id: string) {
+    return this.page.getByTestId(`ticket-item-${id}`);
+  }
+
   ticketItemByTitle(title: string) {
     return this.page.getByText(title);
+  }
+
+  // Status filter trigger is the only combobox visible in the Active tab's
+  // filter bar; fall back to the visible label when the dropdown is closed.
+  get statusFilterTrigger() {
+    return this.page.getByRole("combobox").first();
+  }
+
+  statusFilterOption(name: "All Status" | "Open" | "Resolved") {
+    return this.page.getByRole("option", { name });
   }
 }
