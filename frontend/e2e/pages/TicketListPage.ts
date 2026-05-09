@@ -54,10 +54,8 @@ export class TicketListPage extends BasePage {
     return this.page.getByText(title);
   }
 
-  // Status filter trigger is the only combobox visible in the Active tab's
-  // filter bar; fall back to the visible label when the dropdown is closed.
   get statusFilterTrigger() {
-    return this.page.getByRole("combobox").first();
+    return this.page.getByTestId("status-filter-trigger");
   }
 
   statusFilterOption(name: "All Status" | "Open" | "Resolved") {

@@ -113,7 +113,7 @@ export default function TicketsPage() {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab as ActiveTab);
     setCurrentPage(1);
-    setStatusFilter("all");
+    setStatusFilter("open");
     setAssigneeFilter("all");
     setKeywordFilter("");
     setKeywordInput("");
@@ -237,11 +237,13 @@ export default function TicketsPage() {
           {/* Status filter — only shown in Active tab */}
           {activeTab === "active" && (
             <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-              <SelectTrigger className={`h-8 w-36 text-xs transition-colors ${
-                statusFilter !== "all"
-                  ? "border-blue-500 bg-blue-50 text-blue-700 font-medium"
-                  : ""
-              }`}>
+              <SelectTrigger
+                data-testid="status-filter-trigger"
+                className={`h-8 w-36 text-xs transition-colors ${
+                  statusFilter !== "open"
+                    ? "border-blue-500 bg-blue-50 text-blue-700 font-medium"
+                    : ""
+                }`}>
                 {statusFilter === "open" ? (
                   <span className="flex items-center gap-1.5">
                     <CircleDot className="h-3.5 w-3.5 text-blue-500 shrink-0" />
@@ -328,10 +330,10 @@ export default function TicketsPage() {
           </div>
 
           {/* Clear all filters button — shown when any filter is active */}
-          {(statusFilter !== "all" || assigneeFilter !== "all" || keywordFilter) && (
+          {(statusFilter !== "open" || assigneeFilter !== "all" || keywordFilter) && (
             <button
               onClick={() => {
-                setStatusFilter("all");
+                setStatusFilter("open");
                 setAssigneeFilter("all");
                 setKeywordFilter("");
                 setKeywordInput("");

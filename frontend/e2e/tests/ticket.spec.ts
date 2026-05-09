@@ -208,6 +208,14 @@ test.describe("Tickets", () => {
     await expect(ticketList.ticketItemById(openTicket.id)).toBeVisible();
     await expect(ticketList.ticketItemById(resolvedTicket.id)).toBeVisible();
 
+    // Tab round-trip should restore the Open default — switching to Archived
+    // and back to Active must not leave the filter on "All Status".
+    await ticketList.archivedTab.click();
+    await ticketList.activeTab.click();
+    await expect(ticketList.statusFilterTrigger).toHaveText(/Open/);
+    await expect(ticketList.ticketItemById(openTicket.id)).toBeVisible();
+    await expect(ticketList.ticketItemById(resolvedTicket.id)).toHaveCount(0);
+
     // Cleanup
     await archiveTicketViaAPI(page, resolvedTicket.id);
     await archiveTicketViaAPI(page, openTicket.id);
