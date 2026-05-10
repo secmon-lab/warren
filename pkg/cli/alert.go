@@ -68,7 +68,7 @@ func runAlertPipeline(ctx context.Context, policyCfg *config.Policy, genaiCfg *c
 	schema := types.AlertSchema(schemaStr)
 
 	// Setup policy client
-	policyClient, err := policyCfg.Configure()
+	policyClient, err := policyCfg.Configure(ctx)
 	if err != nil {
 		return goerr.Wrap(err, "failed to create policy client")
 	}
