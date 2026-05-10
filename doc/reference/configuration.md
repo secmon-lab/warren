@@ -80,6 +80,14 @@ Warren uses the following precedence (highest to lowest):
 |---|---|---|---|
 | `WARREN_POLICY` | `--policy` | - | Path to policy files/directories |
 | `WARREN_WATCH` | `--watch` | `false` | Watch policy files for changes |
+| `WARREN_POLICY_GITHUB_REPO` | `--policy-github-repo` | - | GitHub repository hosting Rego policy files (format: `owner/repo`). Loaded from default branch HEAD. |
+| `WARREN_POLICY_GITHUB_PATH` | `--policy-github-path` | repo root | Path within the GitHub repository to scan recursively for `.rego` files. May be specified multiple times. |
+| `WARREN_POLICY_GITHUB_APP_ID` | `--policy-github-app-id` | - | GitHub App ID used for policy repository read access. Required when `--policy-github-repo` is set. |
+| `WARREN_POLICY_GITHUB_APP_INSTALLATION_ID` | `--policy-github-app-installation-id` | - | GitHub App Installation ID. Required when `--policy-github-repo` is set. |
+| `WARREN_POLICY_GITHUB_APP_PRIVATE_KEY` | `--policy-github-app-private-key` | - | GitHub App private key (PEM string). Required when `--policy-github-repo` is set. |
+| `WARREN_POLICY_GITHUB_CACHE_TTL` | `--policy-github-cache-ttl` | `1m` | TTL for cached GitHub policy contents. The HEAD commit sha is checked at most once per TTL; identical sha skips re-fetching file contents. |
+
+GitHub policy loading is described in detail in [`doc/operation/policy.md`](../operation/policy.md#policy-sources).
 
 ### Chat / Agent
 

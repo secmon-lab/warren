@@ -258,6 +258,92 @@ warren test \
   --test-ignore-data ./test/myservice/ignore
 ```
 
+## Policy Sources
+
+Warren can load Rego policies from two kinds of sources, which may be combined. The Rego `package` mechanism merges contributions across sources naturally — partial rules (e.g. `ignore if ...`, `alerts contains ...`) accumulate, while complete rules conflict if they assign different values for the same input.
+
+### File source (default)
+
+Specify one or more local files or directories with `--policy` (or `WARREN_POLICY`). Directories are scanned recursively for `.rego` files. Files are loaded once at startup and never reloaded; restart Warren to pick up changes.
+
+```bash
+warren serve --policy ./policies
+```
+
+### GitHub source
+
+Set `--policy-github-repo owner/repo` together with GitHub App credentials. Each Warren instance independently fetches the default branch HEAD of the repository and rebuilds its policy client when the commit sha changes. There is no editing UI, push, or PR support yet — this stage only adds a read path.
+
+```bash
+warren serve \
+  --policy-github-repo myorg/warren-policy \
+  --policy-github-path policies \
+  --policy-github-app-id 123456 \
+  --policy-github-app-installation-id 78901234 \
+  --policy-github-app-private-key "$(cat /secrets/warren-policy.pem)"
+```
+
+Equivalent environment variables:
+
+```bash
+export WARREN_POLICY_GITHUB_REPO=myorg/warren-policy
+export WARREN_POLICY_GITHUB_PATH=policies
+export WARREN_POLICY_GITHUB_APP_ID=123456
+export WARREN_POLICY_GITHUB_APP_INSTALLATION_ID=78901234
+export WARREN_POLICY_GITHUB_APP_PRIVATE_KEY="$(cat /secrets/warren-policy.pem)"
+```
+
+#### GitHub App setup
+
+Create a dedicated GitHub App with the **minimum** permissions required for read access:
+
+- **Repository permissions**:
+  - `Contents`: **Read-only**
+  - `Metadata`: **Read-only**
+- **Webhook**: not required (Warren polls)
+- **Install on**: only the policy repository (not org-wide)
+
+After creation, install the App on your policy repository and capture:
+- App ID (Settings → GitHub Apps → your app)
+- Installation ID (the `installations/<id>` path segment after install)
+- Private key (Settings → GitHub Apps → your app → Generate a private key, downloads `.pem`)
+
+#### Recommended: dedicated GitHub App
+
+If your Warren deployment already uses a GitHub App for tool use (e.g. `pkg/tool/github`), **create a separate App for policy loading** rather than reusing the existing one.
+
+- The tool-use App typically needs read access to many repositories. Reusing it for policy loading would leave the policy repository within a wider blast radius if that App's credentials were ever compromised.
+- A dedicated `warren-policy` (or `warren-rule`) App can be installed on **only** the policy repository with `contents: read` + `metadata: read`, and it leaves room to later add a separate write-capable App for editing flows without entangling responsibilities.
+
+### Caching behavior
+
+Each instance caches the GitHub fetch result in memory:
+
+1. Within `--policy-github-cache-ttl` (default `1m`), repeated evaluations reuse the cached compiled policy without contacting GitHub.
+2. After the TTL elapses, the next evaluation fetches the default branch HEAD sha. If unchanged, the in-memory policy is reused and only `cachedAt` is refreshed.
+3. If the sha differs, file contents are fetched and validated. On success the cache is replaced.
+4. If the new fetch or validation fails (network error, invalid Rego, etc.), Warren logs the error and **falls back to the previously cached policy**. The very first fetch has no fallback and will surface as a startup error.
+
+Cache updates are guarded by an in-process mutex so concurrent evaluations in the same instance trigger at most one fetch.
+
+### Combining sources
+
+Specifying both `--policy` and `--policy-github-repo` is supported. Files from both are merged into a single compiled policy. Prefer using distinct Rego file paths between sources to avoid accidental key collisions; the loader reports an error if two sources contribute different content under the same path.
+
+### Multi-instance considerations
+
+Each Warren instance polls GitHub independently with its own `cachedAt`. Within a single TTL window, two instances may briefly serve evaluations against different commit shas (the spread is bounded by the TTL). This is intentional for the read-only Phase 1 scope; future work will close the gap with webhook-driven invalidation.
+
+### Out of scope (today)
+
+The following are deliberately not part of the GitHub source:
+
+- Webhook-driven instant reload (each instance polls)
+- Editing through Warren (Web UI / Slack / PR creation / auto merge)
+- Pre-flight checks on candidate rules
+- Multi-instance commit-sha synchronization
+- Audit logging beyond ordinary process logs
+
 ## Best Practices
 
 - **Filter early** with `ignore` rules to drop noise before AI processing
