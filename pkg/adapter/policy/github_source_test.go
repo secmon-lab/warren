@@ -269,6 +269,62 @@ func TestGitHubSource_ValidationFailure_FallbackToCached(t *testing.T) {
 	gt.True(t, strings.Contains(snap.Files["github://owner/repo/policies/ignore.rego"], "from-github\""))
 }
 
+func TestGitHubSource_RuntimeConflict_FallbackToCached(t *testing.T) {
+	mock := newMockGitHub(t, "sha-1", map[string]string{
+		"policies/ignore.rego": ghTestRego,
+	})
+
+	src, err := policyadapter.NewGitHubSource(policyadapter.GitHubSourceOpts{
+		Owner:  "owner",
+		Repo:   "repo",
+		Paths:  []string{"policies"},
+		Client: mock.client(),
+		TTL:    time.Nanosecond,
+	})
+	gt.NoError(t, err)
+
+	first, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+
+	// Compile succeeds but evaluating data triggers a complete-rule conflict.
+	mock.update("sha-conflict", map[string]string{
+		"policies/conflict.rego": `package conflict
+import rego.v1
+x := 1
+x := 2
+`,
+	})
+
+	time.Sleep(2 * time.Millisecond)
+
+	snap, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.Equal(t, snap.Version, first.Version)
+	gt.True(t, strings.Contains(snap.Files["github://owner/repo/policies/ignore.rego"], "from-github\""))
+}
+
+func TestGitHubSource_RuntimeConflict_NoCache_ReturnsError(t *testing.T) {
+	mock := newMockGitHub(t, "sha-conflict", map[string]string{
+		"policies/conflict.rego": `package conflict
+import rego.v1
+x := 1
+x := 2
+`,
+	})
+
+	src, err := policyadapter.NewGitHubSource(policyadapter.GitHubSourceOpts{
+		Owner:  "owner",
+		Repo:   "repo",
+		Paths:  []string{"policies"},
+		Client: mock.client(),
+		TTL:    time.Minute,
+	})
+	gt.NoError(t, err)
+
+	_, err = src.Snapshot(context.Background())
+	gt.Error(t, err)
+}
+
 func TestGitHubSource_ValidationFailure_NoCache_ReturnsError(t *testing.T) {
 	mock := newMockGitHub(t, "sha-broken", map[string]string{
 		"policies/ignore.rego": "not valid rego at all",

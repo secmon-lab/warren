@@ -332,17 +332,7 @@ Specifying both `--policy` and `--policy-github-repo` is supported. Files from b
 
 ### Multi-instance considerations
 
-Each Warren instance polls GitHub independently with its own `cachedAt`. Within a single TTL window, two instances may briefly serve evaluations against different commit shas (the spread is bounded by the TTL). This is intentional for the read-only Phase 1 scope; future work will close the gap with webhook-driven invalidation.
-
-### Out of scope (today)
-
-The following are deliberately not part of the GitHub source:
-
-- Webhook-driven instant reload (each instance polls)
-- Editing through Warren (Web UI / Slack / PR creation / auto merge)
-- Pre-flight checks on candidate rules
-- Multi-instance commit-sha synchronization
-- Audit logging beyond ordinary process logs
+Each Warren instance polls GitHub independently with its own `cachedAt`. Within a single TTL window, two instances may briefly serve evaluations against different commit shas (the spread is bounded by the TTL).
 
 ## Best Practices
 

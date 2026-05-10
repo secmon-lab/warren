@@ -92,7 +92,7 @@ func cmdChat() *cli.Command {
 			}
 
 			// Configure policy client
-			policyClient, err := policyCfg.Configure()
+			policyClient, err := policyCfg.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure policy")
 			}

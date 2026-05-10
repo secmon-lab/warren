@@ -45,7 +45,7 @@ func TestPolicy_Configure_FileSource(t *testing.T) {
 		err := app.Run(context.Background(), []string{"test", "--policy", "testdata/policy"})
 		gt.NoError(t, err)
 
-		client, err := cfg.Configure()
+		client, err := cfg.Configure(context.Background())
 		gt.NoError(t, err)
 		gt.NotNil(t, client)
 
@@ -71,7 +71,7 @@ func TestPolicy_Configure_FileSource(t *testing.T) {
 		err := app.Run(context.Background(), []string{"test", "--policy", "testdata/policy/sample.rego"})
 		gt.NoError(t, err)
 
-		client, err := cfg.Configure()
+		client, err := cfg.Configure(context.Background())
 		gt.NoError(t, err)
 		gt.NotNil(t, client)
 
@@ -97,7 +97,7 @@ func TestPolicy_Configure_FileSource(t *testing.T) {
 		err := app.Run(context.Background(), []string{"test", "--policy", "testdata/does-not-exist"})
 		gt.NoError(t, err)
 
-		_, err = cfg.Configure()
+		_, err = cfg.Configure(context.Background())
 		gt.Error(t, err)
 	})
 }
@@ -106,7 +106,7 @@ func TestPolicy_Configure_NoSources_ReturnsEmptyClient(t *testing.T) {
 	cfg := &config.Policy{}
 	gt.False(t, cfg.HasPolicies())
 
-	client, err := cfg.Configure()
+	client, err := cfg.Configure(context.Background())
 	gt.NoError(t, err)
 	gt.NotNil(t, client)
 	gt.M(t, client.Sources()).Length(0)
@@ -130,7 +130,7 @@ func TestPolicy_Configure_GitHubFlagValidation(t *testing.T) {
 		})
 		gt.NoError(t, err)
 
-		_, err = cfg.Configure()
+		_, err = cfg.Configure(context.Background())
 		gt.Error(t, err)
 	})
 
@@ -149,7 +149,7 @@ func TestPolicy_Configure_GitHubFlagValidation(t *testing.T) {
 		})
 		gt.NoError(t, err)
 
-		_, err = cfg.Configure()
+		_, err = cfg.Configure(context.Background())
 		gt.Error(t, err)
 	})
 

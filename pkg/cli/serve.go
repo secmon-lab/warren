@@ -219,7 +219,7 @@ func cmdServe() *cli.Command {
 				"async", asyncCfg,
 			)
 
-			policyClient, err := policyCfg.Configure()
+			policyClient, err := policyCfg.Configure(ctx)
 			if err != nil {
 				return err
 			}

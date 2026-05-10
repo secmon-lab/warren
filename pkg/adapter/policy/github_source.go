@@ -2,6 +2,7 @@ package policy
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"sync"
@@ -145,9 +146,17 @@ func (s *GitHubSource) Snapshot(ctx context.Context) (*Snapshot, error) {
 			goerr.V("commit_sha", headSha)))
 	}
 
-	if _, err := opaq.New(opaq.DataMap(files)); err != nil {
-		return s.fallbackLocked(ctx, goerr.Wrap(err, "policy validation failed",
-			goerr.V("commit_sha", headSha)))
+	if err := validatePolicy(ctx, files); err != nil {
+		// Validation failures indicate a data-level problem (bad Rego, rule
+		// conflict, etc.) that will not self-heal on retry, so notify
+		// regardless of whether a cached snapshot is available.
+		wrapped := goerr.Wrap(err, "policy validation failed",
+			goerr.V("commit_sha", headSha))
+		errutil.Handle(ctx, wrapped)
+		if s.cachedFiles != nil {
+			return s.snapshotLocked(), nil
+		}
+		return nil, wrapped
 	}
 
 	s.cachedFiles = files
@@ -224,4 +233,25 @@ func (s *GitHubSource) fetchPath(ctx context.Context, p string, opts *github.Rep
 
 func (s *GitHubSource) fileKey(repoPath string) string {
 	return "github://" + s.owner + "/" + s.repo + "/" + repoPath
+}
+
+// validatePolicy performs both compile-time and runtime checks against a set
+// of Rego files. The compile step catches syntax and reference errors; the
+// runtime step (evaluating the root data document with an empty input)
+// surfaces problems such as complete-rule conflicts that pass compilation
+// but fail at evaluation time. ErrNoEvalResult is treated as success since
+// it merely indicates that the requested document is not defined.
+func validatePolicy(ctx context.Context, files map[string]string) error {
+	client, err := opaq.New(opaq.DataMap(files))
+	if err != nil {
+		return goerr.Wrap(err, "failed to compile policy")
+	}
+	var out any
+	if err := client.Query(ctx, "data", map[string]any{}, &out); err != nil {
+		if errors.Is(err, opaq.ErrNoEvalResult) {
+			return nil
+		}
+		return goerr.Wrap(err, "policy evaluation failed under empty input")
+	}
+	return nil
 }

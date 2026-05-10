@@ -94,7 +94,11 @@ func (x Policy) LogValue() slog.Value {
 // Configure builds a PolicyClient that aggregates configured policy sources.
 // File and GitHub sources may be combined; if neither is configured the
 // returned client behaves as a no-op (HasPolicies reports false beforehand).
-func (x *Policy) Configure() (interfaces.PolicyClient, error) {
+//
+// The context is used for the initial GitHub fetch (when a GitHub source is
+// configured), so callers should pass the CLI command's context to honour
+// cancellation and timeouts.
+func (x *Policy) Configure(ctx context.Context) (interfaces.PolicyClient, error) {
 	var sources []policyadapter.Source
 
 	if len(x.filePaths) > 0 {
@@ -134,7 +138,7 @@ func (x *Policy) Configure() (interfaces.PolicyClient, error) {
 	loader := policyadapter.NewLoader(sources...)
 
 	if loader.HasSources() {
-		if err := loader.Prime(context.Background()); err != nil {
+		if err := loader.Prime(ctx); err != nil {
 			return nil, goerr.Wrap(err, "failed to load initial policy")
 		}
 	}
