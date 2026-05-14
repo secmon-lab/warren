@@ -154,7 +154,7 @@ Tools are automatically enabled when their API key is configured. Missing keys a
 | `WARREN_GITHUB_APP_ID` | `--github-app-id` | - | GitHub App ID |
 | `WARREN_GITHUB_APP_INSTALLATION_ID` | `--github-app-installation-id` | - | App installation ID |
 | `WARREN_GITHUB_APP_PRIVATE_KEY` | `--github-app-private-key` | - | App private key (PEM) |
-| `WARREN_GITHUB_APP_CONFIG` | `--github-app-config` | - | YAML config file path(s) |
+| `WARREN_GITHUB_APP_CONFIG` | `--github-app-config` | - | Optional YAML file(s) listing recommended repositories shown to the LLM as starting-point hints. Not an access allowlist — actual access is governed by the GitHub App installation scope. |
 
 ### Microsoft Intune
 

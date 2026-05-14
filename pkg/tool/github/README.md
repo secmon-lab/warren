@@ -1,6 +1,6 @@
 # GitHub
 
-Search code, issues, and pull requests, list commit history, and get file blame across configured GitHub repositories using a GitHub App for authentication.
+Search code, issues, and pull requests, list commit history, and get file blame across any GitHub repository reachable by the configured GitHub App installation.
 
 ## Configuration
 
@@ -9,17 +9,19 @@ Search code, issues, and pull requests, list commit history, and get file blame 
 | `WARREN_GITHUB_APP_ID` | `--github-app-id` | Yes | GitHub App ID |
 | `WARREN_GITHUB_APP_INSTALLATION_ID` | `--github-app-installation-id` | Yes | GitHub App Installation ID |
 | `WARREN_GITHUB_APP_PRIVATE_KEY` | `--github-app-private-key` | Yes | GitHub App private key (PEM format) |
-| `WARREN_GITHUB_APP_CONFIG` | `--github-app-config` | No | YAML config file path(s) for additional settings |
+| `WARREN_GITHUB_APP_CONFIG` | `--github-app-config` | No | YAML file(s) listing recommended repositories. These are presented to the LLM as starting-point hints only and do **not** act as an access allowlist — any repository the App installation can reach is callable. |
 
 ## Available Functions
 
 | Function | Description |
 |---|---|
-| `github_code_search` | Search for code across repositories. Supports filters: `language`, `path`, `filename`, `repo_filter` |
-| `github_issue_search` | Search issues and pull requests. Supports filters: `state`, `labels`, `author`, `type`, `repo_filter` |
+| `github_code_search` | Search for code. Supports filters: `language`, `path`, `filename`, `repo_filter` (comma-separated `owner/name` list, optional) |
+| `github_issue_search` | Search issues and pull requests. Supports filters: `state`, `labels`, `author`, `type`, `repo_filter` (comma-separated `owner/name` list, optional) |
 | `github_get_content` | Get file content from a specific repository by owner, repo, path, and ref |
 | `github_list_commits` | List commits for a repository. Supports filters: `sha`, `path`, `author`, `per_page`, `page` |
 | `github_get_blame` | Get git blame for a file, showing which commit last modified each line. Uses GraphQL API |
+
+The access boundary for every function is the GitHub App installation scope: configure the App to grant access to exactly the repositories you want investigatable. The `WARREN_GITHUB_APP_CONFIG` YAML is used only to populate the LLM-facing hint section in the system prompt (and to look up a `default_branch` for `github_get_blame`).
 
 ## Setup
 

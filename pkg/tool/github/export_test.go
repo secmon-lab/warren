@@ -30,3 +30,12 @@ type GraphQLCommitAuthor = graphQLCommitAuthor
 func (x *Action) SetHTTPClient(client *http.Client) {
 	x.httpClient = client
 }
+
+// BuildCodeSearchQuery is exported for testing
+var BuildCodeSearchQuery = buildCodeSearchQuery
+
+// BuildIssueSearchQuery is exported for testing
+var BuildIssueSearchQuery = buildIssueSearchQuery
+
+// ParseRepoFilter is exported for testing
+var ParseRepoFilter = parseRepoFilter

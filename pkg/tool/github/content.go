@@ -26,13 +26,6 @@ func (x *Action) runGetContent(ctx context.Context, args map[string]any) (map[st
 		return nil, goerr.New("path is required")
 	}
 
-	// Check if the repository is in our configured list
-	if !x.isAllowedRepo(owner, repo) {
-		return nil, goerr.New("repository not in configured list",
-			goerr.V("owner", owner),
-			goerr.V("repo", repo))
-	}
-
 	// Prepare options
 	opts := &github.RepositoryContentGetOptions{}
 
