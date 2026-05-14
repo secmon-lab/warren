@@ -88,32 +88,32 @@ func (x *Action) LogValue() slog.Value {
 
 // Configure implements interfaces.Tool
 func (x *Action) Configure(ctx context.Context) error {
+	logger := logging.From(ctx)
+
 	// Validate required settings
 	if x.appID == 0 || x.installationID == 0 || x.privateKey == "" {
 		return errutil.ErrActionUnavailable
 	}
 
+	// Load repository configurations. Configs are advisory hints surfaced
+	// to the LLM via Prompt(); they do not gate API access.
 	if len(x.configFiles) == 0 {
-		logging.Default().Warn("GitHub App credentials provided but no config files specified")
-		return errutil.ErrActionUnavailable
-	}
-
-	// Private key is already loaded from flag/env var
-
-	// Load repository configurations
-	var allConfigs []*RepositoryConfig
-	for _, configPath := range x.configFiles {
-		configs, err := x.loadConfig(configPath)
-		if err != nil {
-			return err
+		logger.Warn("GitHub App configured without repository hint files; the LLM will see no suggested repositories")
+	} else {
+		var allConfigs []*RepositoryConfig
+		for _, configPath := range x.configFiles {
+			configs, err := x.loadConfig(configPath)
+			if err != nil {
+				return err
+			}
+			allConfigs = append(allConfigs, configs...)
 		}
-		allConfigs = append(allConfigs, configs...)
-	}
 
-	if len(allConfigs) == 0 {
-		return goerr.New("no repository configurations found")
+		if len(allConfigs) == 0 {
+			logger.Warn("GitHub repository hint files loaded but contain no entries", slog.Any("files", x.configFiles))
+		}
+		x.configs = allConfigs
 	}
-	x.configs = allConfigs
 
 	// Create GitHub client with App authentication
 	transport, err := ghinstallation.New(http.DefaultTransport, x.appID, x.installationID, []byte(x.privateKey))
@@ -206,7 +206,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return []gollem.ToolSpec{
 		{
 			Name:        "github_code_search",
-			Description: "Search for code in configured GitHub repositories. Query syntax examples: 'function login', 'language:go fmt.Println', 'path:src/ extension:js', 'filename:config NOT test'",
+			Description: "Search for code across any GitHub repository reachable by the App installation. Query syntax examples: 'function login', 'language:go fmt.Println', 'path:src/ extension:js', 'filename:config NOT test'. Scope the search by passing repo_filter or by including 'repo:owner/name', 'org:owner', or 'user:owner' qualifiers in the query.",
 			Parameters: map[string]*gollem.Parameter{
 				"query": {
 					Type:        gollem.TypeString,
@@ -230,13 +230,13 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				},
 				"repo_filter": {
 					Type:        gollem.TypeString,
-					Description: "Filter repositories by name pattern (case-insensitive substring match)",
+					Description: "Optional repository scope as a comma-separated list of 'owner/name' entries (e.g. 'octocat/Hello-World,octocat/Spoon-Knife'). When omitted, the search is not scoped to any specific repos; use 'repo:', 'org:', or 'user:' qualifiers in the query for finer control.",
 				},
 			},
 		},
 		{
 			Name:        "github_issue_search",
-			Description: "Search for issues and pull requests. Query syntax: 'bug in:title', 'label:security state:open', 'author:octocat type:pr'",
+			Description: "Search for issues and pull requests across any GitHub repository reachable by the App installation. Query syntax: 'bug in:title', 'label:security state:open', 'author:octocat type:pr'. Scope by passing repo_filter or by including 'repo:owner/name', 'org:owner', or 'user:owner' qualifiers in the query.",
 			Parameters: map[string]*gollem.Parameter{
 				"query": {
 					Type:        gollem.TypeString,
@@ -269,13 +269,13 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 				},
 				"repo_filter": {
 					Type:        gollem.TypeString,
-					Description: "Filter repositories by name pattern (case-insensitive substring match)",
+					Description: "Optional repository scope as a comma-separated list of 'owner/name' entries. When omitted, the search is not scoped to any specific repos; use 'repo:', 'org:', or 'user:' qualifiers in the query for finer control.",
 				},
 			},
 		},
 		{
 			Name:        "github_get_content",
-			Description: "Get file content from a specific GitHub repository. Returns the decoded content of the file.",
+			Description: "Get file content from any GitHub repository reachable by the App installation. Returns the decoded content of the file.",
 			Parameters: map[string]*gollem.Parameter{
 				"owner": {
 					Type:        gollem.TypeString,
@@ -308,7 +308,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 		},
 		{
 			Name:        "github_list_commits",
-			Description: "List commits for a repository. Supports filtering by file path, author, and branch/SHA. Useful for understanding change history and identifying who changed what and when.",
+			Description: "List commits for any repository reachable by the App installation. Supports filtering by file path, author, and branch/SHA. Useful for understanding change history and identifying who changed what and when.",
 			Parameters: map[string]*gollem.Parameter{
 				"owner": {
 					Type:        gollem.TypeString,
@@ -350,7 +350,7 @@ func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 		},
 		{
 			Name:        "github_get_blame",
-			Description: "Get git blame information for a file, showing which commit last modified each line. Useful for identifying who wrote specific code and when.",
+			Description: "Get git blame information for a file in any repository reachable by the App installation, showing which commit last modified each line. Useful for identifying who wrote specific code and when.",
 			Parameters: map[string]*gollem.Parameter{
 				"owner": {
 					Type:        gollem.TypeString,
@@ -414,7 +414,7 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 
 	var sb strings.Builder
 	sb.WriteString("## GitHub Repositories\n\n")
-	sb.WriteString("The following GitHub repositories are configured and accessible:\n\n")
+	sb.WriteString("The following repositories are recommended starting points for investigation. They are hints, not an access allowlist: any repository reachable by the GitHub App installation can also be queried by passing its owner/name explicitly.\n\n")
 
 	for _, config := range x.configs {
 		fmt.Fprintf(&sb, "- **%s/%s**", config.Owner, config.Repository)
@@ -428,7 +428,7 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 	}
 
 	sb.WriteString("\n")
-	sb.WriteString("Use the GitHub tools to search code, issues/PRs, retrieve file contents, list commit history, or get file blame from these repositories.\n")
+	sb.WriteString("Use the GitHub tools to search code, issues/PRs, retrieve file contents, list commit history, or get file blame. For search tools, use the `repo_filter` parameter (comma-separated `owner/name` list) or include `repo:`/`org:`/`user:` qualifiers in the query to scope results.\n")
 
 	return sb.String(), nil
 }
