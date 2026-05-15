@@ -82,6 +82,12 @@ func (x *Tool) Prompt(_ context.Context) (string, error) {
 	if x.mode != ModeSearchOnly {
 		sb.WriteString("Specify at least one tag when searching. Use `knowledge_tag_list` to see available tags.\n")
 	}
+
+	sb.WriteString("\n**Two-phase workflow**:\n")
+	sb.WriteString("1. Use `knowledge_list` or `knowledge_search` to browse entries (returns ID, title, tags only)\n")
+	sb.WriteString("2. Use `knowledge_get` with specific IDs to retrieve full details (including claim content)\n")
+	sb.WriteString("This approach minimizes token usage while allowing efficient knowledge exploration.\n")
+
 	return sb.String(), nil
 }
 
@@ -103,7 +109,7 @@ const (
 func (x *Tool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
 	searchSpec := gollem.ToolSpec{
 		Name:        cmdSearch,
-		Description: "Search for knowledge. Returns relevant entries matching the query, filtered by tags.",
+		Description: "Search for knowledge. Returns lightweight summaries (ID, title, tags only). Use knowledge_get to retrieve full details.",
 		Parameters: map[string]*gollem.Parameter{
 			"query": {
 				Type:        gollem.TypeString,
@@ -186,15 +192,26 @@ func (x *Tool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
 			},
 			gollem.ToolSpec{
 				Name:        cmdList,
-				Description: "List knowledge entries (titles and tags only, lightweight).",
+				Description: "List knowledge entries (ID, title, tags only - lightweight for browsing). Use knowledge_get to retrieve full details.",
+				Parameters: map[string]*gollem.Parameter{
+					"limit": {
+						Type:        gollem.TypeInteger,
+						Description: "Maximum number of entries to return (default: 25, max: 100)",
+					},
+					"offset": {
+						Type:        gollem.TypeInteger,
+						Description: "Number of entries to skip for pagination (default: 0)",
+					},
+				},
 			},
 			gollem.ToolSpec{
 				Name:        cmdGet,
-				Description: "Get full details of a specific knowledge entry.",
+				Description: "Get full details (including claim) of one or more knowledge entries by ID.",
 				Parameters: map[string]*gollem.Parameter{
-					"id": {
-						Type:        gollem.TypeString,
-						Description: "Knowledge ID",
+					"ids": {
+						Type:        gollem.TypeArray,
+						Items:       &gollem.Parameter{Type: gollem.TypeString},
+						Description: "Knowledge IDs to retrieve (1-10 IDs)",
 						Required:    true,
 					},
 				},
@@ -289,7 +306,7 @@ func (x *Tool) Run(ctx context.Context, name string, args map[string]any) (map[s
 	case cmdDelete:
 		return x.delete(ctx, args)
 	case cmdList:
-		return x.list(ctx)
+		return x.list(ctx, args)
 	case cmdGet:
 		return x.get(ctx, args)
 	case cmdHistory:
@@ -329,7 +346,7 @@ func (x *Tool) search(ctx context.Context, args map[string]any) (map[string]any,
 	msg.Trace(ctx, "🔍 Found %d knowledge entries", len(results))
 
 	return map[string]any{
-		"results": formatKnowledgeList(results),
+		"results": formatKnowledgeSummary(results),
 		"count":   len(results),
 	}, nil
 }
@@ -386,7 +403,30 @@ func (x *Tool) delete(ctx context.Context, args map[string]any) (map[string]any,
 	return map[string]any{"success": true}, nil
 }
 
-func (x *Tool) list(ctx context.Context) (map[string]any, error) {
+func (x *Tool) list(ctx context.Context, args map[string]any) (map[string]any, error) {
+	// Extract limit and offset parameters
+	limit := 25 // default
+	offset := 0 // default
+
+	if l, ok := args["limit"].(float64); ok {
+		limit = int(l)
+	}
+	if o, ok := args["offset"].(float64); ok {
+		offset = int(o)
+	}
+
+	// Apply max limit
+	const maxLimit = 100
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+	if limit <= 0 {
+		limit = 25
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
 	// List all tags first to resolve names
 	tags, err := x.svc.ListTags(ctx)
 	if err != nil {
@@ -395,7 +435,7 @@ func (x *Tool) list(ctx context.Context) (map[string]any, error) {
 
 	// For list, we search across all tags in this category
 	if len(tags) == 0 {
-		return map[string]any{"entries": []any{}, "count": 0}, nil
+		return map[string]any{"entries": []any{}, "count": 0, "returned": 0, "offset": offset}, nil
 	}
 
 	allTagIDs := make([]types.KnowledgeTagID, len(tags))
@@ -407,7 +447,8 @@ func (x *Tool) list(ctx context.Context) (map[string]any, error) {
 	seen := make(map[types.KnowledgeID]bool)
 	var results []*knowledgeModel.Knowledge
 	for _, tagID := range allTagIDs {
-		knowledges, err := x.svc.SearchKnowledge(ctx, x.category, []types.KnowledgeTagID{tagID}, "", 100)
+		// Query more than needed to account for offset + limit
+		knowledges, err := x.svc.SearchKnowledge(ctx, x.category, []types.KnowledgeTagID{tagID}, "", offset+limit+50)
 		if err != nil {
 			continue
 		}
@@ -419,35 +460,64 @@ func (x *Tool) list(ctx context.Context) (map[string]any, error) {
 		}
 	}
 
+	totalCount := len(results)
+
+	// Apply offset and limit
+	if offset >= len(results) {
+		results = nil
+	} else {
+		results = results[offset:]
+		if len(results) > limit {
+			results = results[:limit]
+		}
+	}
+
 	return map[string]any{
-		"entries": formatKnowledgeList(results),
-		"count":   len(results),
+		"entries":  formatKnowledgeSummary(results),
+		"count":    totalCount,
+		"returned": len(results),
+		"offset":   offset,
 	}, nil
 }
 
 func (x *Tool) get(ctx context.Context, args map[string]any) (map[string]any, error) {
-	id, _ := args["id"].(string)
-	if id == "" {
-		return nil, goerr.New("id is required")
+	// Extract IDs array
+	idsRaw, ok := args["ids"]
+	if !ok {
+		return nil, goerr.New("ids parameter is required")
 	}
 
-	k, err := x.svc.GetKnowledge(ctx, types.KnowledgeID(id))
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get knowledge")
+	idsArray, ok := idsRaw.([]any)
+	if !ok {
+		return nil, goerr.New("ids must be an array")
 	}
-	if k == nil {
-		return map[string]any{"found": false}, nil
+
+	if len(idsArray) == 0 {
+		return nil, goerr.New("at least one ID is required")
+	}
+
+	if len(idsArray) > 10 {
+		return nil, goerr.New("maximum 10 IDs allowed")
+	}
+
+	// Convert to KnowledgeID slice
+	ids := make([]types.KnowledgeID, len(idsArray))
+	for i, v := range idsArray {
+		s, ok := v.(string)
+		if !ok {
+			return nil, goerr.New("ID must be a string")
+		}
+		ids[i] = types.KnowledgeID(s)
+	}
+
+	knowledges, err := x.svc.GetKnowledges(ctx, ids)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to get knowledges")
 	}
 
 	return map[string]any{
-		"found":      true,
-		"id":         k.ID.String(),
-		"category":   string(k.Category),
-		"title":      k.Title,
-		"claim":      k.Claim,
-		"tags":       k.Tags,
-		"author":     k.Author.String(),
-		"updated_at": k.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		"entries": formatKnowledgeDetail(knowledges),
+		"count":   len(knowledges),
 	}, nil
 }
 
@@ -578,8 +648,8 @@ func extractTagIDs(args map[string]any, key string) ([]types.KnowledgeTagID, err
 	return ids, nil
 }
 
-// formatKnowledgeList formats knowledges for tool output.
-func formatKnowledgeList(knowledges []*knowledgeModel.Knowledge) []map[string]any {
+// formatKnowledgeSummary formats knowledges as lightweight summaries (no claim).
+func formatKnowledgeSummary(knowledges []*knowledgeModel.Knowledge) []map[string]any {
 	result := make([]map[string]any, len(knowledges))
 	for i, k := range knowledges {
 		tagStrs := make([]string, len(k.Tags))
@@ -589,8 +659,28 @@ func formatKnowledgeList(knowledges []*knowledgeModel.Knowledge) []map[string]an
 		result[i] = map[string]any{
 			"id":         k.ID.String(),
 			"title":      k.Title,
+			"tags":       tagStrs,
+			"updated_at": k.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		}
+	}
+	return result
+}
+
+// formatKnowledgeDetail formats knowledges with full details (including claim).
+func formatKnowledgeDetail(knowledges []*knowledgeModel.Knowledge) []map[string]any {
+	result := make([]map[string]any, len(knowledges))
+	for i, k := range knowledges {
+		tagStrs := make([]string, len(k.Tags))
+		for j, t := range k.Tags {
+			tagStrs[j] = t.String()
+		}
+		result[i] = map[string]any{
+			"id":         k.ID.String(),
+			"category":   string(k.Category),
+			"title":      k.Title,
 			"claim":      k.Claim,
 			"tags":       tagStrs,
+			"author":     k.Author.String(),
 			"updated_at": k.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 		}
 	}
