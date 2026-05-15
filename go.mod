@@ -28,10 +28,11 @@ require (
 	github.com/m-mizutani/opaq v0.3.0
 	github.com/migueleliasweb/go-github-mock v1.4.0
 	github.com/newmo-oss/go-caller v0.1.0
-	github.com/slack-go/slack v0.20.0
+	github.com/slack-go/slack v0.23.1
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.8.0
 	github.com/vektah/gqlparser/v2 v2.5.32
+	golang.org/x/net v0.53.0
 	google.golang.org/api v0.275.0
 	google.golang.org/genai v1.53.0
 	google.golang.org/grpc v1.80.0
@@ -166,7 +167,6 @@ require (
 	golang.org/x/crypto v0.50.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.35.0 // indirect
-	golang.org/x/net v0.53.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect

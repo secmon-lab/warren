@@ -297,6 +297,7 @@ func cmdServe() *cli.Command {
 
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(repo, embeddingAdapter)
+			tools.InjectLLMClient(llmClient)
 
 			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {

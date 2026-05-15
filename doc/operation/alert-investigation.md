@@ -149,6 +149,7 @@ Warren's AI agent has access to the following tools during investigation. Tools 
 |------|-------------|---------|
 | Slack Message Search | Search workspace messages | [README](../../pkg/tool/slack/README.md) |
 | Knowledge | Save/retrieve investigation knowledge | [README](../../pkg/tool/knowledge/README.md) |
+| WebFetch | Fetch a web page and return Markdown (with indirect-prompt-injection screening) | [README](../../pkg/tool/webfetch/README.md) |
 
 ## Sub-Agents
 
