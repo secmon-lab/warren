@@ -33,6 +33,9 @@ var _ interfaces.Tool = &Action{}
 // SetLLMClient injects the LLM client used by the analyze step.
 // It is invoked from pkg/cli during start-up so that all entrypoints that
 // own an LLM client share the same instance with the webfetch tool.
+//
+// Mutable injection is intentionally retained for now; migrating the whole
+// tool family to an immutable construction model is tracked in #214.
 func (x *Action) SetLLMClient(client gollem.LLMClient) {
 	x.llmClient = client
 }
