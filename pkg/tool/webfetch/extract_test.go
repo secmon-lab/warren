@@ -3,7 +3,6 @@ package webfetch_test
 import (
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -170,8 +169,9 @@ func TestExtract_BinaryRejected(t *testing.T) {
 //   - identifying keywords appear in the extracted text (case-insensitive),
 //   - common HTML noise (<script>, <style>) is absent.
 //
-// Skipped unless TEST_WEBFETCH_LIVE is set, since this requires outbound
-// network access and depends on third-party pages remaining online.
+// Transient upstream failures (network errors, 4xx/5xx anti-bot responses)
+// produce a per-case skip rather than a hard failure so that test runs are
+// not blocked by third-party site flakiness.
 
 type liveExtractCase struct {
 	name        string
@@ -208,10 +208,6 @@ var liveExtractCases = []liveExtractCase{
 }
 
 func TestExtract_Live_RealWebsites(t *testing.T) {
-	if os.Getenv("TEST_WEBFETCH_LIVE") == "" {
-		t.Skip("TEST_WEBFETCH_LIVE is not set")
-	}
-
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	for _, tc := range liveExtractCases {
