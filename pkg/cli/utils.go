@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
@@ -72,6 +73,16 @@ func (x toolList) InjectSlackClient(slackClient interfaces.SlackClient) {
 		// Check if tool supports slack client injection
 		if slackSetter, ok := tool.(interface{ SetSlackClient(interfaces.SlackClient) }); ok {
 			slackSetter.SetSlackClient(slackClient)
+		}
+	}
+}
+
+// InjectLLMClient injects the LLM client into tools that support it (e.g. webfetch
+// uses the LLM both for body cleanup and indirect-prompt-injection detection).
+func (x toolList) InjectLLMClient(llmClient gollem.LLMClient) {
+	for _, tool := range x {
+		if setter, ok := tool.(interface{ SetLLMClient(gollem.LLMClient) }); ok {
+			setter.SetLLMClient(llmClient)
 		}
 	}
 }

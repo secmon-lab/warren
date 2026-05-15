@@ -111,6 +111,7 @@ func cmdChat() *cli.Command {
 
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(repo, embeddingClient)
+			tools.InjectLLMClient(llmClient)
 
 			// Get the ticket
 			ticket, err := repo.GetTicket(ctx, ticketID)
