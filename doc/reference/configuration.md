@@ -171,6 +171,73 @@ Tools are automatically enabled when their API key is configured. Missing keys a
 |---|---|---|---|
 | `WARREN_SLACK_TOOL_USER_TOKEN` | `--slack-tool-user-token` | - | Slack User token (`xoxp-...`) with `search:read` scope |
 
+### WebFetch (Tool)
+
+`web_fetch` performs an HTTP/HTTPS GET, extracts the body, and optionally screens it through an LLM for Markdown reformatting + indirect-prompt-injection detection. Its LLM is configured independently from the warren-wide Gemini/Claude setup so the screening provider can differ from the main one (or be disabled).
+
+| Environment Variable | CLI Flag | Default | Description |
+|---|---|---|---|
+| `WARREN_WEBFETCH_LLM_PROVIDER` | `--webfetch-llm-provider` | _(empty)_ | LLM provider for analyze step: `gemini`, `claude`, or `openai`. Empty disables LLM analysis and forces HITL approval per call. |
+| `WARREN_WEBFETCH_LLM_MODEL` | `--webfetch-llm-model` | _(empty)_ | LLM model name. Required when `--webfetch-llm-provider` is set. Examples: `gemini-2.5-flash`, `claude-sonnet-4@20250514`, `gpt-4o`. |
+| `WARREN_WEBFETCH_LLM_ARGS` | `--webfetch-llm-args` | _(empty)_ | Provider-specific options as `key=value,key=value`. Recognized keys: `project_id`, `location` (Vertex routes), `temperature` (all providers). |
+| `WARREN_WEBFETCH_LLM_API_KEY` | `--webfetch-llm-api-key` | _(empty)_ | API key. Required for `openai` and for the `claude` Anthropic-direct route. Ignored for `gemini` and for the `claude` Vertex route. |
+
+**HITL behavior**: When `--webfetch-llm-provider` is empty, indirect-prompt-injection screening is not performed, so every `web_fetch` call is gated by a human-in-the-loop (HITL) approval dialog. When the provider is set, the LLM performs the screening and the dialog is suppressed to reduce friction.
+
+**Startup ping**: With a provider configured, warren issues a minimal `max_tokens=1` generation request at start-up so misconfigurations (bad API key, wrong model name, wrong project/location) fail fast instead of at first use.
+
+**Claude routing**: The `claude` provider auto-selects between the Vertex AI route and the direct Anthropic API route based on the supplied args/api-key:
+
+- Set `project_id` and `location` in `--webfetch-llm-args`, no api-key → Vertex AI route
+- Set `--webfetch-llm-api-key`, no `project_id`/`location` → Anthropic direct route
+- Set both → start-up error (ambiguous)
+- Set neither → start-up error (route unspecified)
+
+#### Examples
+
+Gemini on Vertex AI:
+
+```bash
+warren chat \
+  --webfetch-llm-provider gemini \
+  --webfetch-llm-model    gemini-2.5-flash \
+  --webfetch-llm-args     "project_id=my-proj,location=us-central1"
+```
+
+Claude on Vertex AI (project/location present → Vertex route):
+
+```bash
+warren chat \
+  --webfetch-llm-provider claude \
+  --webfetch-llm-model    "claude-sonnet-4@20250514" \
+  --webfetch-llm-args     "project_id=my-proj,location=us-east5"
+```
+
+Claude via Anthropic direct API (api-key present → direct route):
+
+```bash
+warren chat \
+  --webfetch-llm-provider claude \
+  --webfetch-llm-model    claude-sonnet-4-5-20250929 \
+  --webfetch-llm-api-key  "$ANTHROPIC_API_KEY"
+```
+
+OpenAI:
+
+```bash
+warren chat \
+  --webfetch-llm-provider openai \
+  --webfetch-llm-model    gpt-4o \
+  --webfetch-llm-args     "temperature=0.2" \
+  --webfetch-llm-api-key  "$OPENAI_API_KEY"
+```
+
+LLM analysis disabled (HITL approval gates every call):
+
+```bash
+warren chat   # no --webfetch-llm-* flags
+```
+
 ## Sub-Agent Configuration
 
 ### BigQuery Agent

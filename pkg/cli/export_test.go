@@ -1,11 +1,19 @@
 package cli
 
 import (
+	"context"
 	"io"
 
 	"github.com/m-mizutani/fireconf"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/usecase"
 )
+
+// HITLToolNamesForTest exposes toolList.HITLToolNames for testing.
+func HITLToolNamesForTest(ctx context.Context, tools ...interfaces.Tool) ([]string, error) {
+	tl := toolList(tools)
+	return tl.HITLToolNames(ctx)
+}
 
 // ReadAlertDataForTest exposes readAlertData for testing
 func ReadAlertDataForTest(inputFile string) (any, error) {
