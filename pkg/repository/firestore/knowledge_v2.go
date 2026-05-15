@@ -55,6 +55,39 @@ func (r *Firestore) GetKnowledge(ctx context.Context, id types.KnowledgeID) (*kn
 	return &k, nil
 }
 
+func (r *Firestore) BatchGetKnowledges(ctx context.Context, ids []types.KnowledgeID) ([]*knowledge.Knowledge, error) {
+	if len(ids) == 0 {
+		return []*knowledge.Knowledge{}, nil
+	}
+
+	// Build document references
+	refs := make([]*firestore.DocumentRef, len(ids))
+	for i, id := range ids {
+		refs[i] = r.db.Collection(collectionKnowledges).Doc(id.String())
+	}
+
+	// Batch get
+	docs, err := r.db.GetAll(ctx, refs)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to batch get knowledges")
+	}
+
+	// Decode results (skip non-existent docs)
+	results := make([]*knowledge.Knowledge, 0, len(docs))
+	for _, doc := range docs {
+		if !doc.Exists() {
+			continue
+		}
+		var k knowledge.Knowledge
+		if err := doc.DataTo(&k); err != nil {
+			return nil, goerr.Wrap(err, "failed to decode knowledge", goerr.V("id", doc.Ref.ID))
+		}
+		results = append(results, &k)
+	}
+
+	return results, nil
+}
+
 func (r *Firestore) PutKnowledge(ctx context.Context, k *knowledge.Knowledge) error {
 	_, err := r.db.Collection(collectionKnowledges).Doc(k.ID.String()).Set(ctx, k)
 	if err != nil {

@@ -173,20 +173,10 @@ func (s *Service) GetKnowledge(ctx context.Context, id types.KnowledgeID) (*know
 	return s.repo.GetKnowledge(ctx, id)
 }
 
-// GetKnowledges retrieves multiple knowledges by IDs.
+// GetKnowledges retrieves multiple knowledges by IDs in a single batch query.
 // Non-existent IDs are silently skipped (not treated as errors).
 func (s *Service) GetKnowledges(ctx context.Context, ids []types.KnowledgeID) ([]*knowledgeModel.Knowledge, error) {
-	results := make([]*knowledgeModel.Knowledge, 0, len(ids))
-	for _, id := range ids {
-		k, err := s.repo.GetKnowledge(ctx, id)
-		if err != nil {
-			return nil, goerr.Wrap(err, "failed to get knowledge", goerr.V("id", id))
-		}
-		if k != nil {
-			results = append(results, k)
-		}
-	}
-	return results, nil
+	return s.repo.BatchGetKnowledges(ctx, ids)
 }
 
 // ListKnowledgeLogs retrieves change history for a knowledge.

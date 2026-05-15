@@ -51,6 +51,23 @@ func (r *Memory) GetKnowledge(_ context.Context, id types.KnowledgeID) (*knowled
 	return &cp, nil
 }
 
+func (r *Memory) BatchGetKnowledges(_ context.Context, ids []types.KnowledgeID) ([]*knowledge.Knowledge, error) {
+	r.knowledge.mu.RLock()
+	defer r.knowledge.mu.RUnlock()
+
+	results := make([]*knowledge.Knowledge, 0, len(ids))
+	for _, id := range ids {
+		k, ok := r.knowledge.knowledges[id]
+		if !ok {
+			continue
+		}
+		cp := *k
+		cp.Tags = append([]types.KnowledgeTagID(nil), k.Tags...)
+		results = append(results, &cp)
+	}
+	return results, nil
+}
+
 func (r *Memory) PutKnowledge(_ context.Context, k *knowledge.Knowledge) error {
 	r.knowledge.mu.Lock()
 	defer r.knowledge.mu.Unlock()

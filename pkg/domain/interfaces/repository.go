@@ -247,6 +247,8 @@ type Repository interface {
 	// Knowledge: topic-based knowledge store with category and tags
 	// GetKnowledge retrieves a specific knowledge by ID
 	GetKnowledge(ctx context.Context, id types.KnowledgeID) (*knowledge.Knowledge, error)
+	// BatchGetKnowledges retrieves multiple knowledges by IDs in a single query
+	BatchGetKnowledges(ctx context.Context, ids []types.KnowledgeID) ([]*knowledge.Knowledge, error)
 	// PutKnowledge saves or updates a knowledge entry
 	PutKnowledge(ctx context.Context, k *knowledge.Knowledge) error
 	// DeleteKnowledge physically deletes a knowledge entry

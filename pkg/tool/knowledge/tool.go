@@ -496,18 +496,23 @@ func (x *Tool) get(ctx context.Context, args map[string]any) (map[string]any, er
 		return nil, goerr.New("at least one ID is required")
 	}
 
-	if len(idsArray) > 10 {
-		return nil, goerr.New("maximum 10 IDs allowed")
-	}
-
-	// Convert to KnowledgeID slice
-	ids := make([]types.KnowledgeID, len(idsArray))
-	for i, v := range idsArray {
+	// Convert to KnowledgeID slice and deduplicate
+	idMap := make(map[types.KnowledgeID]struct{})
+	var ids []types.KnowledgeID
+	for _, v := range idsArray {
 		s, ok := v.(string)
 		if !ok {
 			return nil, goerr.New("ID must be a string")
 		}
-		ids[i] = types.KnowledgeID(s)
+		id := types.KnowledgeID(s)
+		if _, exists := idMap[id]; !exists {
+			idMap[id] = struct{}{}
+			ids = append(ids, id)
+		}
+	}
+
+	if len(ids) > 10 {
+		return nil, goerr.New("maximum 10 unique IDs allowed")
 	}
 
 	knowledges, err := x.svc.GetKnowledges(ctx, ids)
