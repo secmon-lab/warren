@@ -28,7 +28,7 @@ require (
 	github.com/m-mizutani/opaq v0.3.0
 	github.com/migueleliasweb/go-github-mock v1.4.0
 	github.com/newmo-oss/go-caller v0.1.0
-	github.com/slack-go/slack v0.20.0
+	github.com/slack-go/slack v0.23.1
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.8.0
 	github.com/vektah/gqlparser/v2 v2.5.32

@@ -25,6 +25,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"sort"
 	"sync"
 
@@ -276,11 +279,13 @@ func NewSlackClientMock(r *Recorder) *mock.SlackClientMock {
 }
 
 // buildMsgArgs decodes the MsgOption chain into a deterministic map suitable
-// for JSON serialization. Slack's UnsafeApplyMsgOptions returns the same
-// url.Values that the SDK would send over HTTP, so what we record matches what
-// Slack itself would receive.
+// for JSON serialization. The MsgOption chain is rendered by a real
+// slackSDK.Client pointed at a local httptest server so that we capture the
+// exact form payload Slack itself would receive on the wire — including
+// "blocks" and "attachments", which slack-go v0.23+ no longer exposes via
+// slack.UnsafeApplyMsgOptions.
 func buildMsgArgs(channelID string, timestamp string, options []slackSDK.MsgOption) map[string]any {
-	_, values, _ := slackSDK.UnsafeApplyMsgOptions("", channelID, "https://slack.com/api/chat.postMessage", options...)
+	values := renderMsgOptions(channelID, options)
 
 	out := map[string]any{
 		"channel": channelID,
@@ -321,6 +326,32 @@ func buildMsgArgs(channelID string, timestamp string, options []slackSDK.MsgOpti
 	}
 
 	return out
+}
+
+// renderMsgOptions drives the given MsgOption chain through a real
+// slackSDK.Client backed by a httptest server, capturing the exact
+// application/x-www-form-urlencoded body that slack-go would post to
+// chat.postMessage. The recorder uses this so that "blocks"/"attachments"
+// JSON encodings — which slack-go v0.23+ only materialize during the
+// request-build path — remain visible to downstream golden-file assertions.
+func renderMsgOptions(channelID string, options []slackSDK.MsgOption) url.Values {
+	var captured url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err == nil {
+			captured = r.PostForm
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"ts":"1.1","channel":"` + channelID + `"}`))
+	}))
+	defer srv.Close()
+
+	api := slackSDK.New("xoxb-recorder", slackSDK.OptionAPIURL(srv.URL+"/"))
+	_, _, _ = api.PostMessage(channelID, options...)
+
+	if captured == nil {
+		return url.Values{}
+	}
+	return captured
 }
 
 func copyField(values interface{ Get(string) string }, dst map[string]any, key string) {
