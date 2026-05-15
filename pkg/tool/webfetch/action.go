@@ -17,9 +17,8 @@ import (
 )
 
 const (
-	maxResponseBody = 1024 * 1024 // 1MB
-	defaultTimeout  = 30 * time.Second
-	userAgent       = "warren-webfetch/1.0 (+https://github.com/secmon-lab/warren)"
+	defaultTimeout = 30 * time.Second
+	userAgent      = "warren-webfetch/1.0 (+https://github.com/secmon-lab/warren)"
 )
 
 // Action implements the interfaces.Tool interface for fetching web content
@@ -135,9 +134,9 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 	}, nil
 }
 
-// fetch performs the HTTP GET. It enforces a request timeout, sets a stable
-// User-Agent, and caps the body read at maxResponseBody to bound downstream
-// memory and LLM token usage.
+// fetch performs the HTTP GET. It enforces a request timeout and sets a stable
+// User-Agent. No response-size cap is applied; the request timeout and the
+// context deadline are the only bound on the operation.
 func (x *Action) fetch(ctx context.Context, rawURL string) (int, string, []byte, error) {
 	client := x.client
 	if client == nil {
@@ -160,7 +159,7 @@ func (x *Action) fetch(ctx context.Context, rawURL string) (int, string, []byte,
 	}
 	defer safe.Close(ctx, resp.Body)
 
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBody))
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return resp.StatusCode, resp.Header.Get("Content-Type"), nil,
 			goerr.Wrap(err, "failed to read response body",

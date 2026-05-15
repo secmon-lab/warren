@@ -6,7 +6,7 @@ Fetch a web page and return its body as Markdown after extracting the main conte
 
 `web_fetch` follows a 3-stage pipeline:
 
-1. **Fetch** the URL over HTTP/HTTPS (1 MB body cap, 30 s timeout, fixed User-Agent).
+1. **Fetch** the URL over HTTP/HTTPS (30 s timeout, fixed User-Agent). No response-size cap is applied; the request timeout and the context deadline bound the operation.
 2. **Extract** the textual body. HTML pages are parsed with `golang.org/x/net/html`, stripped of `<script>` / `<style>` / `<svg>` / hidden nodes / comments, and rendered as semi-structured plain text that preserves headings, lists, code blocks, and tables. Text-based responses (`text/plain`, `application/json`, etc.) pass through verbatim. Binary content types are rejected.
 3. **Analyze** the body through an LLM call that (a) reformats the content into clean Markdown and (b) checks for indirect prompt injection (role-change attempts, system-prompt overrides, control-token-style strings, etc.). The body is delivered as a `user`-role message; all instructions live in the `system` prompt, which declares the user message untrusted.
 
