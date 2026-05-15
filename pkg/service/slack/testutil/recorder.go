@@ -337,6 +337,10 @@ func buildMsgArgs(channelID string, timestamp string, options []slackSDK.MsgOpti
 func renderMsgOptions(channelID string, options []slackSDK.MsgOption) url.Values {
 	var captured url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Bound the body size before parsing the form; while this is a
+		// test-only fake server, gosec treats unbounded form parsing as a
+		// memory-exhaustion vector regardless of context.
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 		if err := r.ParseForm(); err == nil {
 			captured = r.PostForm
 		}

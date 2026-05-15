@@ -601,6 +601,7 @@ func TestBluebellChat_ContextBlock_NoSlackThread(t *testing.T) {
 func renderMsgOption(opt slack.MsgOption) string {
 	var blocks string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
 		_ = r.ParseForm()
 		blocks = r.PostForm.Get("blocks")
 		w.Header().Set("Content-Type", "application/json")
