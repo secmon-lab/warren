@@ -45,6 +45,14 @@ func TestAction_Run_UnsupportedScheme(t *testing.T) {
 	gt.True(t, goerr.HasTag(err, errutil.TagValidation))
 }
 
+func TestAction_Run_MissingHost(t *testing.T) {
+	action := &webfetch.Action{}
+	action.SetLLMClient(&mock.LLMClientMock{})
+	_, err := action.Run(t.Context(), "web_fetch", map[string]any{"url": "https:///path"})
+	gt.Error(t, err).Required()
+	gt.True(t, goerr.HasTag(err, errutil.TagValidation))
+}
+
 func TestAction_Run_LLMClientNotInjected(t *testing.T) {
 	action := &webfetch.Action{}
 	_, err := action.Run(t.Context(), "web_fetch", map[string]any{"url": "https://example.com"})

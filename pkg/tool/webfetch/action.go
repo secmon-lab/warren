@@ -96,6 +96,11 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 			goerr.V("url", rawURL),
 			goerr.V("scheme", parsed.Scheme))
 	}
+	if parsed.Host == "" {
+		return nil, goerr.New("url is missing a host",
+			goerr.T(errutil.TagValidation),
+			goerr.V("url", rawURL))
+	}
 
 	if x.llmClient == nil {
 		return nil, goerr.New("LLM client is not injected for webfetch",
@@ -138,11 +143,6 @@ func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map
 // User-Agent. No response-size cap is applied; the request timeout and the
 // context deadline are the only bound on the operation.
 func (x *Action) fetch(ctx context.Context, rawURL string) (int, string, []byte, error) {
-	client := x.client
-	if client == nil {
-		client = &http.Client{Timeout: defaultTimeout}
-	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return 0, "", nil, goerr.Wrap(err, "failed to create http request",
@@ -151,7 +151,7 @@ func (x *Action) fetch(ctx context.Context, rawURL string) (int, string, []byte,
 	}
 	req.Header.Set("User-Agent", userAgent)
 
-	resp, err := client.Do(req)
+	resp, err := x.client.Do(req)
 	if err != nil {
 		return 0, "", nil, goerr.Wrap(err, "failed to fetch url",
 			goerr.T(errutil.TagExternal),
@@ -171,6 +171,9 @@ func (x *Action) fetch(ctx context.Context, rawURL string) (int, string, []byte,
 }
 
 func (x *Action) Configure(_ context.Context) error {
+	if x.client == nil {
+		x.client = &http.Client{Timeout: defaultTimeout}
+	}
 	return nil
 }
 

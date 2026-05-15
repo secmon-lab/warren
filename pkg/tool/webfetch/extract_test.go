@@ -3,6 +3,7 @@ package webfetch_test
 import (
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -40,6 +41,8 @@ func TestExtract_HTML_PreservesHeadingsAndLists(t *testing.T) {
 <html><body>
 <h1>Title</h1>
 <h2>Subtitle</h2>
+<h3>SubSub</h3>
+<h6>Deep</h6>
 <p>Body paragraph.</p>
 <ul>
   <li>first</li>
@@ -50,8 +53,14 @@ func TestExtract_HTML_PreservesHeadingsAndLists(t *testing.T) {
 
 	text, _, err := webfetch.Extract("text/html", body)
 	gt.NoError(t, err).Required()
-	gt.S(t, text).Contains("# Title")
-	gt.S(t, text).Contains("## Subtitle")
+	// Validate the exact heading level by anchoring to line boundaries —
+	// substring matching alone would let `## Subtitle` pass against
+	// `###### Subtitle` and hide a level-calculation bug.
+	gt.True(t, regexp.MustCompile(`(?m)^# Title$`).MatchString(text))
+	gt.True(t, regexp.MustCompile(`(?m)^## Subtitle$`).MatchString(text))
+	gt.True(t, regexp.MustCompile(`(?m)^### SubSub$`).MatchString(text))
+	gt.True(t, regexp.MustCompile(`(?m)^###### Deep$`).MatchString(text))
+	gt.S(t, text).NotContains("####### ") // never produce 7+ hashes
 	gt.S(t, text).Contains("- first")
 	gt.S(t, text).Contains("- second")
 	gt.S(t, text).Contains("```")

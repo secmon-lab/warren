@@ -1,6 +1,7 @@
 package webfetch
 
 import (
+	"bytes"
 	"mime"
 	"regexp"
 	"strings"
@@ -76,7 +77,7 @@ var displayNoneRe = regexp.MustCompile(`(?i)(?:^|;)\s*(?:display\s*:\s*none|visi
 // preserves enough structural cues (headings, list markers, code fences,
 // table separators) for an LLM to reconstruct Markdown from it.
 func renderHTML(body []byte) (string, error) {
-	doc, err := html.Parse(strings.NewReader(string(body)))
+	doc, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
@@ -129,7 +130,22 @@ func renderNode(sb *strings.Builder, n *html.Node) {
 func renderElement(sb *strings.Builder, n *html.Node) {
 	switch n.DataAtom {
 	case atom.H1, atom.H2, atom.H3, atom.H4, atom.H5, atom.H6:
-		level := min(max(int(n.DataAtom-atom.H1+1), 1), 6)
+		// atom.H1..H6 are NOT sequential integer constants — use an explicit map.
+		var level int
+		switch n.DataAtom {
+		case atom.H1:
+			level = 1
+		case atom.H2:
+			level = 2
+		case atom.H3:
+			level = 3
+		case atom.H4:
+			level = 4
+		case atom.H5:
+			level = 5
+		case atom.H6:
+			level = 6
+		}
 		sb.WriteString("\n\n")
 		sb.WriteString(strings.Repeat("#", level))
 		sb.WriteString(" ")
@@ -223,9 +239,6 @@ func isInsidePre(n *html.Node) bool {
 //   - 3+ consecutive newlines collapse to two
 //   - leading and trailing whitespace are trimmed
 func collapseWhitespace(s string) string {
-	// Replace tab with space first, then collapse runs of spaces.
-	s = strings.ReplaceAll(s, "\t", " ")
-
 	var sb strings.Builder
 	sb.Grow(len(s))
 	var prevSpace, prevNewline bool
@@ -239,7 +252,7 @@ func collapseWhitespace(s string) string {
 			}
 			prevSpace = false
 			prevNewline = true
-		case ' ':
+		case ' ', '\t':
 			newlineRun = 0
 			if prevSpace || prevNewline {
 				// Skip leading-of-line spaces and runs of spaces.
