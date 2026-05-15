@@ -2720,6 +2720,9 @@ func (mock *NotifierMock) NotifyTriagePolicyResultCalls() []struct {
 //			BatchGetDiagnosisIssueCountsFunc: func(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error) {
 //				panic("mock out the BatchGetDiagnosisIssueCounts method")
 //			},
+//			BatchGetKnowledgesFunc: func(ctx context.Context, ids []types.KnowledgeID) ([]*knowledge.Knowledge, error) {
+//				panic("mock out the BatchGetKnowledges method")
+//			},
 //			BatchGetTicketsFunc: func(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error) {
 //				panic("mock out the BatchGetTickets method")
 //			},
@@ -3086,6 +3089,9 @@ type RepositoryMock struct {
 
 	// BatchGetDiagnosisIssueCountsFunc mocks the BatchGetDiagnosisIssueCounts method.
 	BatchGetDiagnosisIssueCountsFunc func(ctx context.Context, diagnosisIDs []types.DiagnosisID) (map[types.DiagnosisID]diagnosis.IssueCounts, error)
+
+	// BatchGetKnowledgesFunc mocks the BatchGetKnowledges method.
+	BatchGetKnowledgesFunc func(ctx context.Context, ids []types.KnowledgeID) ([]*knowledge.Knowledge, error)
 
 	// BatchGetTicketsFunc mocks the BatchGetTickets method.
 	BatchGetTicketsFunc func(ctx context.Context, ticketIDs []types.TicketID) ([]*ticket.Ticket, error)
@@ -3470,6 +3476,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// DiagnosisIDs is the diagnosisIDs argument value.
 			DiagnosisIDs []types.DiagnosisID
+		}
+		// BatchGetKnowledges holds details about calls to the BatchGetKnowledges method.
+		BatchGetKnowledges []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Ids is the ids argument value.
+			Ids []types.KnowledgeID
 		}
 		// BatchGetTickets holds details about calls to the BatchGetTickets method.
 		BatchGetTickets []struct {
@@ -4376,6 +4389,7 @@ type RepositoryMock struct {
 	lockAcquireSessionLock              sync.RWMutex
 	lockBatchGetAlerts                  sync.RWMutex
 	lockBatchGetDiagnosisIssueCounts    sync.RWMutex
+	lockBatchGetKnowledges              sync.RWMutex
 	lockBatchGetTickets                 sync.RWMutex
 	lockBatchPutAlerts                  sync.RWMutex
 	lockBatchUpdateTicketsStatus        sync.RWMutex
@@ -4663,6 +4677,46 @@ func (mock *RepositoryMock) BatchGetDiagnosisIssueCountsCalls() []struct {
 	mock.lockBatchGetDiagnosisIssueCounts.RLock()
 	calls = mock.calls.BatchGetDiagnosisIssueCounts
 	mock.lockBatchGetDiagnosisIssueCounts.RUnlock()
+	return calls
+}
+
+// BatchGetKnowledges calls BatchGetKnowledgesFunc.
+func (mock *RepositoryMock) BatchGetKnowledges(ctx context.Context, ids []types.KnowledgeID) ([]*knowledge.Knowledge, error) {
+	callInfo := struct {
+		Ctx context.Context
+		Ids []types.KnowledgeID
+	}{
+		Ctx: ctx,
+		Ids: ids,
+	}
+	mock.lockBatchGetKnowledges.Lock()
+	mock.calls.BatchGetKnowledges = append(mock.calls.BatchGetKnowledges, callInfo)
+	mock.lockBatchGetKnowledges.Unlock()
+	if mock.BatchGetKnowledgesFunc == nil {
+		var (
+			knowledgesOut []*knowledge.Knowledge
+			errOut        error
+		)
+		return knowledgesOut, errOut
+	}
+	return mock.BatchGetKnowledgesFunc(ctx, ids)
+}
+
+// BatchGetKnowledgesCalls gets all the calls that were made to BatchGetKnowledges.
+// Check the length with:
+//
+//	len(mockedRepository.BatchGetKnowledgesCalls())
+func (mock *RepositoryMock) BatchGetKnowledgesCalls() []struct {
+	Ctx context.Context
+	Ids []types.KnowledgeID
+} {
+	var calls []struct {
+		Ctx context.Context
+		Ids []types.KnowledgeID
+	}
+	mock.lockBatchGetKnowledges.RLock()
+	calls = mock.calls.BatchGetKnowledges
+	mock.lockBatchGetKnowledges.RUnlock()
 	return calls
 }
 
