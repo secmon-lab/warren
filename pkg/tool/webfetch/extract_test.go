@@ -1,11 +1,16 @@
 package webfetch_test
 
 import (
+	"io"
+	"net/http"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/webfetch"
+	"github.com/secmon-lab/warren/pkg/utils/safe"
 )
 
 func TestExtract_HTML_DropsScriptAndStyle(t *testing.T) {
@@ -155,5 +160,95 @@ func TestExtract_BinaryRejected(t *testing.T) {
 	for _, ct := range cases {
 		_, _, err := webfetch.Extract(ct, []byte("binary"))
 		gt.Error(t, err)
+	}
+}
+
+// Live extraction tests against real websites that the warren agent is likely
+// to fetch during security investigations. Each case asserts that:
+//   - the response can be fetched and parsed,
+//   - extract returns isHTML=true,
+//   - identifying keywords appear in the extracted text (case-insensitive),
+//   - common HTML noise (<script>, <style>) is absent.
+//
+// Skipped unless TEST_WEBFETCH_LIVE is set, since this requires outbound
+// network access and depends on third-party pages remaining online.
+
+type liveExtractCase struct {
+	name        string
+	url         string
+	mustContain []string // case-insensitive substring match
+}
+
+var liveExtractCases = []liveExtractCase{
+	{
+		name:        "nvd_cve_log4shell",
+		url:         "https://nvd.nist.gov/vuln/detail/CVE-2021-44228",
+		mustContain: []string{"CVE-2021-44228", "log4j"},
+	},
+	{
+		name:        "mitre_attack_t1059",
+		url:         "https://attack.mitre.org/techniques/T1059/",
+		mustContain: []string{"T1059", "scripting interpreter"},
+	},
+	{
+		name:        "wikipedia_heartbleed",
+		url:         "https://en.wikipedia.org/wiki/Heartbleed",
+		mustContain: []string{"Heartbleed", "OpenSSL"},
+	},
+	{
+		name:        "github_advisory_log4j",
+		url:         "https://github.com/advisories/GHSA-jfh8-c2jp-5v3q",
+		mustContain: []string{"log4j"},
+	},
+	{
+		name:        "owasp_password_storage",
+		url:         "https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html",
+		mustContain: []string{"password", "hash"},
+	},
+}
+
+func TestExtract_Live_RealWebsites(t *testing.T) {
+	if os.Getenv("TEST_WEBFETCH_LIVE") == "" {
+		t.Skip("TEST_WEBFETCH_LIVE is not set")
+	}
+
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	for _, tc := range liveExtractCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tc.url, nil)
+			gt.NoError(t, err).Required()
+			req.Header.Set("User-Agent", "warren-webfetch-test/1.0 (+https://github.com/secmon-lab/warren)")
+
+			resp, err := client.Do(req)
+			if err != nil {
+				t.Skipf("fetch failed (likely transient): %v", err)
+			}
+			defer safe.Close(t.Context(), resp.Body)
+
+			if resp.StatusCode >= 400 {
+				t.Skipf("upstream returned HTTP %d (likely transient or anti-bot)", resp.StatusCode)
+			}
+
+			body, err := io.ReadAll(resp.Body)
+			gt.NoError(t, err).Required()
+
+			text, isHTML, err := webfetch.Extract(resp.Header.Get("Content-Type"), body)
+			gt.NoError(t, err).Required()
+			gt.True(t, isHTML)
+
+			lower := strings.ToLower(text)
+			for _, want := range tc.mustContain {
+				if !strings.Contains(lower, strings.ToLower(want)) {
+					t.Errorf("expected extracted text to contain %q, but it did not. extracted prefix: %.300q",
+						want, text)
+				}
+			}
+
+			// Common HTML noise must not survive the extraction.
+			gt.S(t, text).NotContains("<script")
+			gt.S(t, text).NotContains("</script>")
+			gt.S(t, text).NotContains("<style")
+		})
 	}
 }

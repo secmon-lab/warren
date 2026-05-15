@@ -35,3 +35,12 @@ No external API keys. The tool relies on the warren-wide LLM client (Gemini via 
 - **UTF-8 assumed.** The `Content-Type` charset is not honored; non-UTF-8 pages may produce garbled output.
 - **No summarization.** The LLM only reformats — it does not condense the body. Large pages (after extraction) are passed to the upstream agent as-is.
 - **No retries.** Transient LLM or HTTP failures bubble up to the agent loop, which owns the retry strategy.
+
+## Live tests
+
+Two opt-in test suites verify behavior against real upstreams:
+
+- `TEST_WEBFETCH_LIVE=1 go test ./pkg/tool/webfetch/ -run TestExtract_Live` — fetches a small set of real websites (NVD, MITRE ATT&CK, Wikipedia, GitHub Security Advisory, OWASP) and asserts that extraction produces non-empty text containing expected keywords and no surviving `<script>`/`<style>` markup.
+- `TEST_GEMINI_PROJECT_ID` and `TEST_GEMINI_LOCATION` — when both are set, `TestAnalyze_Live_*` runs against a real Gemini endpoint to verify indirect-prompt-injection detection on actual LLM responses.
+
+Both suites are skipped by default and are not run in CI.
