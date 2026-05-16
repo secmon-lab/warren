@@ -121,6 +121,30 @@ func TestBuildLLMClient_OpenAIInvalidTemperature(t *testing.T) {
 	gt.True(t, goerr.HasTag(err, errutil.TagValidation))
 }
 
+func TestBuildLLMClient_OpenAITemperatureTooHigh(t *testing.T) {
+	args := map[string]string{"temperature": "2.5"}
+	_, err := webfetch.BuildLLMClient(t.Context(), "openai", "gpt-4o", args, "key")
+	gt.Error(t, err).Required()
+	gt.True(t, goerr.HasTag(err, errutil.TagValidation))
+}
+
+func TestBuildLLMClient_OpenAITemperatureNegative(t *testing.T) {
+	args := map[string]string{"temperature": "-0.1"}
+	_, err := webfetch.BuildLLMClient(t.Context(), "openai", "gpt-4o", args, "key")
+	gt.Error(t, err).Required()
+	gt.True(t, goerr.HasTag(err, errutil.TagValidation))
+}
+
+func TestBuildLLMClient_OpenAITemperatureBoundaryAccepted(t *testing.T) {
+	// 0.0 and 2.0 are both accepted (inclusive bounds).
+	for _, raw := range []string{"0", "0.0", "2", "2.0"} {
+		args := map[string]string{"temperature": raw}
+		client, err := webfetch.BuildLLMClient(t.Context(), "openai", "gpt-4o", args, "fake-key")
+		gt.NoError(t, err).Required()
+		gt.NotNil(t, client)
+	}
+}
+
 // TestBuildLLMClient_OpenAIHappy verifies the dispatch reaches the OpenAI
 // constructor when given valid inputs. The OpenAI gollem constructor does not
 // require network access at construction time, so this happy-path test is

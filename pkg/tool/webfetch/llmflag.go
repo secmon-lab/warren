@@ -240,12 +240,22 @@ func checkKnownArgs(provider string, args map[string]string, allowed ...string) 
 	return nil
 }
 
+// parseTemperature parses the temperature arg and validates the range. The
+// accepted range [0.0, 2.0] covers all currently supported providers (OpenAI
+// and Gemini allow up to 2.0; Anthropic up to 1.0 — values that satisfy this
+// check but exceed a provider's own cap will still fail at the start-up ping,
+// just with a less explicit error).
 func parseTemperature(raw string) (float64, error) {
 	v, err := strconv.ParseFloat(raw, 64)
 	if err != nil {
 		return 0, goerr.Wrap(err, "failed to parse temperature as float",
 			goerr.T(errutil.TagValidation),
 			goerr.V("raw", raw))
+	}
+	if v < 0 || v > 2 {
+		return 0, goerr.New("temperature must be between 0.0 and 2.0",
+			goerr.T(errutil.TagValidation),
+			goerr.V("value", v))
 	}
 	return v, nil
 }
