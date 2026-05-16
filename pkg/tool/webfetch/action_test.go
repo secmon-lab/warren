@@ -53,11 +53,53 @@ func TestAction_Run_MissingHost(t *testing.T) {
 	gt.True(t, goerr.HasTag(err, errutil.TagValidation))
 }
 
-func TestAction_Run_LLMClientNotInjected(t *testing.T) {
+func TestAction_RequiresHITL_DefaultsTrue(t *testing.T) {
 	action := &webfetch.Action{}
-	_, err := action.Run(t.Context(), "web_fetch", map[string]any{"url": "https://example.com"})
+	gt.True(t, action.RequiresHITL())
+}
+
+func TestAction_RequiresHITL_FalseWhenLLMProviderSet(t *testing.T) {
+	action := &webfetch.Action{}
+	action.SetLLMFlags("openai", "gpt-4o", "", "fake-key")
+	gt.False(t, action.RequiresHITL())
+}
+
+func TestAction_Run_NoLLM_SkipsAnalyzeAndReturnsDisabled(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("hello body"))
+	}))
+	defer srv.Close()
+
+	action := &webfetch.Action{}
+	action.SetHTTPClient(srv.Client())
+	// llmClient stays nil; analyze must NOT be invoked.
+
+	out, err := action.Run(t.Context(), "web_fetch", map[string]any{"url": srv.URL})
+	gt.NoError(t, err).Required()
+	gt.Value(t, out["result"]).Equal("hello body")
+	gt.Value(t, out["llm_analysis"]).Equal("disabled")
+	gt.Value(t, out["url"]).Equal(srv.URL)
+	gt.Value(t, out["status"]).Equal(http.StatusOK)
+}
+
+func TestAction_Configure_NoFlags_DisablesLLM(t *testing.T) {
+	action := &webfetch.Action{}
+	gt.NoError(t, action.Configure(t.Context()))
+	gt.Nil(t, action.LLMClient())
+	gt.True(t, action.RequiresHITL())
+}
+
+func TestAction_Configure_PingFailurePropagates(t *testing.T) {
+	// We can't easily configure the flag-driven build path against a mock
+	// LLM (Configure constructs the client itself), but the ping helper is
+	// tested directly in llmflag_test.go. Here we verify that a malformed
+	// --webfetch-llm-args bubbles out of Configure as a validation error.
+	action := &webfetch.Action{}
+	action.SetLLMFlags("openai", "gpt-4o", "no-equals-token", "fake-key")
+	err := action.Configure(t.Context())
 	gt.Error(t, err).Required()
-	gt.True(t, goerr.HasTag(err, errutil.TagInternal))
+	gt.True(t, goerr.HasTag(err, errutil.TagValidation))
 }
 
 func TestAction_Name(t *testing.T) {
