@@ -268,13 +268,13 @@ func (c *BluebellChat) executeTask(ctx context.Context, task TaskPlan, chatCtx *
 	msg.Trace(taskCtx, "Completed")
 
 	// Trigger technique knowledge reflection in background
-	c.triggerTechniqueReflection(ctx, taskCtx, result)
+	c.triggerTechniqueReflection(ctx, result)
 
 	return result
 }
 
 // triggerTechniqueReflection runs background knowledge reflection for a completed task.
-func (c *BluebellChat) triggerTechniqueReflection(ctx context.Context, taskCtx context.Context, result *TaskResult) {
+func (c *BluebellChat) triggerTechniqueReflection(ctx context.Context, result *TaskResult) {
 	logger := logging.From(ctx)
 
 	if c.knowledgeService == nil {
@@ -303,10 +303,6 @@ func (c *BluebellChat) triggerTechniqueReflection(ctx context.Context, taskCtx c
 	input := &svcknowledge.ReflectionInput{
 		Category:         types.KnowledgeCategoryTechnique,
 		ExecutionSummary: result.Result,
-		OnComplete: func(bgCtx context.Context, _ string) {
-			// Use bgCtx (non-cancelled) with taskCtx's msg routing
-			msg.Trace(msg.CopyTo(bgCtx, taskCtx), "Completed")
-		},
 	}
 
 	if err := c.knowledgeService.RunReflection(ctx, c.llmClient, tool, input); err != nil {
