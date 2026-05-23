@@ -303,13 +303,9 @@ func (c *BluebellChat) triggerTechniqueReflection(ctx context.Context, taskCtx c
 	input := &svcknowledge.ReflectionInput{
 		Category:         types.KnowledgeCategoryTechnique,
 		ExecutionSummary: result.Result,
-		OnComplete: func(bgCtx context.Context, traceID string) {
-			suffix := "reflection done"
-			if traceID != "" {
-				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
-			}
+		OnComplete: func(bgCtx context.Context, _ string) {
 			// Use bgCtx (non-cancelled) with taskCtx's msg routing
-			msg.Trace(msg.CopyTo(bgCtx, taskCtx), "Completed (%s)", suffix)
+			msg.Trace(msg.CopyTo(bgCtx, taskCtx), "Completed")
 		},
 	}
 
@@ -319,9 +315,8 @@ func (c *BluebellChat) triggerTechniqueReflection(ctx context.Context, taskCtx c
 }
 
 // triggerFactReflection runs background knowledge reflection for a completed session.
-// The OnComplete hook posts the reflection ID through the active chat
-// sink — for Slack this becomes a context block in the thread, for Web
-// it persists as a trace session.Message.
+// The reflection result is persisted to the knowledge store; no user-facing
+// notification is posted on completion.
 func (c *BluebellChat) triggerFactReflection(ctx context.Context, summary string, chatCtx *chatModel.ChatContext) {
 	logger := logging.From(ctx)
 
@@ -343,19 +338,6 @@ func (c *BluebellChat) triggerFactReflection(ctx context.Context, summary string
 	input := &svcknowledge.ReflectionInput{
 		Category:         types.KnowledgeCategoryFact,
 		ExecutionSummary: summary,
-		OnComplete: func(bgCtx context.Context, traceID string) {
-			sink := chat.ResolveSink(chatCtx, c.slackService, c.repository)
-			if sink == nil {
-				return
-			}
-			suffix := "reflection done"
-			if traceID != "" {
-				suffix = fmt.Sprintf("reflection ID `%s`", traceID)
-			}
-			if err := sink.PostContextBlock(bgCtx, fmt.Sprintf("📝 Fact knowledge %s", suffix)); err != nil {
-				logging.From(bgCtx).Warn("failed to post fact reflection result", "error", err)
-			}
-		},
 	}
 	if chatCtx != nil && chatCtx.Ticket != nil {
 		input.Ticket = chatCtx.Ticket
