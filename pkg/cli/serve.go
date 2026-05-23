@@ -219,7 +219,7 @@ func cmdServe() *cli.Command {
 				"async", asyncCfg,
 			)
 
-			policyClient, err := policyCfg.Configure()
+			policyClient, err := policyCfg.Configure(ctx)
 			if err != nil {
 				return err
 			}
@@ -297,6 +297,7 @@ func cmdServe() *cli.Command {
 
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(repo, embeddingAdapter)
+			tools.InjectLLMClient(llmClient)
 
 			toolSets, err := tools.ToolSets(ctx)
 			if err != nil {
@@ -439,8 +440,18 @@ func cmdServe() *cli.Command {
 					return goerr.New("unknown budget strategy", goerr.V("strategy", budgetStrategy))
 				}
 
-				// Configure HITL tools that require human approval
-				asterOpts = append(asterOpts, aster.WithHITLTools([]string{"web_fetch"}))
+				// Configure HITL tools that require human approval. The list is
+				// built dynamically from each tool's RequiresHITL() state so that
+				// e.g. webfetch only requires HITL when its own LLM screening is
+				// disabled (see pkg/tool/webfetch/action.go RequiresHITL).
+				hitlNames, err := tools.HITLToolNames(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to compute HITL tool list")
+				}
+				if len(hitlNames) > 0 {
+					asterOpts = append(asterOpts, aster.WithHITLTools(hitlNames))
+				}
+				logging.From(ctx).Info("HITL tools configured", "names", hitlNames)
 
 				asterStrategy := aster.New(repo, llmClient, asterOpts...)
 				commonOpts := buildChatUseCaseOpts(repo, policyClient, slackSvc, noAuthorization, webUICfg.GetFrontendURL())
@@ -491,7 +502,14 @@ func cmdServe() *cli.Command {
 					return goerr.New("unknown budget strategy", goerr.V("strategy", budgetStrategy))
 				}
 
-				bluebellOpts = append(bluebellOpts, bluebell.WithHITLTools([]string{"web_fetch"}))
+				hitlNames, err := tools.HITLToolNames(ctx)
+				if err != nil {
+					return goerr.Wrap(err, "failed to compute HITL tool list")
+				}
+				if len(hitlNames) > 0 {
+					bluebellOpts = append(bluebellOpts, bluebell.WithHITLTools(hitlNames))
+				}
+				logging.From(ctx).Info("HITL tools configured", "names", hitlNames)
 
 				bluebellStrategy, err := bluebell.New(repo, llmClient, bluebellOpts...)
 				if err != nil {

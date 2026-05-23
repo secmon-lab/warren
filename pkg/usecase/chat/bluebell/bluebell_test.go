@@ -1,11 +1,9 @@
 package bluebell_test
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"net/http"
-	"net/url"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -594,37 +592,26 @@ func TestBluebellChat_ContextBlock_NoSlackThread(t *testing.T) {
 	}
 }
 
-// renderMsgOption extracts the blocks JSON from a slack.MsgOption for test
-// assertions. Starting with slack-go v0.23, blocks are only materialized in
-// the request body at HTTP send time, so we replay the option through a real
-// slack.Client whose transport is intercepted to obtain the wire payload.
+// renderMsgOption serializes a slack.MsgOption the same way the slack-go
+// client would when sending it to the API, and returns the JSON-encoded
+// "blocks" form value. Implemented via a real slack.Client pointed at a
+// httptest server because as of slack-go v0.23+ the blocks payload is only
+// marshalled inside the request-build path, so slack.UnsafeApplyMsgOptions
+// no longer exposes it via url.Values.
 func renderMsgOption(opt slack.MsgOption) string {
-	ct := &captureTransport{}
-	api := slack.New("xoxb-test", slack.OptionHTTPClient(&http.Client{Transport: ct}))
-	_, _, _ = api.PostMessageContext(context.Background(), "C", opt)
-	parsed, err := url.ParseQuery(string(ct.body))
-	if err != nil {
-		return ""
-	}
-	return parsed.Get("blocks")
-}
+	var blocks string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
+		_ = r.ParseForm()
+		blocks = r.PostForm.Get("blocks")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true,"ts":"1.1","channel":"C0"}`))
+	}))
+	defer srv.Close()
 
-type captureTransport struct {
-	body []byte
-}
-
-func (t *captureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.Body != nil {
-		if b, err := io.ReadAll(req.Body); err == nil {
-			t.body = b
-		}
-	}
-	return &http.Response{
-		StatusCode: http.StatusOK,
-		Header:     http.Header{"Content-Type": {"application/json"}},
-		Body:       io.NopCloser(bytes.NewReader([]byte(`{"ok":true,"channel":"C","ts":"1700000000.000000"}`))),
-		Request:    req,
-	}, nil
+	api := slack.New("xoxb-test", slack.OptionAPIURL(srv.URL+"/"))
+	_, _, _ = api.PostMessage("C0", opt)
+	return blocks
 }
 
 func TestBluebellChat_Ticketless(t *testing.T) {

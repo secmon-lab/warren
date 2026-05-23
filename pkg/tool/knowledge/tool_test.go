@@ -48,3 +48,13 @@ func TestModeSearchOnly_PromptOmitsTagListInstruction(t *testing.T) {
 	gt.True(t, strings.Contains(p, "knowledge_search"))
 	gt.True(t, !strings.Contains(p, "knowledge_tag_list"))
 }
+
+func TestPrompt_IncludesTwoPhaseWorkflow(t *testing.T) {
+	tool := knowledge.New(newTestService(), types.KnowledgeCategoryFact, knowledge.ModeReadWrite)
+
+	p, err := tool.Prompt(t.Context())
+	gt.NoError(t, err)
+	gt.True(t, strings.Contains(p, "Two-phase workflow"))
+	gt.True(t, strings.Contains(p, "knowledge_list"))
+	gt.True(t, strings.Contains(p, "knowledge_get"))
+}

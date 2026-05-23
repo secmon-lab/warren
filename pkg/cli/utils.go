@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/m-mizutani/goerr/v2"
+	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
@@ -74,6 +76,44 @@ func (x toolList) InjectSlackClient(slackClient interfaces.SlackClient) {
 			slackSetter.SetSlackClient(slackClient)
 		}
 	}
+}
+
+// InjectLLMClient injects the warren-wide LLM client into tools that support
+// it. Tools that own their own LLM lifecycle (e.g. webfetch, which builds and
+// pings its client from its own --webfetch-llm-* flags) do not implement the
+// SetLLMClient setter and are skipped by the duck-typed loop below.
+func (x toolList) InjectLLMClient(llmClient gollem.LLMClient) {
+	for _, tool := range x {
+		if setter, ok := tool.(interface{ SetLLMClient(gollem.LLMClient) }); ok {
+			setter.SetLLMClient(llmClient)
+		}
+	}
+}
+
+// HITLToolNames returns the names of tool functions (Specs entries) that
+// require human-in-the-loop approval, based on each tool's RequiresHITL()
+// state. Tools that do not implement the HITL-aware interface are excluded.
+//
+// Configure() MUST have been called on the tool list before this — for
+// flag-driven gating like webfetch's --webfetch-llm-provider, the dynamic
+// state needs to be resolved first.
+func (x toolList) HITLToolNames(ctx context.Context) ([]string, error) {
+	var names []string
+	for _, tool := range x {
+		aware, ok := tool.(interface{ RequiresHITL() bool })
+		if !ok || !aware.RequiresHITL() {
+			continue
+		}
+		specs, err := tool.Specs(ctx)
+		if err != nil {
+			return nil, goerr.Wrap(err, "failed to read tool specs for HITL list",
+				goerr.V("tool", tool.ID()))
+		}
+		for _, s := range specs {
+			names = append(names, s.Name)
+		}
+	}
+	return names, nil
 }
 
 func (x toolList) Flags() []cli.Flag {

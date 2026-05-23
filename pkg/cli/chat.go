@@ -92,7 +92,7 @@ func cmdChat() *cli.Command {
 			}
 
 			// Configure policy client
-			policyClient, err := policyCfg.Configure()
+			policyClient, err := policyCfg.Configure(ctx)
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure policy")
 			}
@@ -111,6 +111,7 @@ func cmdChat() *cli.Command {
 
 			// Inject dependencies into tools that support them
 			tools.InjectDependencies(repo, embeddingClient)
+			tools.InjectLLMClient(llmClient)
 
 			// Get the ticket
 			ticket, err := repo.GetTicket(ctx, ticketID)

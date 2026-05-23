@@ -16,14 +16,7 @@ func (x *Action) runCodeSearch(ctx context.Context, args map[string]any) (map[st
 	}
 
 	// Build search query
-	searchQuery := x.buildCodeSearchQuery(query, args)
-	if searchQuery == "" {
-		// No repositories matched the filter, return empty result
-		return map[string]any{
-			"results": []CodeSearchResult{},
-			"total":   0,
-		}, nil
-	}
+	searchQuery := buildCodeSearchQuery(query, args)
 
 	// Search options
 	opts := &github.SearchOptions{
@@ -78,33 +71,14 @@ func (x *Action) runCodeSearch(ctx context.Context, args map[string]any) (map[st
 	}, nil
 }
 
-func (x *Action) buildCodeSearchQuery(baseQuery string, args map[string]any) string {
+func buildCodeSearchQuery(baseQuery string, args map[string]any) string {
 	var queryParts []string
 	queryParts = append(queryParts, baseQuery)
 
-	// Get repository filter if specified
-	repoFilterPattern := ""
-	if rf, ok := args["repo_filter"].(string); ok && rf != "" {
-		repoFilterPattern = strings.ToLower(rf)
+	// Optional explicit repo scope (comma-separated "owner/name" list)
+	if repoFilters := parseRepoFilter(args); len(repoFilters) > 0 {
+		queryParts = append(queryParts, strings.Join(repoFilters, " "))
 	}
-
-	// Add repository filter for configured repos
-	var repoFilters []string
-	for _, config := range x.configs {
-		fullName := fmt.Sprintf("%s/%s", config.Owner, config.Repository)
-		if repoFilterPattern != "" && !strings.Contains(strings.ToLower(fullName), repoFilterPattern) {
-			continue
-		}
-		repoFilters = append(repoFilters, fmt.Sprintf("repo:%s", fullName))
-	}
-
-	if len(repoFilters) == 0 {
-		// No repositories matched the filter
-		return ""
-	}
-
-	// Add all repo filters to the query
-	queryParts = append(queryParts, strings.Join(repoFilters, " "))
 
 	// Add optional filters
 	if lang, ok := args["language"].(string); ok && lang != "" {
@@ -122,6 +96,26 @@ func (x *Action) buildCodeSearchQuery(baseQuery string, args map[string]any) str
 	return strings.Join(queryParts, " ")
 }
 
+// parseRepoFilter parses the "repo_filter" argument as a comma-separated list of
+// "owner/name" entries and returns them rendered as `repo:owner/name` qualifiers.
+// Entries without a "/" are skipped so that malformed values do not poison the query.
+func parseRepoFilter(args map[string]any) []string {
+	raw, ok := args["repo_filter"].(string)
+	if !ok || raw == "" {
+		return nil
+	}
+
+	var filters []string
+	for entry := range strings.SplitSeq(raw, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" || !strings.Contains(entry, "/") {
+			continue
+		}
+		filters = append(filters, "repo:"+entry)
+	}
+	return filters
+}
+
 func (x *Action) runIssueSearch(ctx context.Context, args map[string]any) (map[string]any, error) {
 	query, ok := args["query"].(string)
 	if !ok || query == "" {
@@ -129,14 +123,7 @@ func (x *Action) runIssueSearch(ctx context.Context, args map[string]any) (map[s
 	}
 
 	// Build search query
-	searchQuery := x.buildIssueSearchQuery(query, args)
-	if searchQuery == "" {
-		// No repositories matched the filter, return empty result
-		return map[string]any{
-			"results": []IssueSearchResult{},
-			"total":   0,
-		}, nil
-	}
+	searchQuery := buildIssueSearchQuery(query, args)
 
 	// Search options
 	opts := &github.SearchOptions{
@@ -224,33 +211,14 @@ func (x *Action) runIssueSearch(ctx context.Context, args map[string]any) (map[s
 	}, nil
 }
 
-func (x *Action) buildIssueSearchQuery(baseQuery string, args map[string]any) string {
+func buildIssueSearchQuery(baseQuery string, args map[string]any) string {
 	var queryParts []string
 	queryParts = append(queryParts, baseQuery)
 
-	// Get repository filter if specified
-	repoFilterPattern := ""
-	if rf, ok := args["repo_filter"].(string); ok && rf != "" {
-		repoFilterPattern = strings.ToLower(rf)
+	// Optional explicit repo scope (comma-separated "owner/name" list)
+	if repoFilters := parseRepoFilter(args); len(repoFilters) > 0 {
+		queryParts = append(queryParts, strings.Join(repoFilters, " "))
 	}
-
-	// Add repository filter for configured repos
-	var repoFilters []string
-	for _, config := range x.configs {
-		fullName := fmt.Sprintf("%s/%s", config.Owner, config.Repository)
-		if repoFilterPattern != "" && !strings.Contains(strings.ToLower(fullName), repoFilterPattern) {
-			continue
-		}
-		repoFilters = append(repoFilters, fmt.Sprintf("repo:%s", fullName))
-	}
-
-	if len(repoFilters) == 0 {
-		// No repositories matched the filter
-		return ""
-	}
-
-	// Add all repo filters to the query
-	queryParts = append(queryParts, strings.Join(repoFilters, " "))
 
 	// Add optional filters
 	if state, ok := args["state"].(string); ok && state != "" && state != "all" {
@@ -263,7 +231,7 @@ func (x *Action) buildIssueSearchQuery(baseQuery string, args map[string]any) st
 
 	if labels, ok := args["labels"].(string); ok && labels != "" {
 		// Split comma-separated labels
-		for _, label := range strings.Split(labels, ",") {
+		for label := range strings.SplitSeq(labels, ",") {
 			label = strings.TrimSpace(label)
 			if label != "" {
 				queryParts = append(queryParts, fmt.Sprintf("label:\"%s\"", label))

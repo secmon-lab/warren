@@ -173,6 +173,12 @@ func (s *Service) GetKnowledge(ctx context.Context, id types.KnowledgeID) (*know
 	return s.repo.GetKnowledge(ctx, id)
 }
 
+// GetKnowledges retrieves multiple knowledges by IDs in a single batch query.
+// Non-existent IDs are silently skipped (not treated as errors).
+func (s *Service) GetKnowledges(ctx context.Context, ids []types.KnowledgeID) ([]*knowledgeModel.Knowledge, error) {
+	return s.repo.BatchGetKnowledges(ctx, ids)
+}
+
 // ListKnowledgeLogs retrieves change history for a knowledge.
 func (s *Service) ListKnowledgeLogs(ctx context.Context, knowledgeID types.KnowledgeID) ([]*knowledgeModel.KnowledgeLog, error) {
 	return s.repo.ListKnowledgeLogs(ctx, knowledgeID)

@@ -31,7 +31,7 @@ func cmdTest() *cli.Command {
 			logger := logging.From(ctx)
 			logger.Info("Starting test", "testDataCfg", testDataCfg, "policyCfg", policyCfg)
 
-			policyClient, err := policyCfg.Configure()
+			policyClient, err := policyCfg.Configure(ctx)
 			if err != nil {
 				return err
 			}

@@ -102,13 +102,6 @@ func (x *Action) runGetBlame(ctx context.Context, args map[string]any) (map[stri
 		return nil, goerr.New("path is required")
 	}
 
-	// Check if the repository is in our configured list
-	if !x.isAllowedRepo(owner, repo) {
-		return nil, goerr.New("repository not in configured list",
-			goerr.V("owner", owner),
-			goerr.V("repo", repo))
-	}
-
 	// Determine ref
 	ref := x.getDefaultBranch(owner, repo)
 	if r, ok := args["ref"].(string); ok && r != "" {

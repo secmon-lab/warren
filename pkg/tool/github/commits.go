@@ -20,13 +20,6 @@ func (x *Action) runListCommits(ctx context.Context, args map[string]any) (map[s
 		return nil, goerr.New("repo is required")
 	}
 
-	// Check if the repository is in our configured list
-	if !x.isAllowedRepo(owner, repo) {
-		return nil, goerr.New("repository not in configured list",
-			goerr.V("owner", owner),
-			goerr.V("repo", repo))
-	}
-
 	// Build options
 	opts := &github.CommitsListOptions{
 		ListOptions: github.ListOptions{
@@ -108,14 +101,4 @@ func (x *Action) runListCommits(ctx context.Context, args map[string]any) (map[s
 		"commits":    results,
 		"count":      len(results),
 	}, nil
-}
-
-// isAllowedRepo checks if the repository is in the configured list
-func (x *Action) isAllowedRepo(owner, repo string) bool {
-	for _, config := range x.configs {
-		if config.Owner == owner && config.Repository == repo {
-			return true
-		}
-	}
-	return false
 }
