@@ -1,7 +1,11 @@
 package bluebell_test
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -590,10 +594,37 @@ func TestBluebellChat_ContextBlock_NoSlackThread(t *testing.T) {
 	}
 }
 
-// renderMsgOption extracts the blocks JSON from a slack.MsgOption for test assertions.
+// renderMsgOption extracts the blocks JSON from a slack.MsgOption for test
+// assertions. Starting with slack-go v0.23, blocks are only materialized in
+// the request body at HTTP send time, so we replay the option through a real
+// slack.Client whose transport is intercepted to obtain the wire payload.
 func renderMsgOption(opt slack.MsgOption) string {
-	_, values, _ := slack.UnsafeApplyMsgOptions("", "", "", opt)
-	return values.Get("blocks")
+	ct := &captureTransport{}
+	api := slack.New("xoxb-test", slack.OptionHTTPClient(&http.Client{Transport: ct}))
+	_, _, _ = api.PostMessageContext(context.Background(), "C", opt)
+	parsed, err := url.ParseQuery(string(ct.body))
+	if err != nil {
+		return ""
+	}
+	return parsed.Get("blocks")
+}
+
+type captureTransport struct {
+	body []byte
+}
+
+func (t *captureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Body != nil {
+		if b, err := io.ReadAll(req.Body); err == nil {
+			t.body = b
+		}
+	}
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": {"application/json"}},
+		Body:       io.NopCloser(bytes.NewReader([]byte(`{"ok":true,"channel":"C","ts":"1700000000.000000"}`))),
+		Request:    req,
+	}, nil
 }
 
 func TestBluebellChat_Ticketless(t *testing.T) {

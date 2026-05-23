@@ -16,16 +16,23 @@
 //
 // Determinism: timestamps returned from PostMessageContext are synthesized by
 // the recorder as "1700000000.{seq:06d}" so no wall-clock randomness leaks into
-// the captured stream. MsgOption values are decoded via
-// slack.UnsafeApplyMsgOptions, which yields the same URL-encoded payload Slack
-// itself would see on the wire.
+// the captured stream. MsgOption values are decoded by replaying the option
+// chain through a real slack.Client whose HTTP transport is intercepted, so
+// what we record matches the URL-encoded payload Slack itself would receive
+// on the wire — including blocks and attachments, which since slack-go v0.23
+// are only serialized at HTTP send time.
 package testutil
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/secmon-lab/warren/pkg/domain/mock"
@@ -276,11 +283,12 @@ func NewSlackClientMock(r *Recorder) *mock.SlackClientMock {
 }
 
 // buildMsgArgs decodes the MsgOption chain into a deterministic map suitable
-// for JSON serialization. Slack's UnsafeApplyMsgOptions returns the same
-// url.Values that the SDK would send over HTTP, so what we record matches what
+// for JSON serialization. Starting with slack-go v0.23, blocks and attachments
+// are only serialized into the request body at HTTP send time, so we capture
+// the request via a synthetic HTTP transport to obtain the same wire payload
 // Slack itself would receive.
 func buildMsgArgs(channelID string, timestamp string, options []slackSDK.MsgOption) map[string]any {
-	_, values, _ := slackSDK.UnsafeApplyMsgOptions("", channelID, "https://slack.com/api/chat.postMessage", options...)
+	values := captureMsgValues(channelID, options)
 
 	out := map[string]any{
 		"channel": channelID,
@@ -323,7 +331,52 @@ func buildMsgArgs(channelID string, timestamp string, options []slackSDK.MsgOpti
 	return out
 }
 
-func copyField(values interface{ Get(string) string }, dst map[string]any, key string) {
+// captureMsgValues replays the given MsgOption chain through a real
+// slack.Client whose HTTP transport is intercepted, returning the parsed
+// form-encoded body that the SDK would have sent to Slack. This is the only
+// reliable way to inspect blocks/attachments since slack-go v0.23 because
+// those fields are no longer materialized in url.Values until HTTP send time.
+func captureMsgValues(channelID string, options []slackSDK.MsgOption) url.Values {
+	ct := &captureTransport{}
+	api := slackSDK.New("xoxb-test", slackSDK.OptionHTTPClient(&http.Client{Transport: ct}))
+	_, _, _ = api.PostMessageContext(context.Background(), channelID, options...)
+
+	if !strings.Contains(ct.contentType, "application/x-www-form-urlencoded") {
+		return url.Values{}
+	}
+	parsed, err := url.ParseQuery(string(ct.body))
+	if err != nil {
+		return url.Values{}
+	}
+	return parsed
+}
+
+// captureTransport is a minimal http.RoundTripper that records the outgoing
+// request body and returns a canned successful chat.postMessage response so
+// the slack.Client call completes without error.
+type captureTransport struct {
+	body        []byte
+	contentType string
+}
+
+func (t *captureTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Body != nil {
+		b, err := io.ReadAll(req.Body)
+		if err == nil {
+			t.body = b
+		}
+	}
+	t.contentType = req.Header.Get("Content-Type")
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": {"application/json"}},
+		Body:       io.NopCloser(bytes.NewReader([]byte(`{"ok":true,"channel":"X","ts":"1700000000.000000"}`))),
+		Request:    req,
+	}
+	return resp, nil
+}
+
+func copyField(values url.Values, dst map[string]any, key string) {
 	if v := values.Get(key); v != "" {
 		dst[key] = v
 	}
