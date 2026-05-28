@@ -14,6 +14,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
+      - name: Run cicd-sensor
+        uses: cicd-sensor/cicd-sensor-action@6ee257338e68af2b279b321b3346fe5f385aa498 # v0.0.29
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
