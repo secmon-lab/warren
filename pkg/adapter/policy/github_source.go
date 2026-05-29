@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v74/github"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/opaq"
+	"github.com/secmon-lab/warren/pkg/utils/async"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
@@ -45,8 +47,14 @@ type GitHubSourceOpts struct {
 
 // GitHubSource fetches Rego policy files from a GitHub repository's default
 // branch HEAD. Results are cached in memory for TTL; sha-based change detection
-// avoids re-fetching content when the branch HEAD has not moved. On any
-// fetch or validation failure, the previously known good snapshot is returned.
+// avoids re-fetching content when the branch HEAD has not moved.
+//
+// Once a snapshot has been cached, Snapshot follows a stale-while-revalidate
+// model: an expired cache is served immediately while a single background
+// refresh runs, so callers (e.g. the alert pipeline) never block on a slow or
+// failing GitHub fetch. A failed refresh keeps the previous snapshot and is
+// reported via errutil.Handle. Only the very first load (no cache yet) fetches
+// synchronously and propagates its error, since there is nothing to serve.
 type GitHubSource struct {
 	owner  string
 	repo   string
@@ -58,6 +66,13 @@ type GitHubSource struct {
 	cachedFiles map[string]string
 	cachedSha   string
 	cachedAt    time.Time
+	// refreshing guarantees at most one background refresh runs at a time. It is
+	// an atomic so the check-and-set is a single atomic operation independent of
+	// s.mu (which protects the cached* fields).
+	refreshing atomic.Bool
+	// refreshWG tracks in-flight background refreshes so tests can await them
+	// deterministically; it has no effect on production behaviour.
+	refreshWG sync.WaitGroup
 }
 
 // NewGitHubSource constructs a GitHubSource. If opts.Client is nil, App
@@ -102,65 +117,34 @@ func NewGitHubSource(opts GitHubSourceOpts) (*GitHubSource, error) {
 	}, nil
 }
 
-// Snapshot returns the current snapshot, fetching from GitHub if the cache is
-// stale. Concurrent callers serialise on the internal mutex so only one fetch
-// is in flight at a time.
+// Snapshot returns the current snapshot. When a cached snapshot exists it is
+// returned without blocking: a fresh cache is returned directly, and an expired
+// cache is returned as-is while a single background refresh is triggered
+// (stale-while-revalidate). Only the first load, when no cache exists yet,
+// fetches synchronously and may return an error.
 func (s *GitHubSource) Snapshot(ctx context.Context) (*Snapshot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.cachedFiles != nil && time.Since(s.cachedAt) < s.ttl {
-		return s.snapshotLocked(), nil
-	}
-
-	repoInfo, _, err := s.client.Repositories.Get(ctx, s.owner, s.repo)
-	if err != nil {
-		return s.fallbackLocked(ctx, goerr.Wrap(err, "failed to fetch repo info",
-			goerr.V("owner", s.owner), goerr.V("repo", s.repo)))
-	}
-	defaultBranch := repoInfo.GetDefaultBranch()
-	if defaultBranch == "" {
-		return s.fallbackLocked(ctx, goerr.New("repository has no default branch",
-			goerr.V("owner", s.owner), goerr.V("repo", s.repo)))
-	}
-
-	branch, _, err := s.client.Repositories.GetBranch(ctx, s.owner, s.repo, defaultBranch, 0)
-	if err != nil {
-		return s.fallbackLocked(ctx, goerr.Wrap(err, "failed to fetch branch",
-			goerr.V("branch", defaultBranch)))
-	}
-	headSha := branch.GetCommit().GetSHA()
-	if headSha == "" {
-		return s.fallbackLocked(ctx, goerr.New("branch has no HEAD commit",
-			goerr.V("branch", defaultBranch)))
-	}
-
-	if s.cachedFiles != nil && headSha == s.cachedSha {
-		s.cachedAt = time.Now()
-		return s.snapshotLocked(), nil
-	}
-
-	files, err := s.fetchAllPaths(ctx, headSha)
-	if err != nil {
-		return s.fallbackLocked(ctx, goerr.Wrap(err, "failed to fetch policy files",
-			goerr.V("commit_sha", headSha)))
-	}
-
-	if err := validatePolicy(ctx, files); err != nil {
-		// Validation failures indicate a data-level problem (bad Rego, rule
-		// conflict, etc.) that will not self-heal on retry, so notify
-		// regardless of whether a cached snapshot is available.
-		wrapped := goerr.Wrap(err, "policy validation failed",
-			goerr.V("commit_sha", headSha))
-		errutil.Handle(ctx, wrapped)
-		if s.cachedFiles != nil {
+	if s.cachedFiles != nil {
+		if time.Since(s.cachedAt) < s.ttl {
 			return s.snapshotLocked(), nil
 		}
-		return nil, wrapped
+		// Cache is stale: refresh in the background and serve the existing
+		// snapshot immediately so the caller never blocks on GitHub.
+		s.triggerRefresh(ctx)
+		return s.snapshotLocked(), nil
 	}
 
+	// First load: there is no cached snapshot to fall back to, so fetch
+	// synchronously and propagate any error to the caller (e.g. Prime fails
+	// at startup and the process exits before the HTTP server starts).
+	files, sha, err := s.fetchRemote(ctx, "")
+	if err != nil {
+		return nil, err
+	}
 	s.cachedFiles = files
-	s.cachedSha = headSha
+	s.cachedSha = sha
 	s.cachedAt = time.Now()
 	return s.snapshotLocked(), nil
 }
@@ -172,15 +156,103 @@ func (s *GitHubSource) snapshotLocked() *Snapshot {
 	}
 }
 
-// fallbackLocked decides what to return when a fetch step fails.
-// If a previous snapshot exists, the error is logged via errutil.Handle and
-// the cached snapshot is returned. Otherwise the error is returned.
-func (s *GitHubSource) fallbackLocked(ctx context.Context, err error) (*Snapshot, error) {
-	if s.cachedFiles != nil {
-		errutil.Handle(ctx, err)
-		return s.snapshotLocked(), nil
+// triggerRefresh starts a single background refresh unless one is already
+// running. The single-flight guard is a CompareAndSwap on s.refreshing, so the
+// check-and-set is atomic and does not depend on holding s.mu. The refresh runs
+// via async.Dispatch, which detaches the request context (so the refresh is not
+// cancelled when the originating request completes) and reports a returned error
+// via errutil.Handle. The guard is always released via the deferred Store(false),
+// even if the refresh returns early or panics, so a failed refresh can never
+// permanently disable future refreshes.
+func (s *GitHubSource) triggerRefresh(ctx context.Context) {
+	if !s.refreshing.CompareAndSwap(false, true) {
+		return // a refresh is already in flight
 	}
-	return nil, err
+	s.refreshWG.Add(1)
+	async.Dispatch(ctx, func(ctx context.Context) error {
+		defer s.refreshWG.Done()
+		defer s.refreshing.Store(false)
+		return s.runRefresh(ctx)
+	})
+}
+
+// runRefresh performs a background refresh without holding the mutex during the
+// network fetch, then swaps in the result under a brief lock. On any failure it
+// keeps the previous snapshot and returns the error (reported by async.Dispatch
+// via errutil.Handle). cachedAt is stamped on both success and failure so a
+// failing GitHub backs off for a full TTL instead of being retried on every
+// alert. The single-flight guard (s.refreshing) is released by the caller via
+// the deferred Store(false).
+func (s *GitHubSource) runRefresh(ctx context.Context) error {
+	s.mu.Lock()
+	prevSha := s.cachedSha
+	s.mu.Unlock()
+
+	files, sha, fetchErr := s.fetchRemote(ctx, prevSha)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.cachedAt = time.Now()
+	if fetchErr != nil {
+		return fetchErr
+	}
+	if files != nil { // nil files means the HEAD sha was unchanged.
+		s.cachedFiles = files
+		s.cachedSha = sha
+	}
+	return nil
+}
+
+// fetchRemote fetches the policy files from GitHub without touching the cache or
+// holding the mutex, so concurrent readers are never blocked by a slow fetch.
+// It returns (nil, headSha, nil) when prevSha matches the current HEAD (no
+// change). On any failure it returns a wrapped error and leaves the cache
+// untouched for the caller to preserve.
+func (s *GitHubSource) fetchRemote(ctx context.Context, prevSha string) (map[string]string, string, error) {
+	repoInfo, _, err := s.client.Repositories.Get(ctx, s.owner, s.repo)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to fetch repo info",
+			goerr.T(errutil.TagGitHubError),
+			goerr.V("owner", s.owner), goerr.V("repo", s.repo))
+	}
+	defaultBranch := repoInfo.GetDefaultBranch()
+	if defaultBranch == "" {
+		return nil, "", goerr.New("repository has no default branch",
+			goerr.T(errutil.TagGitHubError),
+			goerr.V("owner", s.owner), goerr.V("repo", s.repo))
+	}
+
+	branch, _, err := s.client.Repositories.GetBranch(ctx, s.owner, s.repo, defaultBranch, 0)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to fetch branch",
+			goerr.T(errutil.TagGitHubError),
+			goerr.V("branch", defaultBranch))
+	}
+	headSha := branch.GetCommit().GetSHA()
+	if headSha == "" {
+		return nil, "", goerr.New("branch has no HEAD commit",
+			goerr.T(errutil.TagGitHubError),
+			goerr.V("branch", defaultBranch))
+	}
+
+	if prevSha != "" && headSha == prevSha {
+		return nil, headSha, nil
+	}
+
+	files, err := s.fetchAllPaths(ctx, headSha)
+	if err != nil {
+		return nil, "", goerr.Wrap(err, "failed to fetch policy files",
+			goerr.T(errutil.TagGitHubError),
+			goerr.V("commit_sha", headSha))
+	}
+
+	if err := validatePolicy(ctx, files); err != nil {
+		return nil, "", goerr.Wrap(err, "policy validation failed",
+			goerr.T(errutil.TagValidation),
+			goerr.V("commit_sha", headSha))
+	}
+
+	return files, headSha, nil
 }
 
 func (s *GitHubSource) fetchAllPaths(ctx context.Context, sha string) (map[string]string, error) {

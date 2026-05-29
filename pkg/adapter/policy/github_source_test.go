@@ -200,9 +200,13 @@ func TestGitHubSource_RefreshesAfterTTL_SameSha(t *testing.T) {
 	// Wait a moment to ensure TTL window passes.
 	time.Sleep(2 * time.Millisecond)
 
+	// Stale cache is served immediately while a background refresh runs.
 	snap, err := src.Snapshot(context.Background())
 	gt.NoError(t, err)
 	gt.True(t, strings.Contains(snap.Version, "sha-1"))
+
+	// Await the background refresh deterministically.
+	src.WaitRefresh()
 
 	// repo + branch are re-fetched; contents must NOT be re-fetched (sha unchanged).
 	gt.Equal(t, mock.contentsHits, contentsBefore)
@@ -231,11 +235,22 @@ func TestGitHubSource_RefreshesAfterTTL_NewSha(t *testing.T) {
 
 	time.Sleep(2 * time.Millisecond)
 
+	// First post-expiry call serves the stale snapshot and triggers a refresh.
 	second, err := src.Snapshot(context.Background())
 	gt.NoError(t, err)
-	gt.NotEqual(t, first.Version, second.Version)
-	gt.True(t, strings.Contains(second.Version, "sha-2"))
-	gt.True(t, strings.Contains(second.Files["github://owner/repo/policies/ignore.rego"], "from-github-v2"))
+	gt.Equal(t, first.Version, second.Version)
+
+	src.WaitRefresh()
+
+	// Once the refresh has applied, the new sha is visible.
+	third, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.NotEqual(t, first.Version, third.Version)
+	gt.True(t, strings.Contains(third.Version, "sha-2"))
+	gt.True(t, strings.Contains(third.Files["github://owner/repo/policies/ignore.rego"], "from-github-v2"))
+
+	// Drain the no-op refresh re-triggered by the read above.
+	src.WaitRefresh()
 }
 
 func TestGitHubSource_ValidationFailure_FallbackToCached(t *testing.T) {
@@ -262,11 +277,20 @@ func TestGitHubSource_ValidationFailure_FallbackToCached(t *testing.T) {
 
 	time.Sleep(2 * time.Millisecond)
 
+	// Stale snapshot is served immediately; the background refresh will fail.
 	snap, err := src.Snapshot(context.Background())
 	gt.NoError(t, err)
-	// Falls back to previous good snapshot.
 	gt.Equal(t, snap.Version, first.Version)
-	gt.True(t, strings.Contains(snap.Files["github://owner/repo/policies/ignore.rego"], "from-github\""))
+
+	src.WaitRefresh()
+
+	// The failed refresh keeps the previous good snapshot intact.
+	snap2, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.Equal(t, snap2.Version, first.Version)
+	gt.True(t, strings.Contains(snap2.Files["github://owner/repo/policies/ignore.rego"], "from-github\""))
+
+	src.WaitRefresh()
 }
 
 func TestGitHubSource_RuntimeConflict_FallbackToCached(t *testing.T) {
@@ -297,10 +321,21 @@ x := 2
 
 	time.Sleep(2 * time.Millisecond)
 
+	// Stale snapshot is served immediately; the background refresh will fail
+	// the runtime conflict check.
 	snap, err := src.Snapshot(context.Background())
 	gt.NoError(t, err)
 	gt.Equal(t, snap.Version, first.Version)
-	gt.True(t, strings.Contains(snap.Files["github://owner/repo/policies/ignore.rego"], "from-github\""))
+
+	src.WaitRefresh()
+
+	// The failed refresh keeps the previous good snapshot intact.
+	snap2, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.Equal(t, snap2.Version, first.Version)
+	gt.True(t, strings.Contains(snap2.Files["github://owner/repo/policies/ignore.rego"], "from-github\""))
+
+	src.WaitRefresh()
 }
 
 func TestGitHubSource_RuntimeConflict_NoCache_ReturnsError(t *testing.T) {
@@ -393,4 +428,150 @@ func TestGitHubSource_ConcurrentSnapshot_SerialisesFetch(t *testing.T) {
 	gt.Equal(t, mock.repoHits, 1)
 	// And no concurrent fetches inside the lock window.
 	gt.True(t, maxInFlight.Load() <= 1)
+}
+
+// blockingTransport delays every HTTP round trip until release is closed while
+// blocked is set. It simulates a slow or hung GitHub on the client side, which
+// is fully thread-safe (unlike mutating the test server's handler at runtime).
+type blockingTransport struct {
+	blocked *atomic.Bool
+	release chan struct{}
+	base    http.RoundTripper
+}
+
+func (t *blockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.blocked.Load() {
+		<-t.release
+	}
+	return t.base.RoundTrip(req)
+}
+
+func TestGitHubSource_StaleServedImmediately_NonBlocking(t *testing.T) {
+	mock := newMockGitHub(t, "sha-1", map[string]string{
+		"policies/ignore.rego": ghTestRego,
+	})
+
+	u, err := url.Parse(mock.server.URL + "/")
+	gt.NoError(t, err)
+
+	release := make(chan struct{})
+	var blocked atomic.Bool
+	gClient := github.NewClient(&http.Client{
+		Transport: &blockingTransport{
+			blocked: &blocked,
+			release: release,
+			base:    http.DefaultTransport,
+		},
+	})
+	gClient.BaseURL = u
+	gClient.UploadURL = u
+
+	src, err := policyadapter.NewGitHubSource(policyadapter.GitHubSourceOpts{
+		Owner:  "owner",
+		Repo:   "repo",
+		Paths:  []string{"policies"},
+		Client: gClient,
+		TTL:    time.Nanosecond, // immediately expire after the first load
+	})
+	gt.NoError(t, err)
+
+	// Warm the cache with a fast fetch.
+	first, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+
+	// From now on, every GitHub call blocks until released, simulating a slow
+	// or hung GitHub. The background refresh will be stuck in RoundTrip.
+	blocked.Store(true)
+
+	// Let the TTL window pass so the next Snapshot sees a stale cache.
+	time.Sleep(2 * time.Millisecond)
+
+	// Snapshot MUST return the stale snapshot immediately even though the
+	// background refresh is blocked on the hung GitHub server. If Snapshot
+	// blocked on the fetch, this test would deadlock (release is still open).
+	snap, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.Equal(t, snap.Version, first.Version)
+
+	// Release the blocked refresh and drain it.
+	close(release)
+	src.WaitRefresh()
+}
+
+// panicTransport panics on every round trip while shouldPanic is set, to
+// simulate an unexpected failure inside the background refresh goroutine.
+type panicTransport struct {
+	shouldPanic *atomic.Bool
+	base        http.RoundTripper
+}
+
+func (t *panicTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.shouldPanic.Load() {
+		panic("simulated transport panic")
+	}
+	return t.base.RoundTrip(req)
+}
+
+func TestGitHubSource_RefreshPanic_DoesNotWedgeSingleFlight(t *testing.T) {
+	mock := newMockGitHub(t, "sha-1", map[string]string{
+		"policies/ignore.rego": ghTestRego,
+	})
+
+	u, err := url.Parse(mock.server.URL + "/")
+	gt.NoError(t, err)
+
+	var shouldPanic atomic.Bool
+	gClient := github.NewClient(&http.Client{
+		Transport: &panicTransport{
+			shouldPanic: &shouldPanic,
+			base:        http.DefaultTransport,
+		},
+	})
+	gClient.BaseURL = u
+	gClient.UploadURL = u
+
+	src, err := policyadapter.NewGitHubSource(policyadapter.GitHubSourceOpts{
+		Owner:  "owner",
+		Repo:   "repo",
+		Paths:  []string{"policies"},
+		Client: gClient,
+		TTL:    time.Nanosecond, // immediately expire after the first load
+	})
+	gt.NoError(t, err)
+
+	// Warm the cache with a fast fetch.
+	first, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+
+	// Make the next background refresh panic inside RoundTrip.
+	shouldPanic.Store(true)
+	mock.update("sha-2", map[string]string{
+		"policies/ignore.rego": ghTestRegoV2,
+	})
+	time.Sleep(2 * time.Millisecond)
+
+	// Stale snapshot is served; the triggered refresh panics in the background
+	// and is recovered by async.Dispatch.
+	snap, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.Equal(t, snap.Version, first.Version)
+	src.WaitRefresh()
+
+	// After the panic, the single-flight guard must have been released: a
+	// subsequent (now healthy) refresh must run and apply the new sha. If the
+	// guard were wedged at true, this refresh would be skipped and the version
+	// would stay at sha-1.
+	shouldPanic.Store(false)
+	time.Sleep(2 * time.Millisecond)
+
+	stale, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.Equal(t, stale.Version, first.Version) // still stale until refresh applies
+	src.WaitRefresh()
+
+	updated, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.True(t, strings.Contains(updated.Version, "sha-2"))
+	gt.True(t, strings.Contains(updated.Files["github://owner/repo/policies/ignore.rego"], "from-github-v2"))
+	src.WaitRefresh()
 }
