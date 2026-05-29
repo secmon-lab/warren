@@ -157,7 +157,9 @@ func (s *GitHubSource) snapshotLocked() *Snapshot {
 // running. It assumes s.mu is held. The refresh runs via async.Dispatch, which
 // detaches the request context (so the refresh is not cancelled when the
 // originating request completes) and reports a returned error via
-// errutil.Handle.
+// errutil.Handle. The single-flight guard is always released via clearRefreshing,
+// even if the refresh returns early or panics, so a failed refresh can never
+// permanently disable future refreshes.
 func (s *GitHubSource) triggerRefreshLocked(ctx context.Context) {
 	if s.refreshing {
 		return
@@ -166,8 +168,19 @@ func (s *GitHubSource) triggerRefreshLocked(ctx context.Context) {
 	s.refreshWG.Add(1)
 	async.Dispatch(ctx, func(ctx context.Context) error {
 		defer s.refreshWG.Done()
+		defer s.clearRefreshing()
 		return s.runRefresh(ctx)
 	})
+}
+
+// clearRefreshing releases the single-flight guard. It is invoked via defer so
+// the guard is cleared even when the refresh panics; otherwise a single
+// panicking refresh would leave refreshing stuck at true and block every future
+// refresh.
+func (s *GitHubSource) clearRefreshing() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refreshing = false
 }
 
 // runRefresh performs a background refresh without holding the mutex during the
@@ -175,7 +188,8 @@ func (s *GitHubSource) triggerRefreshLocked(ctx context.Context) {
 // keeps the previous snapshot and returns the error (reported by async.Dispatch
 // via errutil.Handle). cachedAt is stamped on both success and failure so a
 // failing GitHub backs off for a full TTL instead of being retried on every
-// alert.
+// alert. The single-flight guard (s.refreshing) is released by the caller via
+// clearRefreshing.
 func (s *GitHubSource) runRefresh(ctx context.Context) error {
 	s.mu.Lock()
 	prevSha := s.cachedSha
@@ -185,7 +199,6 @@ func (s *GitHubSource) runRefresh(ctx context.Context) error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.refreshing = false
 	s.cachedAt = time.Now()
 	if fetchErr != nil {
 		return fetchErr

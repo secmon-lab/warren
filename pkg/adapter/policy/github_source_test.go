@@ -497,3 +497,81 @@ func TestGitHubSource_StaleServedImmediately_NonBlocking(t *testing.T) {
 	close(release)
 	src.WaitRefresh()
 }
+
+// panicTransport panics on every round trip while shouldPanic is set, to
+// simulate an unexpected failure inside the background refresh goroutine.
+type panicTransport struct {
+	shouldPanic *atomic.Bool
+	base        http.RoundTripper
+}
+
+func (t *panicTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.shouldPanic.Load() {
+		panic("simulated transport panic")
+	}
+	return t.base.RoundTrip(req)
+}
+
+func TestGitHubSource_RefreshPanic_DoesNotWedgeSingleFlight(t *testing.T) {
+	mock := newMockGitHub(t, "sha-1", map[string]string{
+		"policies/ignore.rego": ghTestRego,
+	})
+
+	u, err := url.Parse(mock.server.URL + "/")
+	gt.NoError(t, err)
+
+	var shouldPanic atomic.Bool
+	gClient := github.NewClient(&http.Client{
+		Transport: &panicTransport{
+			shouldPanic: &shouldPanic,
+			base:        http.DefaultTransport,
+		},
+	})
+	gClient.BaseURL = u
+	gClient.UploadURL = u
+
+	src, err := policyadapter.NewGitHubSource(policyadapter.GitHubSourceOpts{
+		Owner:  "owner",
+		Repo:   "repo",
+		Paths:  []string{"policies"},
+		Client: gClient,
+		TTL:    time.Nanosecond, // immediately expire after the first load
+	})
+	gt.NoError(t, err)
+
+	// Warm the cache with a fast fetch.
+	first, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+
+	// Make the next background refresh panic inside RoundTrip.
+	shouldPanic.Store(true)
+	mock.update("sha-2", map[string]string{
+		"policies/ignore.rego": ghTestRegoV2,
+	})
+	time.Sleep(2 * time.Millisecond)
+
+	// Stale snapshot is served; the triggered refresh panics in the background
+	// and is recovered by async.Dispatch.
+	snap, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.Equal(t, snap.Version, first.Version)
+	src.WaitRefresh()
+
+	// After the panic, the single-flight guard must have been released: a
+	// subsequent (now healthy) refresh must run and apply the new sha. If the
+	// guard were wedged at true, this refresh would be skipped and the version
+	// would stay at sha-1.
+	shouldPanic.Store(false)
+	time.Sleep(2 * time.Millisecond)
+
+	stale, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.Equal(t, stale.Version, first.Version) // still stale until refresh applies
+	src.WaitRefresh()
+
+	updated, err := src.Snapshot(context.Background())
+	gt.NoError(t, err)
+	gt.True(t, strings.Contains(updated.Version, "sha-2"))
+	gt.True(t, strings.Contains(updated.Files["github://owner/repo/policies/ignore.rego"], "from-github-v2"))
+	src.WaitRefresh()
+}
