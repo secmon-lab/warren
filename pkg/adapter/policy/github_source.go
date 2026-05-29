@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -65,8 +66,10 @@ type GitHubSource struct {
 	cachedFiles map[string]string
 	cachedSha   string
 	cachedAt    time.Time
-	// refreshing guarantees at most one background refresh runs at a time.
-	refreshing bool
+	// refreshing guarantees at most one background refresh runs at a time. It is
+	// an atomic so the check-and-set is a single atomic operation independent of
+	// s.mu (which protects the cached* fields).
+	refreshing atomic.Bool
 	// refreshWG tracks in-flight background refreshes so tests can await them
 	// deterministically; it has no effect on production behaviour.
 	refreshWG sync.WaitGroup
@@ -129,7 +132,7 @@ func (s *GitHubSource) Snapshot(ctx context.Context) (*Snapshot, error) {
 		}
 		// Cache is stale: refresh in the background and serve the existing
 		// snapshot immediately so the caller never blocks on GitHub.
-		s.triggerRefreshLocked(ctx)
+		s.triggerRefresh(ctx)
 		return s.snapshotLocked(), nil
 	}
 
@@ -153,34 +156,24 @@ func (s *GitHubSource) snapshotLocked() *Snapshot {
 	}
 }
 
-// triggerRefreshLocked starts a single background refresh unless one is already
-// running. It assumes s.mu is held. The refresh runs via async.Dispatch, which
-// detaches the request context (so the refresh is not cancelled when the
-// originating request completes) and reports a returned error via
-// errutil.Handle. The single-flight guard is always released via clearRefreshing,
+// triggerRefresh starts a single background refresh unless one is already
+// running. The single-flight guard is a CompareAndSwap on s.refreshing, so the
+// check-and-set is atomic and does not depend on holding s.mu. The refresh runs
+// via async.Dispatch, which detaches the request context (so the refresh is not
+// cancelled when the originating request completes) and reports a returned error
+// via errutil.Handle. The guard is always released via the deferred Store(false),
 // even if the refresh returns early or panics, so a failed refresh can never
 // permanently disable future refreshes.
-func (s *GitHubSource) triggerRefreshLocked(ctx context.Context) {
-	if s.refreshing {
-		return
+func (s *GitHubSource) triggerRefresh(ctx context.Context) {
+	if !s.refreshing.CompareAndSwap(false, true) {
+		return // a refresh is already in flight
 	}
-	s.refreshing = true
 	s.refreshWG.Add(1)
 	async.Dispatch(ctx, func(ctx context.Context) error {
 		defer s.refreshWG.Done()
-		defer s.clearRefreshing()
+		defer s.refreshing.Store(false)
 		return s.runRefresh(ctx)
 	})
-}
-
-// clearRefreshing releases the single-flight guard. It is invoked via defer so
-// the guard is cleared even when the refresh panics; otherwise a single
-// panicking refresh would leave refreshing stuck at true and block every future
-// refresh.
-func (s *GitHubSource) clearRefreshing() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.refreshing = false
 }
 
 // runRefresh performs a background refresh without holding the mutex during the
@@ -189,7 +182,7 @@ func (s *GitHubSource) clearRefreshing() {
 // via errutil.Handle). cachedAt is stamped on both success and failure so a
 // failing GitHub backs off for a full TTL instead of being retried on every
 // alert. The single-flight guard (s.refreshing) is released by the caller via
-// clearRefreshing.
+// the deferred Store(false).
 func (s *GitHubSource) runRefresh(ctx context.Context) error {
 	s.mu.Lock()
 	prevSha := s.cachedSha
