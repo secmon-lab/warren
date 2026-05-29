@@ -430,16 +430,47 @@ func TestGitHubSource_ConcurrentSnapshot_SerialisesFetch(t *testing.T) {
 	gt.True(t, maxInFlight.Load() <= 1)
 }
 
+// blockingTransport delays every HTTP round trip until release is closed while
+// blocked is set. It simulates a slow or hung GitHub on the client side, which
+// is fully thread-safe (unlike mutating the test server's handler at runtime).
+type blockingTransport struct {
+	blocked *atomic.Bool
+	release chan struct{}
+	base    http.RoundTripper
+}
+
+func (t *blockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.blocked.Load() {
+		<-t.release
+	}
+	return t.base.RoundTrip(req)
+}
+
 func TestGitHubSource_StaleServedImmediately_NonBlocking(t *testing.T) {
 	mock := newMockGitHub(t, "sha-1", map[string]string{
 		"policies/ignore.rego": ghTestRego,
 	})
 
+	u, err := url.Parse(mock.server.URL + "/")
+	gt.NoError(t, err)
+
+	release := make(chan struct{})
+	var blocked atomic.Bool
+	gClient := github.NewClient(&http.Client{
+		Transport: &blockingTransport{
+			blocked: &blocked,
+			release: release,
+			base:    http.DefaultTransport,
+		},
+	})
+	gClient.BaseURL = u
+	gClient.UploadURL = u
+
 	src, err := policyadapter.NewGitHubSource(policyadapter.GitHubSourceOpts{
 		Owner:  "owner",
 		Repo:   "repo",
 		Paths:  []string{"policies"},
-		Client: mock.client(),
+		Client: gClient,
 		TTL:    time.Nanosecond, // immediately expire after the first load
 	})
 	gt.NoError(t, err)
@@ -449,16 +480,7 @@ func TestGitHubSource_StaleServedImmediately_NonBlocking(t *testing.T) {
 	gt.NoError(t, err)
 
 	// From now on, every GitHub call blocks until released, simulating a slow
-	// or hung GitHub. The background refresh will be stuck here.
-	release := make(chan struct{})
-	var blocked atomic.Bool
-	origHandler := mock.server.Config.Handler
-	mock.server.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if blocked.Load() {
-			<-release
-		}
-		origHandler.ServeHTTP(w, r)
-	})
+	// or hung GitHub. The background refresh will be stuck in RoundTrip.
 	blocked.Store(true)
 
 	// Let the TTL window pass so the next Snapshot sees a stale cache.
