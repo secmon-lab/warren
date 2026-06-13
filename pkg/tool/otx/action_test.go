@@ -6,12 +6,34 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	extotx "github.com/gollem-dev/tools/otx"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/otx"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
+
+// TestOTX_OptionAppended verifies the base-url flag Action appends WithBaseURL
+// carrying the provided value, by applying the accumulated options to a fresh
+// external ToolSet and reading its unexported field.
+func TestOTX_OptionAppended(t *testing.T) {
+	var action otx.Action
+	cmd := cli.Command{
+		Name:   "otx",
+		Flags:  action.Flags(),
+		Action: func(context.Context, *cli.Command) error { return nil },
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"otx", "--otx-api-key", "k", "--otx-base-url", "https://example.test/api",
+	}))
+
+	var ts extotx.ToolSet
+	for _, o := range action.Opts() {
+		o(&ts)
+	}
+	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/api")
+}
 
 // TestOTX_Delegation verifies that the warren wrapper builds the external
 // toolset on Configure and delegates Run to it (against a stub server).

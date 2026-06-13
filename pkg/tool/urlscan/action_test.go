@@ -6,13 +6,42 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	exturlscan "github.com/gollem-dev/tools/urlscan"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/urlscan"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
+
+// TestURLScan_OptionsAppended verifies that the optional flag Action callbacks
+// append the correct external options by applying them to a fresh ToolSet and
+// reading the unexported fields via reflection.
+func TestURLScan_OptionsAppended(t *testing.T) {
+	var action urlscan.Action
+	cmd := cli.Command{
+		Name:   "urlscan",
+		Flags:  action.Flags(),
+		Action: func(context.Context, *cli.Command) error { return nil },
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"urlscan",
+		"--urlscan-api-key", "k",
+		"--urlscan-base-url", "https://example.test/api",
+		"--urlscan-backoff", "7s",
+		"--urlscan-timeout", "42s",
+	}))
+
+	var ts exturlscan.ToolSet
+	for _, o := range action.Opts() {
+		o(&ts)
+	}
+	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/api")
+	gt.Value(t, test.PrivateField(t, &ts, "backoff")).Equal(7 * time.Second)
+	gt.Value(t, test.PrivateField(t, &ts, "timeout")).Equal(42 * time.Second)
+}
 
 // TestURLScan_Delegation verifies that the warren wrapper builds the external
 // toolset on Configure and delegates Run to it (against a stub server).

@@ -17,3 +17,9 @@ func (x *Action) ConfigureWithOpts(tokenEndpoint, baseURL string) error {
 	}
 	return x.Configure(context.Background())
 }
+
+// Opts exposes the accumulated external options for testing that flag Action
+// callbacks append the expected option.
+func (x *Action) Opts() []extintune.Option {
+	return x.opts
+}

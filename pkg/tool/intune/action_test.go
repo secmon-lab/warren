@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	extintune "github.com/gollem-dev/tools/intune"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/intune"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
@@ -498,6 +499,31 @@ func TestIntune_InvalidFunctionName(t *testing.T) {
 
 	_, err := action.Run(context.Background(), "intune_unknown_function", map[string]any{})
 	gt.Error(t, err)
+}
+
+// TestIntune_OptionAppended verifies the --intune-base-url flag Action appends
+// WithBaseURL carrying the provided value, by applying the accumulated options
+// to a fresh external ToolSet and reading its unexported field.
+func TestIntune_OptionAppended(t *testing.T) {
+	var action intune.Action
+	cmd := cli.Command{
+		Name:   "intune",
+		Flags:  action.Flags(),
+		Action: func(context.Context, *cli.Command) error { return nil },
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"intune",
+		"--intune-tenant-id", "t",
+		"--intune-client-id", "c",
+		"--intune-client-secret", "s",
+		"--intune-base-url", "https://example.test/graph",
+	}))
+
+	var ts extintune.ToolSet
+	for _, o := range action.Opts() {
+		o(&ts)
+	}
+	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/graph")
 }
 
 func TestIntune_Integration(t *testing.T) {

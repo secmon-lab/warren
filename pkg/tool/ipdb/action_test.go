@@ -6,12 +6,34 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	extipdb "github.com/gollem-dev/tools/ipdb"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/ipdb"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
+
+// TestIPDB_OptionAppended verifies the base-url flag Action appends WithBaseURL
+// carrying the provided value, by applying the accumulated options to a fresh
+// external ToolSet and reading its unexported field.
+func TestIPDB_OptionAppended(t *testing.T) {
+	var action ipdb.Action
+	cmd := cli.Command{
+		Name:   "ipdb",
+		Flags:  action.Flags(),
+		Action: func(context.Context, *cli.Command) error { return nil },
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"ipdb", "--ipdb-api-key", "k", "--ipdb-base-url", "https://example.test/api",
+	}))
+
+	var ts extipdb.ToolSet
+	for _, o := range action.Opts() {
+		o(&ts)
+	}
+	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/api")
+}
 
 // TestIPDB_Delegation verifies that the warren wrapper builds the external
 // toolset on Configure and delegates Run to it (against a stub server).

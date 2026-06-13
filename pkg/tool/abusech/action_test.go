@@ -6,12 +6,34 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	extabusech "github.com/gollem-dev/tools/abusech"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
+
+// TestAbusech_OptionAppended verifies the base-url flag Action appends WithBaseURL
+// carrying the provided value, by applying the accumulated options to a fresh
+// external ToolSet and reading its unexported field.
+func TestAbusech_OptionAppended(t *testing.T) {
+	var action abusech.Action
+	cmd := cli.Command{
+		Name:   "abusech",
+		Flags:  action.Flags(),
+		Action: func(context.Context, *cli.Command) error { return nil },
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"abusech", "--abusech-api-key", "k", "--abusech-base-url", "https://example.test/api",
+	}))
+
+	var ts extabusech.ToolSet
+	for _, o := range action.Opts() {
+		o(&ts)
+	}
+	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/api")
+}
 
 func TestAbusech_Unavailable(t *testing.T) {
 	var action abusech.Action

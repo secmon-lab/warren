@@ -1,5 +1,13 @@
 package bigquery
 
+import extbq "github.com/gollem-dev/tools/bigquery"
+
+// Opts exposes the accumulated external options for testing that flag Action
+// callbacks append the expected option.
+func (x *Action) Opts() []extbq.Option {
+	return x.opts
+}
+
 var FlattenSchema = flattenSchema
 
 type SchemaField = schemaField

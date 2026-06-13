@@ -7,9 +7,11 @@ import (
 	"os"
 	"testing"
 
+	extslack "github.com/gollem-dev/tools/slack"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/slack"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
+	"github.com/secmon-lab/warren/pkg/utils/test"
 )
 
 // newAction builds a configured Action pointed at the given stub server URL.
@@ -108,6 +110,20 @@ func TestSlackConfigure(t *testing.T) {
 		action := &slack.Action{}
 		gt.Equal(t, action.Configure(context.Background()), errutil.ErrActionUnavailable)
 	})
+}
+
+// TestSlack_OptionAppended verifies that SetTestURL appends WithBaseURL carrying
+// the provided value, by applying the accumulated options to a fresh external
+// ToolSet and reading its unexported field.
+func TestSlack_OptionAppended(t *testing.T) {
+	action := &slack.Action{}
+	action.SetTestURL("https://example.test/api")
+
+	var ts extslack.ToolSet
+	for _, o := range action.Opts() {
+		o(&ts)
+	}
+	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/api")
 }
 
 func TestSlackMessageSearchIntegration(t *testing.T) {

@@ -5,12 +5,54 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	extbq "github.com/gollem-dev/tools/bigquery"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
+	"github.com/secmon-lab/warren/pkg/utils/test"
 	"github.com/urfave/cli/v3"
 )
+
+// TestBigQueryOptionsAppended verifies that each optional flag's Action appends
+// the matching external option carrying the provided value, by applying the
+// accumulated options to a fresh external ToolSet and reading its unexported
+// fields.
+func TestBigQueryOptionsAppended(t *testing.T) {
+	var action bigquery.Action
+	cmd := cli.Command{
+		Name:   "bigquery",
+		Flags:  action.Flags(),
+		Action: func(context.Context, *cli.Command) error { return nil },
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"bigquery",
+		"--bigquery-project-id", "proj",
+		"--bigquery-credentials", "/tmp/creds.json",
+		"--bigquery-impersonate-service-account", "sa@example.iam.gserviceaccount.com",
+		"--bigquery-config", "/cfg/a.yaml",
+		"--bigquery-config", "/cfg/b.yaml",
+		"--bigquery-runbook-path", "/rb",
+		"--bigquery-storage-bucket", "my-bucket",
+		"--bigquery-storage-prefix", "results/",
+		"--bigquery-timeout", "3m",
+		"--bigquery-scan-limit", "5GB",
+	}))
+
+	var ts extbq.ToolSet
+	for _, o := range action.Opts() {
+		o(&ts)
+	}
+	gt.Value(t, test.PrivateField(t, &ts, "credentials")).Equal("/tmp/creds.json")
+	gt.Value(t, test.PrivateField(t, &ts, "impersonateServiceAccount")).Equal("sa@example.iam.gserviceaccount.com")
+	gt.Value(t, test.PrivateField(t, &ts, "configFiles")).Equal([]string{"/cfg/a.yaml", "/cfg/b.yaml"})
+	gt.Value(t, test.PrivateField(t, &ts, "runbookPaths")).Equal([]string{"/rb"})
+	gt.Value(t, test.PrivateField(t, &ts, "storageBucket")).Equal("my-bucket")
+	gt.Value(t, test.PrivateField(t, &ts, "storagePrefix")).Equal("results/")
+	gt.Value(t, test.PrivateField(t, &ts, "timeout")).Equal(3 * time.Minute)
+	gt.Value(t, test.PrivateField(t, &ts, "scanLimitStr")).Equal("5GB")
+}
 
 // runConfigure parses the given CLI args into a fresh Action and runs Configure.
 func runConfigure(t *testing.T, args []string, fn func(ctx context.Context, action *bigquery.Action)) {
