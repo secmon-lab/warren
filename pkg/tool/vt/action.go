@@ -19,6 +19,7 @@ type Action struct {
 	apiKey  string
 	baseURL string
 
+	opts  []extvt.Option
 	inner gollem.ToolSet
 }
 
@@ -52,6 +53,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       "https://www.virustotal.com/api/v3",
 			Sources:     cli.EnvVars("WARREN_VT_BASE_URL"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extvt.WithBaseURL(v))
+				return nil
+			},
 		},
 	}
 }
@@ -61,12 +66,7 @@ func (x *Action) Configure(_ context.Context) error {
 		return errutil.ErrActionUnavailable
 	}
 
-	var opts []extvt.Option
-	if x.baseURL != "" {
-		opts = append(opts, extvt.WithBaseURL(x.baseURL))
-	}
-
-	ts, err := extvt.New(x.apiKey, opts...)
+	ts, err := extvt.New(x.apiKey, x.opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure VirusTotal tool")
 	}

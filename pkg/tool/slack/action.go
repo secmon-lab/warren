@@ -17,8 +17,8 @@ import (
 // gollem.ToolSet that carries the search.messages Specs/Run logic.
 type Action struct {
 	oauthToken string
-	baseURL    string // for testing
 
+	opts  []extslack.Option
 	inner gollem.ToolSet
 }
 
@@ -53,12 +53,7 @@ func (x *Action) Configure(_ context.Context) error {
 		return errutil.ErrActionUnavailable
 	}
 
-	var opts []extslack.Option
-	if x.baseURL != "" {
-		opts = append(opts, extslack.WithBaseURL(x.baseURL))
-	}
-
-	ts, err := extslack.New(x.oauthToken, opts...)
+	ts, err := extslack.New(x.oauthToken, x.opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure Slack tool")
 	}

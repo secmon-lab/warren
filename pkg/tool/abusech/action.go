@@ -19,6 +19,7 @@ type Action struct {
 	apiKey  string
 	baseURL string
 
+	opts  []extabusech.Option
 	inner gollem.ToolSet
 }
 
@@ -52,6 +53,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       "https://mb-api.abuse.ch/api/v1",
 			Sources:     cli.EnvVars("WARREN_ABUSECH_BASE_URL"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extabusech.WithBaseURL(v))
+				return nil
+			},
 		},
 	}
 }
@@ -61,12 +66,7 @@ func (x *Action) Configure(_ context.Context) error {
 		return errutil.ErrActionUnavailable
 	}
 
-	var opts []extabusech.Option
-	if x.baseURL != "" {
-		opts = append(opts, extabusech.WithBaseURL(x.baseURL))
-	}
-
-	ts, err := extabusech.New(x.apiKey, opts...)
+	ts, err := extabusech.New(x.apiKey, x.opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure abusech tool")
 	}

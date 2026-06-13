@@ -41,6 +41,7 @@ type Action struct {
 	// In-memory storage for runbooks, used to render Prompt().
 	runbooks map[types.RunbookID]*bigquery.RunbookEntry
 
+	opts  []extbq.Option
 	inner gollem.ToolSet
 }
 
@@ -108,6 +109,10 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.credentials,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_CREDENTIALS"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extbq.WithCredentials(v))
+				return nil
+			},
 		},
 		&cli.StringFlag{
 			Name:        "bigquery-impersonate-service-account",
@@ -115,6 +120,10 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.impersonateServiceAccount,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_IMPERSONATE_SERVICE_ACCOUNT"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extbq.WithImpersonateServiceAccount(v))
+				return nil
+			},
 		},
 		&cli.StringSliceFlag{
 			Name:        "bigquery-config",
@@ -122,6 +131,10 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.configFiles,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_CONFIG"),
+			Action: func(_ context.Context, _ *cli.Command, v []string) error {
+				x.opts = append(x.opts, extbq.WithConfigFiles(v))
+				return nil
+			},
 		},
 		&cli.StringSliceFlag{
 			Name:        "bigquery-runbook-path",
@@ -129,6 +142,10 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.runbookPaths,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_RUNBOOK_PATH"),
+			Action: func(_ context.Context, _ *cli.Command, v []string) error {
+				x.opts = append(x.opts, extbq.WithRunbookPaths(v))
+				return nil
+			},
 		},
 		&cli.StringFlag{
 			Name:        "bigquery-storage-bucket",
@@ -136,6 +153,10 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.storageBucket,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_STORAGE_BUCKET"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extbq.WithStorageBucket(v))
+				return nil
+			},
 		},
 		&cli.StringFlag{
 			Name:        "bigquery-storage-prefix",
@@ -143,6 +164,10 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.storagePrefix,
 			Category:    "Tool",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_STORAGE_PREFIX"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extbq.WithStoragePrefix(v))
+				return nil
+			},
 		},
 		&cli.DurationFlag{
 			Name:        "bigquery-timeout",
@@ -151,6 +176,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       5 * time.Minute,
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_TIMEOUT"),
+			Action: func(_ context.Context, _ *cli.Command, v time.Duration) error {
+				x.opts = append(x.opts, extbq.WithTimeout(v))
+				return nil
+			},
 		},
 		&cli.StringFlag{
 			Name:        "bigquery-scan-limit",
@@ -159,6 +188,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       "10GB",
 			Sources:     cli.EnvVars("WARREN_BIGQUERY_SCAN_LIMIT"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extbq.WithScanLimit(v))
+				return nil
+			},
 		},
 	}
 }
@@ -215,30 +248,7 @@ func (x *Action) Configure(ctx context.Context) error {
 		}
 	}
 
-	opts := []extbq.Option{extbq.WithConfigFiles(x.configFiles)}
-	if x.credentials != "" {
-		opts = append(opts, extbq.WithCredentials(x.credentials))
-	}
-	if x.impersonateServiceAccount != "" {
-		opts = append(opts, extbq.WithImpersonateServiceAccount(x.impersonateServiceAccount))
-	}
-	if len(x.runbookPaths) > 0 {
-		opts = append(opts, extbq.WithRunbookPaths(x.runbookPaths))
-	}
-	if x.storageBucket != "" {
-		opts = append(opts, extbq.WithStorageBucket(x.storageBucket))
-	}
-	if x.storagePrefix != "" {
-		opts = append(opts, extbq.WithStoragePrefix(x.storagePrefix))
-	}
-	if x.timeout != 0 {
-		opts = append(opts, extbq.WithTimeout(x.timeout))
-	}
-	if x.scanLimitStr != "" {
-		opts = append(opts, extbq.WithScanLimit(x.scanLimitStr))
-	}
-
-	ts, err := extbq.New(x.projectID, opts...)
+	ts, err := extbq.New(x.projectID, x.opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure BigQuery tool")
 	}

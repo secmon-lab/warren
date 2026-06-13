@@ -19,6 +19,7 @@ type Action struct {
 	apiKey  string
 	baseURL string
 
+	opts  []extipdb.Option
 	inner gollem.ToolSet
 }
 
@@ -52,6 +53,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       "https://api.abuseipdb.com/api/v2",
 			Sources:     cli.EnvVars("WARREN_IPDB_BASE_URL"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extipdb.WithBaseURL(v))
+				return nil
+			},
 		},
 	}
 }
@@ -61,12 +66,7 @@ func (x *Action) Configure(_ context.Context) error {
 		return errutil.ErrActionUnavailable
 	}
 
-	var opts []extipdb.Option
-	if x.baseURL != "" {
-		opts = append(opts, extipdb.WithBaseURL(x.baseURL))
-	}
-
-	ts, err := extipdb.New(x.apiKey, opts...)
+	ts, err := extipdb.New(x.apiKey, x.opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure AbuseIPDB tool")
 	}

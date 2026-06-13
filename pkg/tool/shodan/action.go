@@ -19,6 +19,7 @@ type Action struct {
 	apiKey  string
 	baseURL string
 
+	opts  []extshodan.Option
 	inner gollem.ToolSet
 }
 
@@ -52,6 +53,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       "https://api.shodan.io",
 			Sources:     cli.EnvVars("WARREN_SHODAN_BASE_URL"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extshodan.WithBaseURL(v))
+				return nil
+			},
 		},
 	}
 }
@@ -61,12 +66,7 @@ func (x *Action) Configure(_ context.Context) error {
 		return errutil.ErrActionUnavailable
 	}
 
-	var opts []extshodan.Option
-	if x.baseURL != "" {
-		opts = append(opts, extshodan.WithBaseURL(x.baseURL))
-	}
-
-	ts, err := extshodan.New(x.apiKey, opts...)
+	ts, err := extshodan.New(x.apiKey, x.opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure Shodan tool")
 	}

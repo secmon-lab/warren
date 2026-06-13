@@ -6,15 +6,14 @@ import (
 	extintune "github.com/gollem-dev/tools/intune"
 )
 
-// ConfigureWithOpts calls configure with extra extintune options, allowing tests
-// to inject a token endpoint and/or base URL pointing at httptest servers.
+// ConfigureWithOpts appends test-only extintune options (token endpoint and/or
+// base URL pointing at httptest servers) then calls Configure.
 func (x *Action) ConfigureWithOpts(tokenEndpoint, baseURL string) error {
-	var opts []extintune.Option
 	if tokenEndpoint != "" {
-		opts = append(opts, extintune.WithTokenEndpoint(tokenEndpoint))
+		x.opts = append(x.opts, extintune.WithTokenEndpoint(tokenEndpoint))
 	}
 	if baseURL != "" {
-		opts = append(opts, extintune.WithBaseURL(baseURL))
+		x.opts = append(x.opts, extintune.WithBaseURL(baseURL))
 	}
-	return x.configure(context.Background(), opts...)
+	return x.Configure(context.Background())
 }

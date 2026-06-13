@@ -21,6 +21,7 @@ type Action struct {
 	clientSecret string
 	baseURL      string
 
+	opts  []extintune.Option
 	inner gollem.ToolSet
 }
 
@@ -68,26 +69,20 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       "https://graph.microsoft.com/v1.0",
 			Sources:     cli.EnvVars("WARREN_INTUNE_BASE_URL"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, extintune.WithBaseURL(v))
+				return nil
+			},
 		},
 	}
 }
 
-func (x *Action) Configure(ctx context.Context) error {
-	return x.configure(ctx)
-}
-
-func (x *Action) configure(ctx context.Context, extraOpts ...extintune.Option) error {
+func (x *Action) Configure(_ context.Context) error {
 	if x.tenantID == "" || x.clientID == "" || x.clientSecret == "" {
 		return errutil.ErrActionUnavailable
 	}
 
-	var opts []extintune.Option
-	if x.baseURL != "" {
-		opts = append(opts, extintune.WithBaseURL(x.baseURL))
-	}
-	opts = append(opts, extraOpts...)
-
-	ts, err := extintune.New(x.tenantID, x.clientID, x.clientSecret, opts...)
+	ts, err := extintune.New(x.tenantID, x.clientID, x.clientSecret, x.opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure Intune tool")
 	}

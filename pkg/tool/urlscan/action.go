@@ -22,6 +22,7 @@ type Action struct {
 	backoff time.Duration
 	timeout time.Duration
 
+	opts  []exturlscan.Option
 	inner gollem.ToolSet
 }
 
@@ -55,6 +56,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       "https://urlscan.io/api/v1",
 			Sources:     cli.EnvVars("WARREN_URLSCAN_BASE_URL"),
+			Action: func(_ context.Context, _ *cli.Command, v string) error {
+				x.opts = append(x.opts, exturlscan.WithBaseURL(v))
+				return nil
+			},
 		},
 		&cli.DurationFlag{
 			Name:        "urlscan-backoff",
@@ -63,6 +68,10 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       time.Duration(3) * time.Second,
 			Sources:     cli.EnvVars("WARREN_URLSCAN_BACKOFF"),
+			Action: func(_ context.Context, _ *cli.Command, v time.Duration) error {
+				x.opts = append(x.opts, exturlscan.WithBackoff(v))
+				return nil
+			},
 		},
 		&cli.DurationFlag{
 			Name:        "urlscan-timeout",
@@ -70,6 +79,10 @@ func (x *Action) Flags() []cli.Flag {
 			Destination: &x.timeout,
 			Category:    "Tool",
 			Value:       time.Duration(30) * time.Second,
+			Action: func(_ context.Context, _ *cli.Command, v time.Duration) error {
+				x.opts = append(x.opts, exturlscan.WithTimeout(v))
+				return nil
+			},
 		},
 	}
 }
@@ -79,18 +92,7 @@ func (x *Action) Configure(_ context.Context) error {
 		return errutil.ErrActionUnavailable
 	}
 
-	var opts []exturlscan.Option
-	if x.baseURL != "" {
-		opts = append(opts, exturlscan.WithBaseURL(x.baseURL))
-	}
-	if x.backoff != 0 {
-		opts = append(opts, exturlscan.WithBackoff(x.backoff))
-	}
-	if x.timeout != 0 {
-		opts = append(opts, exturlscan.WithTimeout(x.timeout))
-	}
-
-	ts, err := exturlscan.New(x.apiKey, opts...)
+	ts, err := exturlscan.New(x.apiKey, x.opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure urlscan tool")
 	}
