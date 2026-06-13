@@ -1,11 +1,20 @@
 package intune
 
-// SetTokenEndpoint overrides the token endpoint for testing.
-func (x *Action) SetTokenEndpoint(endpoint string) {
-	x.tokenEndpoint = endpoint
-}
+import (
+	"context"
 
-// SetBaseURL overrides the base URL for testing.
-func (x *Action) SetBaseURL(baseURL string) {
-	x.baseURL = baseURL
+	extintune "github.com/gollem-dev/tools/intune"
+)
+
+// ConfigureWithOpts calls configure with extra extintune options, allowing tests
+// to inject a token endpoint and/or base URL pointing at httptest servers.
+func (x *Action) ConfigureWithOpts(tokenEndpoint, baseURL string) error {
+	var opts []extintune.Option
+	if tokenEndpoint != "" {
+		opts = append(opts, extintune.WithTokenEndpoint(tokenEndpoint))
+	}
+	if baseURL != "" {
+		opts = append(opts, extintune.WithBaseURL(baseURL))
+	}
+	return x.configure(context.Background(), opts...)
 }

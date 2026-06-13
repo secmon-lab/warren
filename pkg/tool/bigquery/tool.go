@@ -2,13 +2,14 @@ package bigquery
 
 import (
 	"context"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/dustin/go-humanize"
 	"github.com/gollem-dev/gollem"
+	extbq "github.com/gollem-dev/tools/bigquery"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
@@ -19,6 +20,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Action is the warren-side wrapper around github.com/gollem-dev/tools/bigquery.
+// The runtime Specs/Run logic (query execution, dataset/schema inspection,
+// runbook retrieval) lives in the external module. warren retains the CLI
+// flags, the planner Prompt() built from the configured tables/runbooks, and
+// the `generate-config` Helper() subcommand, which the external module does not
+// provide.
 type Action struct {
 	projectID                 string
 	impersonateServiceAccount string
@@ -28,12 +35,13 @@ type Action struct {
 	storagePrefix             string
 	timeout                   time.Duration
 	scanLimitStr              string
-	scanLimit                 uint64
 	configs                   []*Config
 	runbookPaths              []string
 
-	// In-memory storage for runbooks
+	// In-memory storage for runbooks, used to render Prompt().
 	runbooks map[types.RunbookID]*bigquery.RunbookEntry
+
+	inner gollem.ToolSet
 }
 
 var _ interfaces.Tool = &Action{}
@@ -196,20 +204,45 @@ func (x *Action) Configure(ctx context.Context) error {
 		return goerr.New("no valid configuration files found")
 	}
 
-	scanLimit, err := humanize.ParseBytes(x.scanLimitStr)
-	if err != nil {
-		return goerr.Wrap(err, "failed to parse scan limit")
-	}
-	x.scanLimit = scanLimit
-
 	x.configs = configs
 
-	// Load runbooks if paths are configured
+	// Load runbooks if paths are configured. warren keeps its own copy to
+	// render Prompt(); the external toolset loads them independently for the
+	// get_runbook_entry tool.
 	if len(x.runbookPaths) > 0 {
 		if err := x.loadRunbooks(ctx); err != nil {
 			return goerr.Wrap(err, "failed to load runbooks")
 		}
 	}
+
+	opts := []extbq.Option{extbq.WithConfigFiles(x.configFiles)}
+	if x.credentials != "" {
+		opts = append(opts, extbq.WithCredentials(x.credentials))
+	}
+	if x.impersonateServiceAccount != "" {
+		opts = append(opts, extbq.WithImpersonateServiceAccount(x.impersonateServiceAccount))
+	}
+	if len(x.runbookPaths) > 0 {
+		opts = append(opts, extbq.WithRunbookPaths(x.runbookPaths))
+	}
+	if x.storageBucket != "" {
+		opts = append(opts, extbq.WithStorageBucket(x.storageBucket))
+	}
+	if x.storagePrefix != "" {
+		opts = append(opts, extbq.WithStoragePrefix(x.storagePrefix))
+	}
+	if x.timeout != 0 {
+		opts = append(opts, extbq.WithTimeout(x.timeout))
+	}
+	if x.scanLimitStr != "" {
+		opts = append(opts, extbq.WithScanLimit(x.scanLimitStr))
+	}
+
+	ts, err := extbq.New(x.projectID, opts...)
+	if err != nil {
+		return goerr.Wrap(err, "failed to configure BigQuery tool")
+	}
+	x.inner = ts
 
 	return nil
 }
@@ -262,93 +295,27 @@ func loadConfigsFromDirInternal(dirPath string) ([]*Config, error) {
 }
 
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        "bigquery_list_dataset",
-			Description: "List available BigQuery datasets, tables and partial schema that is necessary for investigation",
-			Parameters:  map[string]*gollem.Parameter{},
-		},
-		{
-			Name:        "bigquery_query",
-			Description: bigqueryQueryPrompt(x.scanLimitStr),
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "The SQL query to execute",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "bigquery_result",
-			Description: "Get the results of a previously executed query. Returns rows as JSON string in 'rows_json' field due to Vertex AI type limitations.",
-			Parameters: map[string]*gollem.Parameter{
-				"query_id": {
-					Type:        gollem.TypeString,
-					Description: "The ID of the query to get results for",
-					Required:    true,
-				},
-				"limit": {
-					Type:        gollem.TypeInteger,
-					Description: "Maximum number of rows to return",
-				},
-				"offset": {
-					Type:        gollem.TypeInteger,
-					Description: "Number of rows to skip",
-				},
-			},
-		},
-		{
-			Name:        "bigquery_table_summary",
-			Description: "Get a summary of available BigQuery tables including all fields, examples, and descriptions",
-			Parameters: map[string]*gollem.Parameter{
-				"project_id": {
-					Type:        gollem.TypeString,
-					Description: "The project ID to filter by (optional)",
-				},
-				"dataset_id": {
-					Type:        gollem.TypeString,
-					Description: "The dataset ID to filter by (optional)",
-				},
-				"table_id": {
-					Type:        gollem.TypeString,
-					Description: "The table ID to filter by (optional)",
-				},
-			},
-		},
-		{
-			Name:        "bigquery_schema",
-			Description: "Get detailed schema information for a specific BigQuery table",
-			Parameters: map[string]*gollem.Parameter{
-				"project_id": {
-					Type:        gollem.TypeString,
-					Description: "The project ID of the table",
-					Required:    true,
-				},
-				"dataset_id": {
-					Type:        gollem.TypeString,
-					Description: "The dataset ID of the table",
-					Required:    true,
-				},
-				"table_id": {
-					Type:        gollem.TypeString,
-					Description: "The table ID to get schema for",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "get_runbook_entry",
-			Description: "Get a specific runbook entry by its ID. Returns the SQL content and description of the runbook.",
-			Parameters: map[string]*gollem.Parameter{
-				"runbook_id": {
-					Type:        gollem.TypeString,
-					Description: "The ID of the runbook entry to retrieve",
-					Required:    true,
-				},
-			},
-		},
-	}, nil
+	if x.inner == nil {
+		return nil, goerr.New("BigQuery tool is not configured")
+	}
+	return x.inner.Specs(ctx)
+}
+
+func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
+	if x.inner == nil {
+		return nil, goerr.New("BigQuery tool is not configured")
+	}
+	return x.inner.Run(ctx, name, args)
+}
+
+func (x *Action) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("project_id", x.projectID),
+		slog.String("credentials", x.credentials),
+		slog.Any("config_files", x.configFiles),
+		slog.String("storage_bucket", x.storageBucket),
+		slog.Duration("timeout", x.timeout),
+	)
 }
 
 // Prompt returns additional instructions for the system prompt

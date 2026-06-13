@@ -1,6 +1,6 @@
 module github.com/secmon-lab/warren
 
-go 1.26.0
+go 1.26.4
 
 require (
 	cloud.google.com/go/bigquery v1.74.0
@@ -13,12 +13,23 @@ require (
 	github.com/getsentry/sentry-go v0.44.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/gollem-dev/gollem v0.26.0
+	github.com/gollem-dev/tools/abusech v0.1.0
+	github.com/gollem-dev/tools/bigquery v0.1.0
+	github.com/gollem-dev/tools/github v0.1.0
+	github.com/gollem-dev/tools/intune v0.1.0
+	github.com/gollem-dev/tools/ipdb v0.1.0
+	github.com/gollem-dev/tools/otx v0.1.0
+	github.com/gollem-dev/tools/shodan v0.1.0
+	github.com/gollem-dev/tools/slack v0.1.0
+	github.com/gollem-dev/tools/urlscan v0.1.0
+	github.com/gollem-dev/tools/vt v0.1.0
+	github.com/gollem-dev/tools/webfetch v0.1.0
+	github.com/gollem-dev/tools/whois v0.1.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/graph-gophers/dataloader/v7 v7.1.3
 	github.com/lestrrat-go/jwx/v2 v2.1.6
-	github.com/likexian/whois v1.15.7
 	github.com/m-mizutani/clog v0.2.1
 	github.com/m-mizutani/fireconf v0.3.0
 	github.com/m-mizutani/goerr/v2 v2.0.1
@@ -26,13 +37,11 @@ require (
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.2.1
 	github.com/m-mizutani/opaq v0.3.0
-	github.com/migueleliasweb/go-github-mock v1.4.0
 	github.com/newmo-oss/go-caller v0.1.0
 	github.com/slack-go/slack v0.23.1
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.8.0
 	github.com/vektah/gqlparser/v2 v2.5.32
-	golang.org/x/net v0.54.0
 	google.golang.org/api v0.275.0
 	google.golang.org/genai v1.53.0
 	google.golang.org/grpc v1.80.0
@@ -114,14 +123,12 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/google/flatbuffers v25.12.19+incompatible // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-github/v73 v73.0.0 // indirect
 	github.com/google/go-github/v84 v84.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
 	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
 	github.com/googleapis/gax-go/v2 v2.21.0 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/hashicorp/aws-sdk-go-base/v2 v2.0.0-beta.72 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-getter v1.8.6 // indirect
@@ -142,6 +149,7 @@ require (
 	github.com/lestrrat-go/jwx/v3 v3.0.13 // indirect
 	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/lestrrat-go/option/v2 v2.0.0 // indirect
+	github.com/likexian/whois v1.15.7 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/m-mizutani/jsonex v0.0.1 // indirect
 	github.com/matryer/moq v0.6.0 // indirect
@@ -200,6 +208,7 @@ require (
 	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect

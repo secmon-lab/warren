@@ -14,7 +14,9 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func setupTestServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *httptest.Server) {
+// setupTestServers creates an httptest token server and an httptest graph server,
+// returning (graphURL, tokenURL). Callers configure the action via ConfigureWithOpts.
+func setupTestServers(t *testing.T, handler http.HandlerFunc) (graphURL, tokenURL string) {
 	t.Helper()
 
 	graphServer := httptest.NewServer(handler)
@@ -34,11 +36,30 @@ func setupTestServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, 
 	}))
 	t.Cleanup(tokenServer.Close)
 
-	return graphServer, tokenServer
+	return graphServer.URL, tokenServer.URL
+}
+
+// configureAction sets the flag-bound fields on action then calls ConfigureWithOpts
+// so that network calls go to the provided test servers.
+func configureAction(t *testing.T, action *intune.Action, graphURL, tokenURL string) {
+	t.Helper()
+	cmd := cli.Command{
+		Name:  "intune",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			return action.ConfigureWithOpts(tokenURL, graphURL)
+		},
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"intune",
+		"--intune-tenant-id", "test-tenant",
+		"--intune-client-id", "test-client",
+		"--intune-client-secret", "test-secret",
+	}))
 }
 
 func TestIntune_DevicesByUser(t *testing.T) {
-	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	graphURL, tokenURL := setupTestServers(t, func(w http.ResponseWriter, r *http.Request) {
 		gt.Value(t, r.Header.Get("Authorization")).Equal("Bearer test-token")
 
 		switch r.URL.Path {
@@ -77,51 +98,35 @@ func TestIntune_DevicesByUser(t *testing.T) {
 	})
 
 	var action intune.Action
-	cmd := cli.Command{
-		Name:  "intune",
-		Flags: action.Flags(),
-		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
+	configureAction(t, &action, graphURL, tokenURL)
 
-			resp, err := action.Run(ctx, "intune_devices_by_user", map[string]any{
-				"user_principal_name": "user@example.com",
-			})
-			gt.NoError(t, err)
+	resp, err := action.Run(context.Background(), "intune_devices_by_user", map[string]any{
+		"user_principal_name": "user@example.com",
+	})
+	gt.NoError(t, err)
 
-			devices, ok := resp["devices"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, devices).Length(1)
+	devices, ok := resp["devices"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, devices).Length(1)
 
-			device := devices[0].(map[string]any)
-			gt.Value(t, device["userPrincipalName"]).Equal("user@example.com")
-			gt.Value(t, device["deviceName"]).Equal("LAPTOP-001")
-			gt.Value(t, device["complianceState"]).Equal("compliant")
-			gt.Value(t, device["isEncrypted"]).Equal(true)
+	device := devices[0].(map[string]any)
+	gt.Value(t, device["userPrincipalName"]).Equal("user@example.com")
+	gt.Value(t, device["deviceName"]).Equal("LAPTOP-001")
+	gt.Value(t, device["complianceState"]).Equal("compliant")
+	gt.Value(t, device["isEncrypted"]).Equal(true)
 
-			signIns, ok := resp["signInHistory"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, signIns).Length(1)
+	signIns, ok := resp["signInHistory"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, signIns).Length(1)
 
-			signIn := signIns[0].(map[string]any)
-			gt.Value(t, signIn["ipAddress"]).Equal("203.0.113.1")
+	signIn := signIns[0].(map[string]any)
+	gt.Value(t, signIn["ipAddress"]).Equal("203.0.113.1")
 
-			gt.Value(t, resp["totalDevices"]).Equal(1)
-			return nil
-		},
-	}
-
-	gt.NoError(t, cmd.Run(context.Background(), []string{
-		"intune",
-		"--intune-tenant-id", "test-tenant",
-		"--intune-client-id", "test-client",
-		"--intune-client-secret", "test-secret",
-	}))
+	gt.Value(t, resp["totalDevices"]).Equal(1)
 }
 
 func TestIntune_DevicesByUser_NoDevices(t *testing.T) {
-	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	graphURL, tokenURL := setupTestServers(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/deviceManagement/managedDevices":
 			gt.NoError(t, json.NewEncoder(w).Encode(map[string]any{"value": []any{}}))
@@ -135,37 +140,21 @@ func TestIntune_DevicesByUser_NoDevices(t *testing.T) {
 	})
 
 	var action intune.Action
-	cmd := cli.Command{
-		Name:  "intune",
-		Flags: action.Flags(),
-		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
+	configureAction(t, &action, graphURL, tokenURL)
 
-			resp, err := action.Run(ctx, "intune_devices_by_user", map[string]any{
-				"user_principal_name": "unknown@example.com",
-			})
-			gt.NoError(t, err)
+	resp, err := action.Run(context.Background(), "intune_devices_by_user", map[string]any{
+		"user_principal_name": "unknown@example.com",
+	})
+	gt.NoError(t, err)
 
-			devices, ok := resp["devices"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, devices).Length(0)
-			gt.Value(t, resp["totalDevices"]).Equal(0)
-			return nil
-		},
-	}
-
-	gt.NoError(t, cmd.Run(context.Background(), []string{
-		"intune",
-		"--intune-tenant-id", "test-tenant",
-		"--intune-client-id", "test-client",
-		"--intune-client-secret", "test-secret",
-	}))
+	devices, ok := resp["devices"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, devices).Length(0)
+	gt.Value(t, resp["totalDevices"]).Equal(0)
 }
 
 func TestIntune_DevicesByUser_MultipleDevices(t *testing.T) {
-	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	graphURL, tokenURL := setupTestServers(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/deviceManagement/managedDevices":
 			resp := map[string]any{
@@ -193,42 +182,26 @@ func TestIntune_DevicesByUser_MultipleDevices(t *testing.T) {
 	})
 
 	var action intune.Action
-	cmd := cli.Command{
-		Name:  "intune",
-		Flags: action.Flags(),
-		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
+	configureAction(t, &action, graphURL, tokenURL)
 
-			resp, err := action.Run(ctx, "intune_devices_by_user", map[string]any{
-				"user_principal_name": "user@example.com",
-			})
-			gt.NoError(t, err)
+	resp, err := action.Run(context.Background(), "intune_devices_by_user", map[string]any{
+		"user_principal_name": "user@example.com",
+	})
+	gt.NoError(t, err)
 
-			devices, ok := resp["devices"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, devices).Length(2)
-			gt.Value(t, resp["totalDevices"]).Equal(2)
+	devices, ok := resp["devices"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, devices).Length(2)
+	gt.Value(t, resp["totalDevices"]).Equal(2)
 
-			d0 := devices[0].(map[string]any)
-			gt.Value(t, d0["deviceName"]).Equal("LAPTOP-001")
-			d1 := devices[1].(map[string]any)
-			gt.Value(t, d1["deviceName"]).Equal("PHONE-001")
-			return nil
-		},
-	}
-
-	gt.NoError(t, cmd.Run(context.Background(), []string{
-		"intune",
-		"--intune-tenant-id", "test-tenant",
-		"--intune-client-id", "test-client",
-		"--intune-client-secret", "test-secret",
-	}))
+	d0 := devices[0].(map[string]any)
+	gt.Value(t, d0["deviceName"]).Equal("LAPTOP-001")
+	d1 := devices[1].(map[string]any)
+	gt.Value(t, d1["deviceName"]).Equal("PHONE-001")
 }
 
 func TestIntune_DevicesByHostname(t *testing.T) {
-	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	graphURL, tokenURL := setupTestServers(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/deviceManagement/managedDevices":
 			resp := map[string]any{
@@ -260,49 +233,33 @@ func TestIntune_DevicesByHostname(t *testing.T) {
 	})
 
 	var action intune.Action
-	cmd := cli.Command{
-		Name:  "intune",
-		Flags: action.Flags(),
-		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
+	configureAction(t, &action, graphURL, tokenURL)
 
-			resp, err := action.Run(ctx, "intune_devices_by_hostname", map[string]any{
-				"device_name": "LAPTOP-001",
-			})
-			gt.NoError(t, err)
+	resp, err := action.Run(context.Background(), "intune_devices_by_hostname", map[string]any{
+		"device_name": "LAPTOP-001",
+	})
+	gt.NoError(t, err)
 
-			devices, ok := resp["devices"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, devices).Length(1)
+	devices, ok := resp["devices"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, devices).Length(1)
 
-			device := devices[0].(map[string]any)
-			gt.Value(t, device["deviceName"]).Equal("LAPTOP-001")
-			gt.Value(t, device["operatingSystem"]).Equal("Windows")
+	device := devices[0].(map[string]any)
+	gt.Value(t, device["deviceName"]).Equal("LAPTOP-001")
+	gt.Value(t, device["operatingSystem"]).Equal("Windows")
 
-			signIns, ok := resp["signInHistory"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, signIns).Length(1)
+	signIns, ok := resp["signInHistory"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, signIns).Length(1)
 
-			signIn := signIns[0].(map[string]any)
-			gt.Value(t, signIn["ipAddress"]).Equal("10.0.0.1")
+	signIn := signIns[0].(map[string]any)
+	gt.Value(t, signIn["ipAddress"]).Equal("10.0.0.1")
 
-			gt.Value(t, resp["totalDevices"]).Equal(1)
-			return nil
-		},
-	}
-
-	gt.NoError(t, cmd.Run(context.Background(), []string{
-		"intune",
-		"--intune-tenant-id", "test-tenant",
-		"--intune-client-id", "test-client",
-		"--intune-client-secret", "test-secret",
-	}))
+	gt.Value(t, resp["totalDevices"]).Equal(1)
 }
 
 func TestIntune_DevicesByHostname_NoDevices(t *testing.T) {
-	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	graphURL, tokenURL := setupTestServers(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/deviceManagement/managedDevices" {
 			gt.NoError(t, json.NewEncoder(w).Encode(map[string]any{"value": []any{}}))
 			return
@@ -311,42 +268,26 @@ func TestIntune_DevicesByHostname_NoDevices(t *testing.T) {
 	})
 
 	var action intune.Action
-	cmd := cli.Command{
-		Name:  "intune",
-		Flags: action.Flags(),
-		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
+	configureAction(t, &action, graphURL, tokenURL)
 
-			resp, err := action.Run(ctx, "intune_devices_by_hostname", map[string]any{
-				"device_name": "UNKNOWN-HOST",
-			})
-			gt.NoError(t, err)
+	resp, err := action.Run(context.Background(), "intune_devices_by_hostname", map[string]any{
+		"device_name": "UNKNOWN-HOST",
+	})
+	gt.NoError(t, err)
 
-			devices, ok := resp["devices"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, devices).Length(0)
-			gt.Value(t, resp["totalDevices"]).Equal(0)
+	devices, ok := resp["devices"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, devices).Length(0)
+	gt.Value(t, resp["totalDevices"]).Equal(0)
 
-			// No sign-in logs should be fetched when no devices found
-			gt.Value(t, resp["signInHistory"]).Equal([]any(nil))
-			return nil
-		},
-	}
-
-	gt.NoError(t, cmd.Run(context.Background(), []string{
-		"intune",
-		"--intune-tenant-id", "test-tenant",
-		"--intune-client-id", "test-client",
-		"--intune-client-secret", "test-secret",
-	}))
+	// No sign-in logs should be fetched when no devices found
+	gt.Value(t, resp["signInHistory"]).Equal([]any(nil))
 }
 
 func TestIntune_TokenRetryOn401(t *testing.T) {
 	callCount := 0
 
-	graphServer, _ := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	graphServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/deviceManagement/managedDevices":
 			callCount++
@@ -372,9 +313,9 @@ func TestIntune_TokenRetryOn401(t *testing.T) {
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
-	})
+	}))
+	t.Cleanup(graphServer.Close)
 
-	// Custom token server that tracks calls
 	tokenCallCount := 0
 	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenCallCount++
@@ -391,35 +332,31 @@ func TestIntune_TokenRetryOn401(t *testing.T) {
 		Name:  "intune",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
-
-			resp, err := action.Run(ctx, "intune_devices_by_user", map[string]any{
-				"user_principal_name": "user@example.com",
-			})
-			gt.NoError(t, err)
-
-			devices, ok := resp["devices"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, devices).Length(1)
-
-			// Token should have been fetched at least twice (initial + retry)
-			gt.Value(t, tokenCallCount >= 2).Equal(true)
-			return nil
+			return action.ConfigureWithOpts(tokenServer.URL, graphServer.URL)
 		},
 	}
-
 	gt.NoError(t, cmd.Run(context.Background(), []string{
 		"intune",
 		"--intune-tenant-id", "test-tenant",
 		"--intune-client-id", "test-client",
 		"--intune-client-secret", "test-secret",
 	}))
+
+	resp, err := action.Run(context.Background(), "intune_devices_by_user", map[string]any{
+		"user_principal_name": "user@example.com",
+	})
+	gt.NoError(t, err)
+
+	devices, ok := resp["devices"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, devices).Length(1)
+
+	// Token should have been fetched at least twice (initial + retry)
+	gt.Value(t, tokenCallCount >= 2).Equal(true)
 }
 
 func TestIntune_SignInLogFailure_Fallback(t *testing.T) {
-	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	graphURL, tokenURL := setupTestServers(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/deviceManagement/managedDevices":
 			resp := map[string]any{
@@ -444,35 +381,19 @@ func TestIntune_SignInLogFailure_Fallback(t *testing.T) {
 	})
 
 	var action intune.Action
-	cmd := cli.Command{
-		Name:  "intune",
-		Flags: action.Flags(),
-		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
+	configureAction(t, &action, graphURL, tokenURL)
 
-			resp, err := action.Run(ctx, "intune_devices_by_user", map[string]any{
-				"user_principal_name": "user@example.com",
-			})
-			gt.NoError(t, err)
+	resp, err := action.Run(context.Background(), "intune_devices_by_user", map[string]any{
+		"user_principal_name": "user@example.com",
+	})
+	gt.NoError(t, err)
 
-			// Devices should still be returned even if sign-in logs fail
-			devices, ok := resp["devices"].([]any)
-			gt.Value(t, ok).Equal(true)
-			gt.A(t, devices).Length(1)
+	// Devices should still be returned even if sign-in logs fail
+	devices, ok := resp["devices"].([]any)
+	gt.Value(t, ok).Equal(true)
+	gt.A(t, devices).Length(1)
 
-			gt.Value(t, resp["totalDevices"]).Equal(1)
-			return nil
-		},
-	}
-
-	gt.NoError(t, cmd.Run(context.Background(), []string{
-		"intune",
-		"--intune-tenant-id", "test-tenant",
-		"--intune-client-id", "test-client",
-		"--intune-client-secret", "test-secret",
-	}))
+	gt.Value(t, resp["totalDevices"]).Equal(1)
 }
 
 func TestIntune_TokenRequestFailure(t *testing.T) {
@@ -493,28 +414,44 @@ func TestIntune_TokenRequestFailure(t *testing.T) {
 		Name:  "intune",
 		Flags: action.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
-
-			_, err := action.Run(ctx, "intune_devices_by_user", map[string]any{
-				"user_principal_name": "user@example.com",
-			})
-			gt.Error(t, err)
-			return nil
+			return action.ConfigureWithOpts(tokenServer.URL, graphServer.URL)
 		},
 	}
-
 	gt.NoError(t, cmd.Run(context.Background(), []string{
 		"intune",
 		"--intune-tenant-id", "test-tenant",
 		"--intune-client-id", "test-client",
 		"--intune-client-secret", "test-secret",
 	}))
+
+	_, err := action.Run(context.Background(), "intune_devices_by_user", map[string]any{
+		"user_principal_name": "user@example.com",
+	})
+	gt.Error(t, err)
 }
 
 func TestIntune_Specs(t *testing.T) {
+	// Specs only needs a configured inner toolset; no network calls are made.
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	t.Cleanup(tokenServer.Close)
+	graphServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	t.Cleanup(graphServer.Close)
+
 	var action intune.Action
+	cmd := cli.Command{
+		Name:  "intune",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			return action.ConfigureWithOpts(tokenServer.URL, graphServer.URL)
+		},
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"intune",
+		"--intune-tenant-id", "test-tenant",
+		"--intune-client-id", "test-client",
+		"--intune-client-secret", "test-secret",
+	}))
+
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
 	gt.A(t, specs).Length(2)
@@ -552,31 +489,15 @@ func TestIntune_Enabled(t *testing.T) {
 }
 
 func TestIntune_InvalidFunctionName(t *testing.T) {
-	graphServer, tokenServer := setupTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+	graphURL, tokenURL := setupTestServers(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
 	var action intune.Action
-	cmd := cli.Command{
-		Name:  "intune",
-		Flags: action.Flags(),
-		Action: func(ctx context.Context, c *cli.Command) error {
-			gt.NoError(t, action.Configure(ctx))
-			action.SetTokenEndpoint(tokenServer.URL)
-			action.SetBaseURL(graphServer.URL)
+	configureAction(t, &action, graphURL, tokenURL)
 
-			_, err := action.Run(ctx, "intune_unknown_function", map[string]any{})
-			gt.Error(t, err)
-			return nil
-		},
-	}
-
-	gt.NoError(t, cmd.Run(context.Background(), []string{
-		"intune",
-		"--intune-tenant-id", "test-tenant",
-		"--intune-client-id", "test-client",
-		"--intune-client-secret", "test-secret",
-	}))
+	_, err := action.Run(context.Background(), "intune_unknown_function", map[string]any{})
+	gt.Error(t, err)
 }
 
 func TestIntune_Integration(t *testing.T) {
@@ -589,8 +510,6 @@ func TestIntune_Integration(t *testing.T) {
 		Action: func(ctx context.Context, c *cli.Command) error {
 			gt.NoError(t, action.Configure(ctx))
 
-			// Test that we can at least get a token and call the API without errors
-			// The response may be empty but should not error (validates access)
 			resp, err := action.Run(ctx, "intune_devices_by_user", map[string]any{
 				"user_principal_name": "test@example.com",
 			})

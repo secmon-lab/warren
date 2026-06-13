@@ -4,15 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/gollem-dev/gollem"
-	"github.com/google/go-github/v74/github"
+	extgithub "github.com/gollem-dev/tools/github"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
@@ -21,14 +18,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Action is the warren-side wrapper around github.com/gollem-dev/tools/github.
+// The Specs/Run logic lives in the external module; warren retains the CLI
+// flags, the repository-hint YAML loading, and the planner Prompt() generated
+// from those hints (the external module has no notion of repository hints).
 type Action struct {
 	appID          int64
 	installationID int64
 	privateKey     string
 	configFiles    []string
 	configs        []*RepositoryConfig
-	githubClient   *github.Client
-	httpClient     *http.Client
+
+	inner gollem.ToolSet
 }
 
 var _ interfaces.Tool = &Action{}
@@ -86,17 +87,16 @@ func (x *Action) LogValue() slog.Value {
 	)
 }
 
-// Configure implements interfaces.Tool
+// Configure implements interfaces.Tool.
 func (x *Action) Configure(ctx context.Context) error {
 	logger := logging.From(ctx)
 
-	// Validate required settings
 	if x.appID == 0 || x.installationID == 0 || x.privateKey == "" {
 		return errutil.ErrActionUnavailable
 	}
 
-	// Load repository configurations. Configs are advisory hints surfaced
-	// to the LLM via Prompt(); they do not gate API access.
+	// Load repository configurations. Configs are advisory hints surfaced to
+	// the LLM via Prompt(); they do not gate API access.
 	if len(x.configFiles) == 0 {
 		logger.Warn("GitHub App configured without repository hint files; the LLM will see no suggested repositories")
 	} else {
@@ -115,20 +115,11 @@ func (x *Action) Configure(ctx context.Context) error {
 		x.configs = allConfigs
 	}
 
-	// Create GitHub client with App authentication
-	transport, err := ghinstallation.New(http.DefaultTransport, x.appID, x.installationID, []byte(x.privateKey))
+	ts, err := extgithub.New(x.appID, x.installationID, x.privateKey)
 	if err != nil {
-		return goerr.Wrap(err, "failed to create GitHub App transport")
+		return goerr.Wrap(err, "failed to configure GitHub tool")
 	}
-
-	// Create HTTP client with transport
-	x.httpClient = &http.Client{
-		Transport: transport,
-		Timeout:   30 * time.Second,
-	}
-
-	// Create GitHub client
-	x.githubClient = github.NewClient(x.httpClient)
+	x.inner = ts
 
 	return nil
 }
@@ -142,7 +133,6 @@ func (x *Action) loadConfig(configPath string) ([]*RepositoryConfig, error) {
 	var configs []*RepositoryConfig
 
 	if fileInfo.IsDir() {
-		// Load all YAML files from directory
 		entries, err := os.ReadDir(configPath)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to read directory", goerr.V("path", configPath))
@@ -166,7 +156,6 @@ func (x *Action) loadConfig(configPath string) ([]*RepositoryConfig, error) {
 			configs = append(configs, fileConfigs...)
 		}
 	} else {
-		// Load single file
 		fileConfigs, err := x.loadConfigFile(configPath)
 		if err != nil {
 			return nil, err
@@ -188,7 +177,6 @@ func (x *Action) loadConfigFile(filePath string) ([]*RepositoryConfig, error) {
 		return nil, goerr.Wrap(err, "failed to parse config file", goerr.V("path", filePath))
 	}
 
-	// Validate configurations
 	for _, repo := range config.Repositories {
 		if repo.Owner == "" || repo.Repository == "" {
 			return nil, goerr.New("invalid repository config: owner and repository are required",
@@ -201,213 +189,25 @@ func (x *Action) loadConfigFile(filePath string) ([]*RepositoryConfig, error) {
 	return config.Repositories, nil
 }
 
-// Specs implements gollem.ToolSet
+// Specs implements gollem.ToolSet.
 func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        "github_code_search",
-			Description: "Search for code across any GitHub repository reachable by the App installation. Query syntax examples: 'function login', 'language:go fmt.Println', 'path:src/ extension:js', 'filename:config NOT test'. Scope the search by passing repo_filter or by including 'repo:owner/name', 'org:owner', or 'user:owner' qualifiers in the query.",
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "Search query using GitHub code search syntax. Supports operators like AND, OR, NOT",
-					Required:    true,
-					MinLength:   github.Ptr(1),
-				},
-				"language": {
-					Type:        gollem.TypeString,
-					Description: "Filter by programming language (e.g., 'go', 'python', 'javascript')",
-					Pattern:     "^[a-zA-Z0-9+#-]+$",
-				},
-				"path": {
-					Type:        gollem.TypeString,
-					Description: "Filter by file path pattern (e.g., 'src/', 'test/', '*.go')",
-				},
-				"filename": {
-					Type:        gollem.TypeString,
-					Description: "Filter by filename (e.g., 'config.yaml', 'main.go')",
-					Pattern:     "^[^/]+$",
-				},
-				"repo_filter": {
-					Type:        gollem.TypeString,
-					Description: "Optional repository scope as a comma-separated list of 'owner/name' entries (e.g. 'octocat/Hello-World,octocat/Spoon-Knife'). When omitted, the search is not scoped to any specific repos; use 'repo:', 'org:', or 'user:' qualifiers in the query for finer control.",
-				},
-			},
-		},
-		{
-			Name:        "github_issue_search",
-			Description: "Search for issues and pull requests across any GitHub repository reachable by the App installation. Query syntax: 'bug in:title', 'label:security state:open', 'author:octocat type:pr'. Scope by passing repo_filter or by including 'repo:owner/name', 'org:owner', or 'user:owner' qualifiers in the query.",
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "Search query using GitHub issue search syntax. Supports operators like in:title, in:body",
-					Required:    true,
-					MinLength:   github.Ptr(1),
-				},
-				"state": {
-					Type:        gollem.TypeString,
-					Description: "Filter by state: 'open', 'closed', or 'all'",
-					Enum:        []string{"open", "closed", "all"},
-					Default:     "all",
-				},
-				"labels": {
-					Type:        gollem.TypeString,
-					Description: "Filter by labels (comma-separated list, e.g., 'bug,help wanted')",
-					Pattern:     "^[a-zA-Z0-9-_,\\s]+$",
-				},
-				"author": {
-					Type:        gollem.TypeString,
-					Description: "Filter by author username (GitHub username)",
-					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
-					MaxLength:   github.Ptr(39),
-				},
-				"type": {
-					Type:        gollem.TypeString,
-					Description: "Filter by type: 'issue' for issues only, 'pr' for pull requests only, or 'all' for both",
-					Enum:        []string{"issue", "pr", "all"},
-					Default:     "all",
-				},
-				"repo_filter": {
-					Type:        gollem.TypeString,
-					Description: "Optional repository scope as a comma-separated list of 'owner/name' entries. When omitted, the search is not scoped to any specific repos; use 'repo:', 'org:', or 'user:' qualifiers in the query for finer control.",
-				},
-			},
-		},
-		{
-			Name:        "github_get_content",
-			Description: "Get file content from any GitHub repository reachable by the App installation. Returns the decoded content of the file.",
-			Parameters: map[string]*gollem.Parameter{
-				"owner": {
-					Type:        gollem.TypeString,
-					Description: "Repository owner (organization or username)",
-					Required:    true,
-					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
-					MinLength:   github.Ptr(1),
-					MaxLength:   github.Ptr(39),
-				},
-				"repo": {
-					Type:        gollem.TypeString,
-					Description: "Repository name",
-					Required:    true,
-					Pattern:     "^[a-zA-Z0-9_.-]+$",
-					MinLength:   github.Ptr(1),
-					MaxLength:   github.Ptr(100),
-				},
-				"path": {
-					Type:        gollem.TypeString,
-					Description: "File path in the repository (e.g., 'src/main.go', 'README.md')",
-					Required:    true,
-					MinLength:   github.Ptr(1),
-				},
-				"ref": {
-					Type:        gollem.TypeString,
-					Description: "Git reference: branch name (e.g., 'main'), tag (e.g., 'v1.0.0'), or commit SHA. Defaults to the default branch if not specified.",
-					Pattern:     "^[a-zA-Z0-9/_.-]+$",
-				},
-			},
-		},
-		{
-			Name:        "github_list_commits",
-			Description: "List commits for any repository reachable by the App installation. Supports filtering by file path, author, and branch/SHA. Useful for understanding change history and identifying who changed what and when.",
-			Parameters: map[string]*gollem.Parameter{
-				"owner": {
-					Type:        gollem.TypeString,
-					Description: "Repository owner (organization or username)",
-					Required:    true,
-					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
-					MinLength:   github.Ptr(1),
-					MaxLength:   github.Ptr(39),
-				},
-				"repo": {
-					Type:        gollem.TypeString,
-					Description: "Repository name",
-					Required:    true,
-					Pattern:     "^[a-zA-Z0-9_.-]+$",
-					MinLength:   github.Ptr(1),
-					MaxLength:   github.Ptr(100),
-				},
-				"sha": {
-					Type:        gollem.TypeString,
-					Description: "SHA or branch to start listing commits from. Defaults to the default branch.",
-				},
-				"path": {
-					Type:        gollem.TypeString,
-					Description: "Only commits containing this file path will be returned (e.g., 'src/main.go')",
-				},
-				"author": {
-					Type:        gollem.TypeString,
-					Description: "GitHub login or email address to filter commits by author",
-				},
-				"per_page": {
-					Type:        gollem.TypeInteger,
-					Description: "Number of commits per page (default: 30, max: 100)",
-				},
-				"page": {
-					Type:        gollem.TypeInteger,
-					Description: "Page number for pagination (default: 1)",
-				},
-			},
-		},
-		{
-			Name:        "github_get_blame",
-			Description: "Get git blame information for a file in any repository reachable by the App installation, showing which commit last modified each line. Useful for identifying who wrote specific code and when.",
-			Parameters: map[string]*gollem.Parameter{
-				"owner": {
-					Type:        gollem.TypeString,
-					Description: "Repository owner (organization or username)",
-					Required:    true,
-					Pattern:     "^[a-zA-Z0-9][a-zA-Z0-9-]*$",
-					MinLength:   github.Ptr(1),
-					MaxLength:   github.Ptr(39),
-				},
-				"repo": {
-					Type:        gollem.TypeString,
-					Description: "Repository name",
-					Required:    true,
-					Pattern:     "^[a-zA-Z0-9_.-]+$",
-					MinLength:   github.Ptr(1),
-					MaxLength:   github.Ptr(100),
-				},
-				"path": {
-					Type:        gollem.TypeString,
-					Description: "File path in the repository (e.g., 'src/main.go')",
-					Required:    true,
-					MinLength:   github.Ptr(1),
-				},
-				"ref": {
-					Type:        gollem.TypeString,
-					Description: "Git reference: branch name, tag, or commit SHA. Defaults to the repository's default branch.",
-					Pattern:     "^[a-zA-Z0-9/_.-]+$",
-				},
-			},
-		},
-	}, nil
+	if x.inner == nil {
+		return nil, goerr.New("GitHub tool is not configured")
+	}
+	return x.inner.Specs(ctx)
 }
 
-// Run implements gollem.ToolSet
+// Run implements gollem.ToolSet.
 func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	if x.githubClient == nil {
-		return nil, goerr.New("GitHub client not initialized")
+	if x.inner == nil {
+		return nil, goerr.New("GitHub tool is not configured")
 	}
-
-	switch name {
-	case "github_code_search":
-		return x.runCodeSearch(ctx, args)
-	case "github_issue_search":
-		return x.runIssueSearch(ctx, args)
-	case "github_get_content":
-		return x.runGetContent(ctx, args)
-	case "github_list_commits":
-		return x.runListCommits(ctx, args)
-	case "github_get_blame":
-		return x.runGetBlame(ctx, args)
-	default:
-		return nil, goerr.New("unknown tool name", goerr.V("name", name))
-	}
+	return x.inner.Run(ctx, name, args)
 }
 
-// Prompt implements interfaces.Tool
-func (x *Action) Prompt(ctx context.Context) (string, error) {
+// Prompt implements interfaces.Tool. It surfaces the configured repository
+// hints to the planner.
+func (x *Action) Prompt(_ context.Context) (string, error) {
 	if len(x.configs) == 0 {
 		return "", nil
 	}
@@ -431,24 +231,4 @@ func (x *Action) Prompt(ctx context.Context) (string, error) {
 	sb.WriteString("Use the GitHub tools to search code, issues/PRs, retrieve file contents, list commit history, or get file blame. For search tools, use the `repo_filter` parameter (comma-separated `owner/name` list) or include `repo:`/`org:`/`user:` qualifiers in the query to scope results.\n")
 
 	return sb.String(), nil
-}
-
-// Helper methods for testing
-func (x *Action) SetGitHubClient(client *github.Client) {
-	x.githubClient = client
-}
-
-func (x *Action) SetConfigs(configs []*RepositoryConfig) {
-	x.configs = configs
-}
-
-func (x *Action) GetConfigs() []*RepositoryConfig {
-	return x.configs
-}
-
-func (x *Action) SetTestData(appID, installationID int64, privateKey string, configFiles []string) {
-	x.appID = appID
-	x.installationID = installationID
-	x.privateKey = privateKey
-	x.configFiles = configFiles
 }
