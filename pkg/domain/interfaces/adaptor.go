@@ -4,7 +4,7 @@ import (
 	"context"
 	"io"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"

@@ -3,7 +3,7 @@ package slack
 import (
 	"context"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 )
 
 // toolSet implements interfaces.ToolSet by wrapping the internalTool.

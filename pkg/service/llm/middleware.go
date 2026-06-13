@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/middleware/compacter"
+	"github.com/gollem-dev/gollem"
+	"github.com/gollem-dev/gollem/middleware/compacter"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 )
 

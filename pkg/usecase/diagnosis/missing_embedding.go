@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	diagnosismodel "github.com/secmon-lab/warren/pkg/domain/model/diagnosis"
 	"github.com/secmon-lab/warren/pkg/domain/types"

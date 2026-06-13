@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/dustin/go-humanize"
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/bigquery"
 	"github.com/secmon-lab/warren/pkg/domain/types"

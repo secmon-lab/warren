@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gollem-dev/gollem"
+	gollem_mock "github.com/gollem-dev/gollem/mock"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
-	gollem_mock "github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
 	"github.com/newmo-oss/go-caller"
 	"github.com/secmon-lab/warren/pkg/domain/mock"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/tool/abusech"
 	"github.com/secmon-lab/warren/pkg/tool/bigquery"

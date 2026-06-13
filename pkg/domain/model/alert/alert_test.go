@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/m-mizutani/gollem"
-	gollem_mock "github.com/m-mizutani/gollem/mock"
+	"github.com/gollem-dev/gollem"
+	gollem_mock "github.com/gollem-dev/gollem/mock"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
 	"github.com/secmon-lab/warren/pkg/domain/model/tag"

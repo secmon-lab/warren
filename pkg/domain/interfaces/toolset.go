@@ -3,7 +3,7 @@ package interfaces
 import (
 	"context"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 )
 
 // ToolSet extends gollem.ToolSet with Warren-specific metadata for planning.

@@ -3,7 +3,7 @@ package webfetch
 import (
 	"net/http"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 )
 
 // Extract is the test-only export of the package-private extract function.

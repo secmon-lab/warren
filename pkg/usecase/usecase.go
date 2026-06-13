@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/gollem-dev/gollem"
+	"github.com/gollem-dev/gollem/trace"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/trace"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/slack"

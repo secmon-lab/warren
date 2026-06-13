@@ -3,7 +3,7 @@ package slack
 import (
 	_ "embed"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 )
 
 //go:embed prompt/system.md

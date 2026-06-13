@@ -3,8 +3,8 @@ package test
 import (
 	"testing"
 
-	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/llm/gemini"
+	"github.com/gollem-dev/gollem"
+	"github.com/gollem-dev/gollem/llm/gemini"
 )
 
 func NewGeminiClient(t *testing.T) gollem.LLMClient {

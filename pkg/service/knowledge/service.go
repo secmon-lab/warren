@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
+	"github.com/gollem-dev/gollem/trace"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	knowledgeModel "github.com/secmon-lab/warren/pkg/domain/model/knowledge"
 	"github.com/secmon-lab/warren/pkg/domain/types"

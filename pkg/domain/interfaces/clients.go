@@ -1,6 +1,6 @@
 package interfaces
 
-import "github.com/m-mizutani/gollem"
+import "github.com/gollem-dev/gollem"
 
 type Clients struct {
 	repo    Repository

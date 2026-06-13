@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"github.com/m-mizutani/gollem"
-	gollem_mock "github.com/m-mizutani/gollem/mock"
+	"github.com/gollem-dev/gollem"
+	gollem_mock "github.com/gollem-dev/gollem/mock"
 	"github.com/m-mizutani/gt"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
