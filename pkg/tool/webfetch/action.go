@@ -97,10 +97,7 @@ func (x *Action) Configure(ctx context.Context) error {
 		x.client = &http.Client{Timeout: defaultTimeout}
 	}
 
-	var opts []extwebfetch.Option
-	if x.client != nil {
-		opts = append(opts, extwebfetch.WithHTTPClient(x.client))
-	}
+	opts := []extwebfetch.Option{extwebfetch.WithHTTPClient(x.client)}
 
 	// If llmClient was not pre-injected (e.g. by tests), build one from flags.
 	if x.llmClient == nil && x.llmProvider != "" {
