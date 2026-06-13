@@ -7,9 +7,9 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/dustin/go-humanize"
+	"github.com/gollem-dev/gollem"
 	"github.com/google/uuid"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"

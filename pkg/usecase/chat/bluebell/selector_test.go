@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/mock"

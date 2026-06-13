@@ -12,9 +12,9 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"github.com/dustin/go-humanize"
+	"github.com/gollem-dev/gollem"
+	"github.com/gollem-dev/gollem/llm/gemini"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"

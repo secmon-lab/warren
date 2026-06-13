@@ -3,7 +3,7 @@ package config
 import (
 	"context"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 )
 
 type CompositeLLMClient struct {

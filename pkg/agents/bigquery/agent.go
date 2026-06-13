@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 )
 
 // toolSet implements interfaces.ToolSet by wrapping the internalTool

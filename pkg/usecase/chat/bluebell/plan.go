@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/gollem-dev/gollem"
+	"github.com/gollem-dev/gollem/trace"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/trace"
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	knowledgeTool "github.com/secmon-lab/warren/pkg/tool/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/logging"

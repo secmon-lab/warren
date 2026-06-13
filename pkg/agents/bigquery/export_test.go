@@ -1,7 +1,7 @@
 package bigquery
 
 import (
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 )
 
 // NewToolSetForTest creates a toolSet instance for testing with direct configuration

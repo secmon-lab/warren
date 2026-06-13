@@ -6,10 +6,10 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gollem-dev/gollem"
+	"github.com/gollem-dev/gollem/llm/gemini"
+	"github.com/gollem-dev/gollem/mock"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/llm/gemini"
-	"github.com/m-mizutani/gollem/mock"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/webfetch"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"

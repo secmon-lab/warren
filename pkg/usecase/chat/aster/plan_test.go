@@ -6,8 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/m-mizutani/gollem"
-	gollemtrace "github.com/m-mizutani/gollem/trace"
+	"github.com/gollem-dev/gollem"
+	gollemtrace "github.com/gollem-dev/gollem/trace"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"

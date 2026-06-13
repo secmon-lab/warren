@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 )
 
 // BudgetStatus represents the current state of the action budget.

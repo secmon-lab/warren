@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
+	"github.com/gollem-dev/gollem/llm/gemini"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem/llm/gemini"
 	"github.com/urfave/cli/v3"
 )
 

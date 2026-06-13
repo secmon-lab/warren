@@ -3,8 +3,8 @@ package config
 import (
 	"context"
 
+	"github.com/gollem-dev/gollem/llm/claude"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem/llm/claude"
 	"github.com/urfave/cli/v3"
 )
 

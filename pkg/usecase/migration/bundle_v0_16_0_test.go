@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/gt"
 	adapterStorage "github.com/secmon-lab/warren/pkg/adapter/storage"
 	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"

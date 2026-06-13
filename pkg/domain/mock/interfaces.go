@@ -5,7 +5,7 @@ package mock
 
 import (
 	"context"
-	"github.com/m-mizutani/gollem"
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/opaq"
 	"github.com/secmon-lab/warren/pkg/domain/event"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"

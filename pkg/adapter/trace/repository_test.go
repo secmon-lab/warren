@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	gollemtrace "github.com/m-mizutani/gollem/trace"
+	gollemtrace "github.com/gollem-dev/gollem/trace"
 	"github.com/m-mizutani/gt"
 	traceAdapter "github.com/secmon-lab/warren/pkg/adapter/trace"
 	"github.com/secmon-lab/warren/pkg/utils/logging"

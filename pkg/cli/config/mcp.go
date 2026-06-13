@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gollem-dev/gollem"
+	"github.com/gollem-dev/gollem/mcp"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
-	"github.com/m-mizutani/gollem/mcp"
 	helpertransport "github.com/secmon-lab/warren/pkg/service/mcp"
 	"github.com/urfave/cli/v3"
 	"gopkg.in/yaml.v3"

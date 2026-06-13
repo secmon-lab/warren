@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/m-mizutani/gollem/llm/gemini"
+	"github.com/gollem-dev/gollem/llm/gemini"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/msg"

@@ -12,6 +12,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/getsentry/sentry-go v0.44.1
 	github.com/go-chi/chi/v5 v5.2.5
+	github.com/gollem-dev/gollem v0.26.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
@@ -21,7 +22,6 @@ require (
 	github.com/m-mizutani/clog v0.2.1
 	github.com/m-mizutani/fireconf v0.3.0
 	github.com/m-mizutani/goerr/v2 v2.0.1
-	github.com/m-mizutani/gollem v0.25.0
 	github.com/m-mizutani/gt v0.2.1
 	github.com/m-mizutani/harlog v0.0.3
 	github.com/m-mizutani/masq v0.2.1

@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/gollem-dev/gollem"
 	whoislib "github.com/likexian/whois"
 	"github.com/m-mizutani/goerr/v2"
-	"github.com/m-mizutani/gollem"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/urfave/cli/v3"
 )
