@@ -2,30 +2,27 @@ package webfetch
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/gollem-dev/gollem"
+	extwebfetch "github.com/gollem-dev/tools/webfetch"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
-	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
-	"github.com/secmon-lab/warren/pkg/utils/safe"
 	"github.com/urfave/cli/v3"
 )
 
 const (
 	defaultTimeout = 30 * time.Second
-	userAgent      = "warren-webfetch/1.0 (+https://github.com/secmon-lab/warren)"
 
 	flagCategory = "WebFetch"
 )
 
-// Action implements the interfaces.Tool interface for fetching web content
-// and sanitizing it through an LLM-based pipeline.
+// Action is the warren-side wrapper around github.com/gollem-dev/tools/webfetch.
+// It implements interfaces.Tool, binding CLI flags and warren-specific HITL
+// gating onto the external gollem.ToolSet that carries the Specs/Run logic.
 //
 // LLM analysis is configured via the --webfetch-llm-* flags. If
 // --webfetch-llm-provider is empty, the analyze step is disabled and the
@@ -43,6 +40,9 @@ type Action struct {
 
 	// Resolved at Configure(). Nil when LLM analysis is disabled.
 	llmClient gollem.LLMClient
+
+	// inner is the external ToolSet constructed in Configure().
+	inner gollem.ToolSet
 }
 
 var _ interfaces.Tool = &Action{}
@@ -92,164 +92,66 @@ func (x *Action) Flags() []cli.Flag {
 	}
 }
 
-func (x *Action) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        "web_fetch",
-			Description: "Fetch a web page and return its body. When LLM analysis is enabled, the body is reformatted as Markdown and screened for indirect prompt injection; otherwise the extracted text is returned verbatim (HITL approval gates each call in that mode).",
-			Parameters: map[string]*gollem.Parameter{
-				"url": {
-					Type:        gollem.TypeString,
-					Description: "The URL to fetch (http or https only)",
-					Required:    true,
-				},
-			},
-		},
-	}, nil
-}
-
-func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	if name != "web_fetch" {
-		return nil, goerr.New("invalid function name",
-			goerr.T(errutil.TagValidation),
-			goerr.V("name", name))
-	}
-
-	rawURL, ok := args["url"].(string)
-	if !ok || rawURL == "" {
-		return nil, goerr.New("url is required",
-			goerr.T(errutil.TagValidation))
-	}
-
-	parsed, err := url.Parse(rawURL)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to parse url",
-			goerr.T(errutil.TagValidation),
-			goerr.V("url", rawURL))
-	}
-	switch parsed.Scheme {
-	case "http", "https":
-	default:
-		return nil, goerr.New("unsupported url scheme (only http/https are allowed)",
-			goerr.T(errutil.TagValidation),
-			goerr.V("url", rawURL),
-			goerr.V("scheme", parsed.Scheme))
-	}
-	if parsed.Host == "" {
-		return nil, goerr.New("url is missing a host",
-			goerr.T(errutil.TagValidation),
-			goerr.V("url", rawURL))
-	}
-
-	status, contentType, body, err := x.fetch(ctx, rawURL)
-	if err != nil {
-		return nil, err
-	}
-
-	text, _, err := extract(contentType, body)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to extract body",
-			goerr.V("url", rawURL))
-	}
-
-	if x.llmClient == nil {
-		// LLM analysis disabled: return the extracted text verbatim. HITL
-		// approval (wired in pkg/cli/serve.go) is the safety net in this mode.
-		return map[string]any{
-			"result":       text,
-			"url":          rawURL,
-			"status":       status,
-			"content_type": contentType,
-			"llm_analysis": "disabled",
-		}, nil
-	}
-
-	result, err := analyze(ctx, x.llmClient, text)
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to analyze body",
-			goerr.V("url", rawURL))
-	}
-
-	if result.Malicious {
-		return nil, goerr.New("indirect prompt injection detected in fetched body",
-			goerr.T(errutil.TagValidation),
-			goerr.V("url", rawURL),
-			goerr.V("reason", result.Reason))
-	}
-
-	return map[string]any{
-		"result":       result.Markdown,
-		"url":          rawURL,
-		"status":       status,
-		"content_type": contentType,
-	}, nil
-}
-
-// fetch performs the HTTP GET. It enforces a request timeout and sets a stable
-// User-Agent. No response-size cap is applied; the request timeout and the
-// context deadline are the only bound on the operation.
-func (x *Action) fetch(ctx context.Context, rawURL string) (int, string, []byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return 0, "", nil, goerr.Wrap(err, "failed to create http request",
-			goerr.T(errutil.TagValidation),
-			goerr.V("url", rawURL))
-	}
-	req.Header.Set("User-Agent", userAgent)
-
-	resp, err := x.client.Do(req)
-	if err != nil {
-		return 0, "", nil, goerr.Wrap(err, "failed to fetch url",
-			goerr.T(errutil.TagExternal),
-			goerr.V("url", rawURL))
-	}
-	defer safe.Close(ctx, resp.Body)
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return resp.StatusCode, resp.Header.Get("Content-Type"), nil,
-			goerr.Wrap(err, "failed to read response body",
-				goerr.T(errutil.TagExternal),
-				goerr.V("url", rawURL))
-	}
-
-	return resp.StatusCode, resp.Header.Get("Content-Type"), body, nil
-}
-
 func (x *Action) Configure(ctx context.Context) error {
 	if x.client == nil {
 		x.client = &http.Client{Timeout: defaultTimeout}
 	}
 
-	if x.llmProvider == "" {
+	opts := []extwebfetch.Option{extwebfetch.WithHTTPClient(x.client)}
+
+	// If llmClient was not pre-injected (e.g. by tests), build one from flags.
+	if x.llmClient == nil && x.llmProvider != "" {
+		parsedArgs, err := parseLLMArgs(x.llmArgs)
+		if err != nil {
+			return goerr.Wrap(err, "failed to parse --webfetch-llm-args",
+				goerr.V("provider", x.llmProvider))
+		}
+
+		client, err := buildLLMClient(ctx, x.llmProvider, x.llmModel, parsedArgs, x.llmAPIKey)
+		if err != nil {
+			return goerr.Wrap(err, "failed to build webfetch LLM client",
+				goerr.V("provider", x.llmProvider),
+				goerr.V("model", x.llmModel))
+		}
+
+		if err := pingLLMClient(ctx, client); err != nil {
+			return goerr.Wrap(err, "webfetch LLM ping failed",
+				goerr.V("provider", x.llmProvider),
+				goerr.V("model", x.llmModel))
+		}
+
+		x.llmClient = client
+	}
+
+	if x.llmClient == nil {
 		logging.From(ctx).Info("webfetch LLM analysis disabled; HITL approval is required for every web_fetch call")
-		return nil
+	} else {
+		opts = append(opts, extwebfetch.WithLLMClient(x.llmClient))
+		logging.From(ctx).Info("webfetch LLM analysis enabled",
+			"provider", x.llmProvider,
+			"model", x.llmModel)
 	}
 
-	parsedArgs, err := parseLLMArgs(x.llmArgs)
+	inner, err := extwebfetch.New(opts...)
 	if err != nil {
-		return goerr.Wrap(err, "failed to parse --webfetch-llm-args",
-			goerr.V("provider", x.llmProvider))
+		return goerr.Wrap(err, "failed to construct webfetch tool")
 	}
-
-	client, err := buildLLMClient(ctx, x.llmProvider, x.llmModel, parsedArgs, x.llmAPIKey)
-	if err != nil {
-		return goerr.Wrap(err, "failed to build webfetch LLM client",
-			goerr.V("provider", x.llmProvider),
-			goerr.V("model", x.llmModel))
-	}
-
-	if err := pingLLMClient(ctx, client); err != nil {
-		return goerr.Wrap(err, "webfetch LLM ping failed",
-			goerr.V("provider", x.llmProvider),
-			goerr.V("model", x.llmModel))
-	}
-
-	x.llmClient = client
-	logging.From(ctx).Info("webfetch LLM analysis enabled",
-		"provider", x.llmProvider,
-		"model", x.llmModel)
+	x.inner = inner
 	return nil
+}
+
+func (x *Action) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	if x.inner == nil {
+		return nil, goerr.New("webfetch tool is not configured")
+	}
+	return x.inner.Specs(ctx)
+}
+
+func (x *Action) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
+	if x.inner == nil {
+		return nil, goerr.New("webfetch tool is not configured")
+	}
+	return x.inner.Run(ctx, name, args)
 }
 
 // RequiresHITL reports whether the web_fetch tool should be gated by a HITL

@@ -2,288 +2,99 @@ package github_test
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
-	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
-	"time"
 
-	"github.com/google/go-github/v74/github"
 	"github.com/m-mizutani/gt"
-	"github.com/migueleliasweb/go-github-mock/src/mock"
 	githubtool "github.com/secmon-lab/warren/pkg/tool/github"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
+	"github.com/urfave/cli/v3"
 )
 
-func TestGitHubCodeSearch(t *testing.T) {
-	// Create mock GitHub client
-	mockedHTTPClient := mock.NewMockedHTTPClient(
-		mock.WithRequestMatch(
-			mock.GetSearchCode,
-			github.CodeSearchResult{
-				Total: github.Ptr(2),
-				CodeResults: []*github.CodeResult{
-					{
-						Name:    github.Ptr("main.go"),
-						Path:    github.Ptr("src/main.go"),
-						SHA:     github.Ptr("abc123"),
-						HTMLURL: github.Ptr("https://github.com/test/repo/blob/main/src/main.go"),
-						Repository: &github.Repository{
-							FullName: github.Ptr("test/repo"),
-						},
-						TextMatches: []*github.TextMatch{
-							{
-								Fragment: github.Ptr("func main() {\n    fmt.Println(\"test\")\n}"),
-							},
-						},
-					},
-					{
-						Name:    github.Ptr("utils.go"),
-						Path:    github.Ptr("pkg/utils.go"),
-						SHA:     github.Ptr("def456"),
-						HTMLURL: github.Ptr("https://github.com/test/repo/blob/main/pkg/utils.go"),
-						Repository: &github.Repository{
-							FullName: github.Ptr("test/repo"),
-						},
-					},
-				},
-			},
-		),
-	)
-
-	client := github.NewClient(mockedHTTPClient)
-
-	// Create action and set mock client
-	action := &githubtool.Action{}
-	action.SetGitHubClient(client)
-	action.SetConfigs([]*githubtool.RepositoryConfig{
-		{
-			Owner:       "test",
-			Repository:  "repo",
-			Description: "Test repository",
-		},
-	})
-
-	// Execute search
-	ctx := context.Background()
-	args := map[string]any{
-		"query":    "fmt.Println",
-		"language": "Go",
+// bindFlags parses the action's flags so that env-var sources populate the
+// flag-bound struct fields.
+func bindFlags(t *testing.T, action *githubtool.Action) {
+	t.Helper()
+	cmd := &cli.Command{
+		Name:   "github",
+		Flags:  action.Flags(),
+		Action: func(context.Context, *cli.Command) error { return nil },
 	}
-
-	result, err := action.Run(ctx, "github_code_search", args)
-	gt.NoError(t, err)
-	gt.NotNil(t, result)
-
-	// Validate results
-	total, ok := result["total"].(int)
-	gt.True(t, ok)
-	gt.Number(t, total).Equal(2)
-
-	results, ok := result["results"].([]githubtool.CodeSearchResult)
-	gt.True(t, ok)
-	gt.A(t, results).Length(2)
-
-	// Check first result
-	gt.S(t, results[0].Repository).Equal("test/repo")
-	gt.S(t, results[0].Path).Equal("src/main.go")
-	gt.A(t, results[0].Matches).Length(1)
+	gt.NoError(t, cmd.Run(context.Background(), []string{"github"}))
 }
 
-func TestGitHubIssueSearch(t *testing.T) {
-	// Create mock GitHub client
-	mockedHTTPClient := mock.NewMockedHTTPClient(
-		mock.WithRequestMatch(
-			mock.GetSearchIssues,
-			github.IssuesSearchResult{
-				Total: github.Ptr(2),
-				Issues: []*github.Issue{
-					{
-						Number:  github.Ptr(123),
-						Title:   github.Ptr("Test Issue"),
-						State:   github.Ptr("open"),
-						HTMLURL: github.Ptr("https://github.com/test/repo/issues/123"),
-						User: &github.User{
-							Login: github.Ptr("testuser"),
-						},
-						Body: github.Ptr("This is a test issue"),
-						Labels: []*github.Label{
-							{Name: github.Ptr("bug")},
-							{Name: github.Ptr("help wanted")},
-						},
-						RepositoryURL: github.Ptr("https://api.github.com/repos/test/repo"),
-					},
-					{
-						Number:  github.Ptr(456),
-						Title:   github.Ptr("Test PR"),
-						State:   github.Ptr("open"),
-						HTMLURL: github.Ptr("https://github.com/test/repo/pull/456"),
-						User: &github.User{
-							Login: github.Ptr("anotheruser"),
-						},
-						PullRequestLinks: &github.PullRequestLinks{
-							URL: github.Ptr("https://api.github.com/repos/test/repo/pulls/456"),
-						},
-						RepositoryURL: github.Ptr("https://api.github.com/repos/test/repo"),
-					},
-				},
-			},
-		),
-	)
-
-	client := github.NewClient(mockedHTTPClient)
-
-	// Create action and set mock client
-	action := &githubtool.Action{}
-	action.SetGitHubClient(client)
-	action.SetConfigs([]*githubtool.RepositoryConfig{
-		{
-			Owner:       "test",
-			Repository:  "repo",
-			Description: "Test repository",
-		},
-	})
-
-	// Execute search
-	ctx := context.Background()
-	args := map[string]any{
-		"query":  "test",
-		"state":  "open",
-		"labels": "bug,help wanted",
-	}
-
-	result, err := action.Run(ctx, "github_issue_search", args)
+// testPrivateKey returns a valid PEM-encoded RSA private key. The external
+// github toolset parses the key during construction, so a structurally valid
+// key is required even for offline tests.
+func testPrivateKey(t *testing.T) string {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	gt.NoError(t, err)
-	gt.NotNil(t, result)
-
-	// Validate results
-	total, ok := result["total"].(int)
-	gt.True(t, ok)
-	gt.Number(t, total).Equal(2)
-
-	results, ok := result["results"].([]githubtool.IssueSearchResult)
-	gt.True(t, ok)
-	gt.A(t, results).Length(2)
-
-	// Check first result (issue)
-	gt.Number(t, results[0].Number).Equal(123)
-	gt.S(t, results[0].Title).Equal("Test Issue")
-	gt.S(t, results[0].State).Equal("open")
-	gt.S(t, results[0].User).Equal("testuser")
-	gt.B(t, results[0].IsPR).False()
-	gt.A(t, results[0].Labels).Length(2)
-	gt.B(t, results[0].Labels[0] == "bug" || results[0].Labels[1] == "bug").True()
-	gt.B(t, results[0].Labels[0] == "help wanted" || results[0].Labels[1] == "help wanted").True()
-
-	// Check second result (PR)
-	gt.Number(t, results[1].Number).Equal(456)
-	gt.B(t, results[1].IsPR).True()
+	block := &pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)}
+	return string(pem.EncodeToMemory(block))
 }
 
-func TestGitHubGetContent(t *testing.T) {
-	// Create mock GitHub client
-	content := "package main\n\nfunc main() {\n    fmt.Println(\"Hello, World!\")\n}\n"
-	encodedContent := "cGFja2FnZSBtYWluCgpmdW5jIG1haW4oKSB7CiAgICBmbXQuUHJpbnRsbigiSGVsbG8sIFdvcmxkISIpCn0K"
-
-	mockedHTTPClient := mock.NewMockedHTTPClient(
-		mock.WithRequestMatch(
-			mock.GetReposContentsByOwnerByRepoByPath,
-			github.RepositoryContent{
-				Name:     github.Ptr("main.go"),
-				Path:     github.Ptr("main.go"),
-				SHA:      github.Ptr("abc123def456"),
-				Size:     github.Ptr(len(content)),
-				Content:  github.Ptr(encodedContent),
-				HTMLURL:  github.Ptr("https://github.com/test/repo/blob/main/main.go"),
-				Type:     github.Ptr("file"),
-				Encoding: github.Ptr("base64"),
-			},
-		),
-	)
-
-	client := github.NewClient(mockedHTTPClient)
-
-	// Create action and set mock client
-	action := &githubtool.Action{}
-	action.SetGitHubClient(client)
-	action.SetConfigs([]*githubtool.RepositoryConfig{
-		{
-			Owner:       "test",
-			Repository:  "repo",
-			Description: "Test repository",
-		},
-	})
-
-	// Execute get content
-	ctx := context.Background()
-	args := map[string]any{
-		"owner": "test",
-		"repo":  "repo",
-		"path":  "main.go",
-		"ref":   "main",
-	}
-
-	result, err := action.Run(ctx, "github_get_content", args)
-	gt.NoError(t, err)
-	gt.NotNil(t, result)
-
-	// Validate results
-	gt.S(t, result["repository"].(string)).Equal("test/repo")
-	gt.S(t, result["path"].(string)).Equal("main.go")
-	gt.S(t, result["content"].(string)).Equal(content)
-	gt.S(t, result["sha"].(string)).Equal("abc123def456")
-	gt.Number(t, result["size"].(int)).Equal(len(content))
+func writeConfig(t *testing.T, content string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	gt.NoError(t, os.WriteFile(path, []byte(content), 0600))
+	return path
 }
 
-func TestGitHubGetContentUnconfiguredRepo(t *testing.T) {
-	content := "drive-by file"
-	encodedContent := "ZHJpdmUtYnkgZmlsZQ=="
-
-	mockedHTTPClient := mock.NewMockedHTTPClient(
-		mock.WithRequestMatch(
-			mock.GetReposContentsByOwnerByRepoByPath,
-			github.RepositoryContent{
-				Name:     github.Ptr("note.txt"),
-				Path:     github.Ptr("note.txt"),
-				SHA:      github.Ptr("cafebabe"),
-				Size:     github.Ptr(len(content)),
-				Content:  github.Ptr(encodedContent),
-				HTMLURL:  github.Ptr("https://github.com/unconfigured/repo/blob/main/note.txt"),
-				Type:     github.Ptr("file"),
-				Encoding: github.Ptr("base64"),
-			},
-		),
-	)
-
-	client := github.NewClient(mockedHTTPClient)
+// configure builds and configures an Action via its CLI flags.
+func configure(t *testing.T, appID, installationID int64, privateKey string, configFiles []string) (*githubtool.Action, error) {
+	t.Helper()
+	t.Setenv("WARREN_GITHUB_APP_ID", strconv.FormatInt(appID, 10))
+	t.Setenv("WARREN_GITHUB_APP_INSTALLATION_ID", strconv.FormatInt(installationID, 10))
+	t.Setenv("WARREN_GITHUB_APP_PRIVATE_KEY", privateKey)
+	t.Setenv("WARREN_GITHUB_APP_CONFIG", strings.Join(configFiles, ","))
 
 	action := &githubtool.Action{}
-	action.SetGitHubClient(client)
-	// Configure only "hinted/repo" as a hint; request a different repo.
-	action.SetConfigs([]*githubtool.RepositoryConfig{
-		{
-			Owner:      "hinted",
-			Repository: "repo",
-		},
-	})
-
-	ctx := context.Background()
-	args := map[string]any{
-		"owner": "unconfigured",
-		"repo":  "ad-hoc",
-		"path":  "note.txt",
-	}
-
-	result, err := action.Run(ctx, "github_get_content", args)
-	gt.NoError(t, err)
-	gt.S(t, result["repository"].(string)).Equal("unconfigured/ad-hoc")
-	gt.S(t, result["content"].(string)).Equal(content)
-	gt.S(t, result["sha"].(string)).Equal("cafebabe")
+	bindFlags(t, action)
+	return action, action.Configure(context.Background())
 }
 
-func TestLoadConfig(t *testing.T) {
-	// Create a temporary config file
+func TestGitHubConfigureValidation(t *testing.T) {
+	pk := testPrivateKey(t)
+
+	testCases := []struct {
+		name              string
+		appID             int64
+		installationID    int64
+		privateKey        string
+		expectUnavailable bool
+		expectErr         bool
+	}{
+		{name: "missing app ID", appID: 0, installationID: 12345, privateKey: pk, expectUnavailable: true, expectErr: true},
+		{name: "missing installation ID", appID: 12345, installationID: 0, privateKey: pk, expectUnavailable: true, expectErr: true},
+		{name: "missing private key", appID: 12345, installationID: 67890, privateKey: "", expectUnavailable: true, expectErr: true},
+		{name: "invalid private key", appID: 12345, installationID: 67890, privateKey: "not-a-pem", expectUnavailable: false, expectErr: true},
+		{name: "valid credentials", appID: 12345, installationID: 67890, privateKey: pk, expectUnavailable: false, expectErr: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := configure(t, tc.appID, tc.installationID, tc.privateKey, nil)
+			if !tc.expectErr {
+				gt.NoError(t, err)
+				return
+			}
+			gt.Error(t, err)
+			gt.Value(t, errors.Is(err, errutil.ErrActionUnavailable)).Equal(tc.expectUnavailable)
+		})
+	}
+}
+
+func TestGitHubLoadConfigAndPrompt(t *testing.T) {
 	configContent := `repositories:
   - owner: "test-owner"
     repository: "test-repo"
@@ -293,534 +104,59 @@ func TestLoadConfig(t *testing.T) {
     repository: "another-repo"
     description: "Another test repository"`
 
-	tmpFile, err := os.CreateTemp("", "github-app-config-*.yaml")
+	path := writeConfig(t, configContent)
+	action, err := configure(t, 12345, 67890, testPrivateKey(t), []string{path})
 	gt.NoError(t, err)
-	defer func() {
-		_ = os.Remove(tmpFile.Name())
-	}()
 
-	_, err = tmpFile.WriteString(configContent)
+	prompt, err := action.Prompt(context.Background())
 	gt.NoError(t, err)
-	_ = tmpFile.Close()
+	gt.S(t, prompt).Contains("test-owner/test-repo")
+	gt.S(t, prompt).Contains("Test repository")
+	gt.S(t, prompt).Contains("default branch: main")
+	gt.S(t, prompt).Contains("another-owner/another-repo")
+}
 
-	// Create action and configure
-	action := &githubtool.Action{}
-
-	// Set required fields for Configure to work
-	action.SetTestData(12345, 67890, "dummy-private-key", []string{tmpFile.Name()})
-
-	err = action.Configure(context.Background())
-	// Will fail due to invalid private key format
+func TestGitHubInvalidConfig(t *testing.T) {
+	// owner missing -> validation error during Configure
+	path := writeConfig(t, "repositories:\n  - repository: \"only-repo\"\n")
+	_, err := configure(t, 12345, 67890, testPrivateKey(t), []string{path})
 	gt.Error(t, err)
+	gt.Value(t, errors.Is(err, errutil.ErrActionUnavailable)).Equal(false)
 }
 
-func TestConfigureValidation(t *testing.T) {
-	testCases := []struct {
-		name              string
-		appID             int64
-		installationID    int64
-		privateKeyPath    string
-		configFiles       []string
-		expectUnavailable bool
-	}{
-		{
-			name:              "missing app ID",
-			appID:             0,
-			installationID:    12345,
-			privateKeyPath:    "key.pem",
-			configFiles:       []string{"config.yaml"},
-			expectUnavailable: true,
-		},
-		{
-			name:              "missing installation ID",
-			appID:             12345,
-			installationID:    0,
-			privateKeyPath:    "key.pem",
-			configFiles:       []string{"config.yaml"},
-			expectUnavailable: true,
-		},
-		{
-			name:              "missing private key",
-			appID:             12345,
-			installationID:    67890,
-			privateKeyPath:    "",
-			configFiles:       []string{"config.yaml"},
-			expectUnavailable: true,
-		},
-		{
-			// Config files are now optional hints. With App credentials
-			// present but no config files, Configure must proceed past
-			// the unavailable check and reach transport initialization,
-			// which fails here because the dummy private key is not a
-			// valid PEM.
-			name:              "missing config files is no longer fatal",
-			appID:             12345,
-			installationID:    67890,
-			privateKeyPath:    "invalid-pem-but-non-empty",
-			configFiles:       []string{},
-			expectUnavailable: false,
-		},
+func TestGitHubPromptEmptyWithoutConfig(t *testing.T) {
+	action, err := configure(t, 12345, 67890, testPrivateKey(t), nil)
+	gt.NoError(t, err)
+	prompt, err := action.Prompt(context.Background())
+	gt.NoError(t, err)
+	gt.S(t, prompt).Equal("")
+}
+
+func TestGitHubSpecsDelegation(t *testing.T) {
+	action, err := configure(t, 12345, 67890, testPrivateKey(t), nil)
+	gt.NoError(t, err)
+
+	specs, err := action.Specs(context.Background())
+	gt.NoError(t, err)
+	gt.A(t, specs).Length(5)
+
+	names := map[string]bool{}
+	for _, s := range specs {
+		names[s.Name] = true
 	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			action := &githubtool.Action{}
-			action.SetTestData(tc.appID, tc.installationID, tc.privateKeyPath, tc.configFiles)
-
-			err := action.Configure(context.Background())
-			gt.Error(t, err)
-			if tc.expectUnavailable {
-				gt.True(t, errors.Is(err, errutil.ErrActionUnavailable))
-			} else {
-				gt.False(t, errors.Is(err, errutil.ErrActionUnavailable))
-			}
-		})
+	for _, want := range []string{
+		"github_code_search",
+		"github_issue_search",
+		"github_get_content",
+		"github_list_commits",
+		"github_get_blame",
+	} {
+		gt.Value(t, names[want]).Equal(true)
 	}
 }
 
-func TestGitHubListCommits(t *testing.T) {
-	commitDate := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
-
-	mockedHTTPClient := mock.NewMockedHTTPClient(
-		mock.WithRequestMatch(
-			mock.GetReposCommitsByOwnerByRepo,
-			[]*github.RepositoryCommit{
-				{
-					SHA:     github.Ptr("abc123def456"),
-					HTMLURL: github.Ptr("https://github.com/test/repo/commit/abc123def456"),
-					Commit: &github.Commit{
-						Message: github.Ptr("Fix security vulnerability in auth handler"),
-						Author: &github.CommitAuthor{
-							Name: github.Ptr("Test User"),
-							Date: &github.Timestamp{Time: commitDate},
-						},
-					},
-					Author: &github.User{
-						Login: github.Ptr("testuser"),
-					},
-					Files: []*github.CommitFile{
-						{Filename: github.Ptr("auth.go")},
-						{Filename: github.Ptr("auth_test.go")},
-					},
-				},
-				{
-					SHA:     github.Ptr("789xyz"),
-					HTMLURL: github.Ptr("https://github.com/test/repo/commit/789xyz"),
-					Commit: &github.Commit{
-						Message: github.Ptr("Initial commit"),
-						Author: &github.CommitAuthor{
-							Name: github.Ptr("Another User"),
-							Date: &github.Timestamp{Time: commitDate.Add(-24 * time.Hour)},
-						},
-					},
-					Author: &github.User{
-						Login: github.Ptr("anotheruser"),
-					},
-				},
-			},
-		),
-	)
-
-	client := github.NewClient(mockedHTTPClient)
-
+func TestGitHubSpecsBeforeConfigure(t *testing.T) {
 	action := &githubtool.Action{}
-	action.SetGitHubClient(client)
-	action.SetConfigs([]*githubtool.RepositoryConfig{
-		{
-			Owner:       "test",
-			Repository:  "repo",
-			Description: "Test repository",
-		},
-	})
-
-	ctx := context.Background()
-	args := map[string]any{
-		"owner":    "test",
-		"repo":     "repo",
-		"per_page": float64(10),
-	}
-
-	result, err := action.Run(ctx, "github_list_commits", args)
-	gt.NoError(t, err)
-	gt.NotNil(t, result)
-
-	// Validate results
-	gt.S(t, result["repository"].(string)).Equal("test/repo")
-	gt.Number(t, result["count"].(int)).Equal(2)
-
-	commits := gt.Cast[[]githubtool.CommitResult](t, result["commits"])
-	gt.A(t, commits).Length(2)
-
-	// Check first commit
-	gt.S(t, commits[0].SHA).Equal("abc123def456")
-	gt.S(t, commits[0].Message).Equal("Fix security vulnerability in auth handler")
-	gt.S(t, commits[0].Author).Equal("testuser")
-	gt.S(t, commits[0].HTMLURL).Equal("https://github.com/test/repo/commit/abc123def456")
-
-	// Check second commit
-	gt.S(t, commits[1].SHA).Equal("789xyz")
-	gt.S(t, commits[1].Author).Equal("anotheruser")
-}
-
-func TestGitHubListCommitsUnconfiguredRepo(t *testing.T) {
-	commitDate := time.Date(2024, 6, 15, 10, 30, 0, 0, time.UTC)
-
-	mockedHTTPClient := mock.NewMockedHTTPClient(
-		mock.WithRequestMatch(
-			mock.GetReposCommitsByOwnerByRepo,
-			[]*github.RepositoryCommit{
-				{
-					SHA:     github.Ptr("deadbeef"),
-					HTMLURL: github.Ptr("https://github.com/unconfigured/repo/commit/deadbeef"),
-					Commit: &github.Commit{
-						Message: github.Ptr("Drive-by fix"),
-						Author: &github.CommitAuthor{
-							Name: github.Ptr("Outside Contributor"),
-							Date: &github.Timestamp{Time: commitDate},
-						},
-					},
-					Author: &github.User{Login: github.Ptr("outsider")},
-				},
-			},
-		),
-	)
-	client := github.NewClient(mockedHTTPClient)
-
-	action := &githubtool.Action{}
-	action.SetGitHubClient(client)
-	// Only "allowed/repo" is configured as a hint, but the call targets a different repo.
-	action.SetConfigs([]*githubtool.RepositoryConfig{
-		{
-			Owner:      "allowed",
-			Repository: "repo",
-		},
-	})
-
-	ctx := context.Background()
-	args := map[string]any{
-		"owner": "unconfigured",
-		"repo":  "secret-repo",
-	}
-
-	result, err := action.Run(ctx, "github_list_commits", args)
-	gt.NoError(t, err)
-	gt.S(t, result["repository"].(string)).Equal("unconfigured/secret-repo")
-	gt.Number(t, result["count"].(int)).Equal(1)
-	commits := gt.Cast[[]githubtool.CommitResult](t, result["commits"])
-	gt.A(t, commits).Length(1)
-	gt.S(t, commits[0].SHA).Equal("deadbeef")
-	gt.S(t, commits[0].Author).Equal("outsider")
-}
-
-func TestGitHubGetBlame(t *testing.T) {
-	blameResponse := githubtool.GraphQLBlameResponse{
-		Data: githubtool.GraphQLBlameData{
-			Repository: githubtool.GraphQLRepository{
-				Object: &githubtool.GraphQLObject{
-					Blame: &githubtool.GraphQLBlame{
-						Ranges: []githubtool.GraphQLBlameRange{
-							{
-								StartingLine: 1,
-								EndingLine:   10,
-								Commit: githubtool.GraphQLCommitRef{
-									OID:     "abc123",
-									Message: "Initial commit",
-									Author: githubtool.GraphQLCommitAuthor{
-										Name: "testuser",
-										Date: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-									},
-								},
-							},
-							{
-								StartingLine: 11,
-								EndingLine:   25,
-								Commit: githubtool.GraphQLCommitRef{
-									OID:     "def456",
-									Message: "Add error handling",
-									Author: githubtool.GraphQLCommitAuthor{
-										Name: "anotheruser",
-										Date: time.Date(2024, 3, 15, 12, 0, 0, 0, time.UTC),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	graphQLEndpoint := mock.EndpointPattern{
-		Pattern: "/graphql",
-		Method:  "POST",
-	}
-
-	mockedHTTPClient := mock.NewMockedHTTPClient(
-		mock.WithRequestMatchHandler(
-			graphQLEndpoint,
-			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(mock.MustMarshal(blameResponse))
-			}),
-		),
-	)
-
-	client := github.NewClient(mockedHTTPClient)
-
-	action := &githubtool.Action{}
-	action.SetGitHubClient(client)
-	action.SetHTTPClient(mockedHTTPClient)
-	action.SetConfigs([]*githubtool.RepositoryConfig{
-		{
-			Owner:         "test",
-			Repository:    "repo",
-			Description:   "Test repository",
-			DefaultBranch: "main",
-		},
-	})
-
-	ctx := context.Background()
-	args := map[string]any{
-		"owner": "test",
-		"repo":  "repo",
-		"path":  "src/main.go",
-	}
-
-	result, err := action.Run(ctx, "github_get_blame", args)
-	gt.NoError(t, err)
-	gt.NotNil(t, result)
-
-	// Validate results
-	gt.S(t, result["repository"].(string)).Equal("test/repo")
-	gt.S(t, result["path"].(string)).Equal("src/main.go")
-	gt.S(t, result["ref"].(string)).Equal("main")
-	gt.Number(t, result["count"].(int)).Equal(2)
-
-	ranges := gt.Cast[[]githubtool.BlameRange](t, result["ranges"])
-	gt.A(t, ranges).Length(2)
-
-	// Check first range
-	gt.Number(t, ranges[0].StartLine).Equal(1)
-	gt.Number(t, ranges[0].EndLine).Equal(10)
-	gt.S(t, ranges[0].CommitSHA).Equal("abc123")
-	gt.S(t, ranges[0].CommitMessage).Equal("Initial commit")
-	gt.S(t, ranges[0].Author).Equal("testuser")
-
-	// Check second range
-	gt.Number(t, ranges[1].StartLine).Equal(11)
-	gt.Number(t, ranges[1].EndLine).Equal(25)
-	gt.S(t, ranges[1].CommitSHA).Equal("def456")
-	gt.S(t, ranges[1].Author).Equal("anotheruser")
-}
-
-func TestGitHubGetBlameUnconfiguredRepo(t *testing.T) {
-	blameResponse := githubtool.GraphQLBlameResponse{
-		Data: githubtool.GraphQLBlameData{
-			Repository: githubtool.GraphQLRepository{
-				Object: &githubtool.GraphQLObject{
-					Blame: &githubtool.GraphQLBlame{
-						Ranges: []githubtool.GraphQLBlameRange{
-							{
-								StartingLine: 1,
-								EndingLine:   3,
-								Commit: githubtool.GraphQLCommitRef{
-									OID:     "feedface",
-									Message: "Drive-by patch",
-									Author: githubtool.GraphQLCommitAuthor{
-										Name: "outsider",
-										Date: time.Date(2024, 2, 2, 0, 0, 0, 0, time.UTC),
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	graphQLEndpoint := mock.EndpointPattern{
-		Pattern: "/graphql",
-		Method:  "POST",
-	}
-	mockedHTTPClient := mock.NewMockedHTTPClient(
-		mock.WithRequestMatchHandler(
-			graphQLEndpoint,
-			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write(mock.MustMarshal(blameResponse))
-			}),
-		),
-	)
-	client := github.NewClient(mockedHTTPClient)
-
-	action := &githubtool.Action{}
-	action.SetGitHubClient(client)
-	action.SetHTTPClient(mockedHTTPClient)
-	action.SetConfigs([]*githubtool.RepositoryConfig{
-		{
-			Owner:      "allowed",
-			Repository: "repo",
-		},
-	})
-
-	ctx := context.Background()
-	args := map[string]any{
-		"owner": "unconfigured",
-		"repo":  "secret-repo",
-		"path":  "main.go",
-	}
-
-	result, err := action.Run(ctx, "github_get_blame", args)
-	gt.NoError(t, err)
-	gt.S(t, result["repository"].(string)).Equal("unconfigured/secret-repo")
-	gt.Number(t, result["count"].(int)).Equal(1)
-	ranges := gt.Cast[[]githubtool.BlameRange](t, result["ranges"])
-	gt.A(t, ranges).Length(1)
-	gt.S(t, ranges[0].CommitSHA).Equal("feedface")
-	gt.S(t, ranges[0].Author).Equal("outsider")
-}
-
-func TestGitHubIntegration(t *testing.T) {
-	// Check for required environment variables
-	appID := os.Getenv("TEST_GITHUB_APP_ID")
-	installationID := os.Getenv("TEST_GITHUB_INSTALLATION_ID")
-	privateKey := os.Getenv("TEST_GITHUB_PRIVATE_KEY")
-	configPath := os.Getenv("TEST_GITHUB_CONFIG")
-
-	if appID == "" || installationID == "" || privateKey == "" {
-		t.Skip("TEST_GITHUB_APP_ID, TEST_GITHUB_INSTALLATION_ID, and TEST_GITHUB_PRIVATE_KEY must be set for integration tests")
-	}
-
-	// If no config path provided, use test data
-	if configPath == "" {
-		configPath = "./testdata/config.yaml"
-	}
-
-	// Check if config file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		t.Skipf("Config file does not exist: %s", configPath)
-	}
-
-	// Create action
-	action := &githubtool.Action{}
-
-	// Convert string IDs to int64
-	appIDInt, err := strconv.ParseInt(appID, 10, 64)
-	gt.NoError(t, err)
-
-	installIDInt, err := strconv.ParseInt(installationID, 10, 64)
-	gt.NoError(t, err)
-
-	action.SetTestData(appIDInt, installIDInt, privateKey, []string{configPath})
-
-	// Configure
-	ctx := context.Background()
-	err = action.Configure(ctx)
-	gt.NoError(t, err)
-
-	// Test code search
-	t.Run("code search", func(t *testing.T) {
-		searchQuery := os.Getenv("TEST_GITHUB_SEARCH_QUERY")
-		if searchQuery == "" {
-			searchQuery = "func"
-		}
-
-		args := map[string]any{
-			"query": searchQuery,
-		}
-
-		result, err := action.Run(ctx, "github_code_search", args)
-		gt.NoError(t, err)
-
-		results := gt.Cast[[]githubtool.CodeSearchResult](t, result["results"])
-		t.Logf("Found %d code results for query '%s'", len(results), searchQuery)
-	})
-
-	// Test issue search
-	t.Run("issue search", func(t *testing.T) {
-		args := map[string]any{
-			"query": "state:closed",
-		}
-
-		result, err := action.Run(ctx, "github_issue_search", args)
-		gt.NoError(t, err)
-
-		results := gt.Cast[[]githubtool.IssueSearchResult](t, result["results"])
-		t.Logf("Found %d Closed issues/PRs", len(results))
-	})
-}
-
-func TestParseRepoFilter(t *testing.T) {
-	t.Run("empty arg yields no filters", func(t *testing.T) {
-		gt.A(t, githubtool.ParseRepoFilter(map[string]any{})).Length(0)
-		gt.A(t, githubtool.ParseRepoFilter(map[string]any{"repo_filter": ""})).Length(0)
-	})
-
-	t.Run("single owner/name", func(t *testing.T) {
-		filters := githubtool.ParseRepoFilter(map[string]any{"repo_filter": "ubie-inc/hospital-core"})
-		gt.A(t, filters).Length(1)
-		gt.S(t, filters[0]).Equal("repo:ubie-inc/hospital-core")
-	})
-
-	t.Run("comma-separated list with whitespace", func(t *testing.T) {
-		filters := githubtool.ParseRepoFilter(map[string]any{
-			"repo_filter": "ubie-inc/hospital-core, ubie-inc/hospital-proxy ,ubie-inc/vpn-releases",
-		})
-		gt.A(t, filters).Length(3)
-		gt.S(t, filters[0]).Equal("repo:ubie-inc/hospital-core")
-		gt.S(t, filters[1]).Equal("repo:ubie-inc/hospital-proxy")
-		gt.S(t, filters[2]).Equal("repo:ubie-inc/vpn-releases")
-	})
-
-	t.Run("entries without slash are skipped", func(t *testing.T) {
-		filters := githubtool.ParseRepoFilter(map[string]any{
-			"repo_filter": "ubie-inc/hospital-core,nope, ubie-inc/hospital-proxy",
-		})
-		gt.A(t, filters).Length(2)
-		gt.S(t, filters[0]).Equal("repo:ubie-inc/hospital-core")
-		gt.S(t, filters[1]).Equal("repo:ubie-inc/hospital-proxy")
-	})
-}
-
-func TestBuildCodeSearchQuery(t *testing.T) {
-	t.Run("query without repo_filter is left unscoped", func(t *testing.T) {
-		got := githubtool.BuildCodeSearchQuery("fmt.Println", map[string]any{})
-		gt.S(t, got).Equal("fmt.Println")
-	})
-
-	t.Run("repo_filter expands to repo: qualifiers", func(t *testing.T) {
-		got := githubtool.BuildCodeSearchQuery("fmt.Println", map[string]any{
-			"repo_filter": "ubie-inc/foo,ubie-inc/bar",
-		})
-		gt.S(t, got).Equal("fmt.Println repo:ubie-inc/foo repo:ubie-inc/bar")
-	})
-
-	t.Run("additional filters are appended", func(t *testing.T) {
-		got := githubtool.BuildCodeSearchQuery("rewrite", map[string]any{
-			"repo_filter": "ubie-inc/foo",
-			"language":    "go",
-			"path":        "pkg/",
-			"filename":    "nginx.conf",
-		})
-		gt.S(t, got).Equal("rewrite repo:ubie-inc/foo language:go path:pkg/ filename:nginx.conf")
-	})
-}
-
-func TestBuildIssueSearchQuery(t *testing.T) {
-	t.Run("query without repo_filter is left unscoped", func(t *testing.T) {
-		got := githubtool.BuildIssueSearchQuery("bug in:title", map[string]any{})
-		gt.S(t, got).Equal("bug in:title")
-	})
-
-	t.Run("repo_filter and additional qualifiers are appended", func(t *testing.T) {
-		got := githubtool.BuildIssueSearchQuery("regression", map[string]any{
-			"repo_filter": "ubie-inc/foo,ubie-inc/bar",
-			"state":       "open",
-			"author":      "octocat",
-			"labels":      "bug, help wanted",
-			"type":        "issue",
-		})
-		gt.S(t, got).Equal(`regression repo:ubie-inc/foo repo:ubie-inc/bar state:open author:octocat label:"bug" label:"help wanted" type:issue`)
-	})
+	_, err := action.Specs(context.Background())
+	gt.Error(t, err)
 }

@@ -6,12 +6,6 @@ import (
 	"github.com/gollem-dev/gollem"
 )
 
-// Extract is the test-only export of the package-private extract function.
-var Extract = extract
-
-// Analyze is the test-only export of the package-private analyze function.
-var Analyze = analyze
-
 // ParseLLMArgs is the test-only export of parseLLMArgs.
 var ParseLLMArgs = parseLLMArgs
 
@@ -27,7 +21,8 @@ func (x *Action) SetHTTPClient(c *http.Client) {
 }
 
 // SetLLMClient injects an LLM client for tests, bypassing the flag-driven
-// build+ping path used in production.
+// build+ping path used in production. Configure will use this client when
+// building the inner ToolSet.
 func (x *Action) SetLLMClient(c gollem.LLMClient) {
 	x.llmClient = c
 }

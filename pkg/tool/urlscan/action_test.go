@@ -2,8 +2,10 @@ package urlscan_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/m-mizutani/gt"
@@ -13,110 +15,135 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func TestURLScan(t *testing.T) {
-	testCases := []struct {
-		name       string
-		funcName   string
-		args       map[string]any
-		apiResp    string
-		statusCode int
-		wantResp   string
-		wantErr    bool
-	}{
-		{
-			name:     "valid scan response",
-			funcName: "urlscan_scan",
-			args: map[string]any{
-				"url": "https://example.com",
-			},
-			apiResp:    `{"uuid": "test-uuid"}`,
-			statusCode: http.StatusOK,
-			wantResp:   `{"result": "test result"}`,
-			wantErr:    false,
-		},
-		{
-			name:     "api error response",
-			funcName: "urlscan_scan",
-			args: map[string]any{
-				"url": "https://example.com",
-			},
-			apiResp:    `{"error": "invalid request"}`,
-			statusCode: http.StatusBadRequest,
-			wantErr:    true,
-		},
-		{
-			name:     "api unauthorized response",
-			funcName: "urlscan_scan",
-			args: map[string]any{
-				"url": "https://example.com",
-			},
-			apiResp:    `{"error": "unauthorized"}`,
-			statusCode: http.StatusUnauthorized,
-			wantErr:    true,
+// TestURLScan_Delegation verifies that the warren wrapper builds the external
+// toolset on Configure and delegates Run to it (against a stub server).
+// It also confirms that --urlscan-api-key sets the API-Key header and
+// --urlscan-base-url redirects requests to the stub.
+func TestURLScan_Delegation(t *testing.T) {
+	// The external module POSTs to /scan/ and then GETs /result/<uuid>/.
+	// We respond to both in this single handler.
+	const fakeUUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	var scanHits int
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gt.Value(t, r.Header.Get("API-Key")).Equal("test-key")
+
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/scan/":
+			w.WriteHeader(http.StatusOK)
+			resp := map[string]string{"uuid": fakeUUID, "result": "https://urlscan.io/result/" + fakeUUID + "/"}
+			b, _ := json.Marshal(resp)
+			_, _ = w.Write(b)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/result/"+fakeUUID+"/":
+			scanHits++
+			w.WriteHeader(http.StatusOK)
+			result := map[string]any{"data": map[string]any{"requests": []any{}}}
+			b, _ := json.Marshal(result)
+			_, _ = w.Write(b)
+
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
+	var action urlscan.Action
+	cmd := cli.Command{
+		Name:  "urlscan",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			gt.NoError(t, action.Configure(ctx))
+			resp, err := action.Run(ctx, "urlscan_scan", map[string]any{"url": "https://example.com"})
+			gt.NoError(t, err)
+			gt.NotEqual(t, resp, nil)
+			gt.Map(t, resp).HasKey("data")
+			return nil
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				gt.Value(t, r.Header.Get("API-Key")).Equal("test-key")
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"urlscan",
+		"--urlscan-api-key", "test-key",
+		"--urlscan-base-url", ts.URL,
+		"--urlscan-backoff", "1ms",
+	}))
+	gt.Value(t, scanHits).Equal(1)
+}
 
-				if tc.statusCode == 0 {
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
-				w.WriteHeader(tc.statusCode)
-				if _, err := w.Write([]byte(tc.apiResp)); err != nil {
-					t.Fatal("failed to write response:", err)
-				}
-			}))
-			defer ts.Close()
+// TestURLScan_BackoffTimeout verifies that --urlscan-backoff and --urlscan-timeout
+// are wired through to the underlying toolset. The stub always returns 404 on
+// poll so the scan times out, and we assert at least 2 poll attempts were made
+// (proving the backoff loop actually iterated before the timeout fired).
+func TestURLScan_BackoffTimeout(t *testing.T) {
+	const fakeUUID = "aaaaaaaa-bbbb-cccc-dddd-ffffffffffff"
+	var pollCount atomic.Int64
 
-			var action urlscan.Action
-			cmd := cli.Command{
-				Name:  "urlscan",
-				Flags: action.Flags(),
-				Action: func(ctx context.Context, c *cli.Command) error {
-					resp, err := action.Run(ctx, tc.funcName, tc.args)
-					if tc.wantErr {
-						gt.Error(t, err)
-						return nil
-					}
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/scan/":
+			w.WriteHeader(http.StatusOK)
+			resp := map[string]string{"uuid": fakeUUID, "result": "https://urlscan.io/result/" + fakeUUID + "/"}
+			b, _ := json.Marshal(resp)
+			_, _ = w.Write(b)
 
-					gt.NoError(t, err)
-					gt.NotEqual(t, resp, nil)
-					data := gt.Cast[string](t, resp["uuid"])
-					gt.Equal(t, data, "test-uuid")
-					return nil
-				},
-			}
+		case r.Method == http.MethodGet && r.URL.Path == "/result/"+fakeUUID+"/":
+			pollCount.Add(1)
+			// Always respond "not ready" so the client keeps polling until timeout.
+			w.WriteHeader(http.StatusNotFound)
 
-			gt.NoError(t, cmd.Run(context.Background(), []string{
-				"urlscan",
-				"--urlscan-api-key", "test-key",
-				"--urlscan-base-url", ts.URL,
-			}))
-		})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
+	var action urlscan.Action
+	cmd := cli.Command{
+		Name:  "urlscan",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			gt.NoError(t, action.Configure(ctx))
+			_, err := action.Run(ctx, "urlscan_scan", map[string]any{"url": "https://example.com"})
+			// Must time out — error is expected.
+			gt.Error(t, err)
+			return nil
+		},
 	}
+
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"urlscan",
+		"--urlscan-api-key", "test-key",
+		"--urlscan-base-url", ts.URL,
+		"--urlscan-backoff", "20ms",
+		"--urlscan-timeout", "80ms",
+	}))
+
+	// With backoff=20ms and timeout=80ms we expect at least 2 poll attempts.
+	gt.B(t, pollCount.Load() >= 2).True()
 }
 
 func TestURLScan_Specs(t *testing.T) {
 	var action urlscan.Action
-	specs, err := action.Specs(context.Background())
-	gt.NoError(t, err)
-	gt.A(t, specs).Length(1) // Verify there is 1 tool specification
+	cmd := cli.Command{
+		Name:  "urlscan",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			gt.NoError(t, action.Configure(ctx))
+			specs, err := action.Specs(ctx)
+			gt.NoError(t, err)
+			gt.A(t, specs).Length(1)
 
-	// Verify tool specification
-	spec := specs[0]
-	gt.Value(t, spec.Name).Equal("urlscan_scan")
-	gt.Value(t, spec.Description).Equal("Scan a URL with URLScan")
-	gt.Map(t, spec.Parameters).HasKey("url")
-	gt.Value(t, spec.Parameters["url"].Type).Equal("string")
+			gt.Value(t, specs[0].Name).Equal("urlscan_scan")
+			gt.Map(t, specs[0].Parameters).HasKey("url")
+			gt.Value(t, specs[0].Parameters["url"].Type).Equal("string")
+			return nil
+		},
+	}
+	gt.NoError(t, cmd.Run(context.Background(), []string{"urlscan", "--urlscan-api-key", "test-key"}))
 }
 
-func TestURLScan_Enabled(t *testing.T) {
+func TestURLScan_Unavailable(t *testing.T) {
 	var action urlscan.Action
-
 	cmd := cli.Command{
 		Name:  "urlscan",
 		Flags: action.Flags(),
@@ -127,18 +154,14 @@ func TestURLScan_Enabled(t *testing.T) {
 	}
 
 	t.Setenv("WARREN_URLSCAN_API_KEY", "")
-	t.Setenv("TEST_URLSCAN_API_KEY", "")
 	gt.NoError(t, cmd.Run(t.Context(), []string{
 		"urlscan",
 		"--urlscan-base-url", "https://urlscan.io/api/v1",
 	}))
 }
 
-// TestSendRequest tests the Run method of the Action struct.
-// It sets up a test environment with a actual API key and target URL,
-// and then runs the command to send a request to the URLScan API.
-// The test verifies that the request is sent successfully and the response is not nil.
-// It also checks that the response type is JSON and contains the expected result field.
+// TestSendRequest hits the real urlscan.io API and only runs when credentials
+// are provided via environment variables.
 func TestSendRequest(t *testing.T) {
 	var act urlscan.Action
 
@@ -147,6 +170,7 @@ func TestSendRequest(t *testing.T) {
 		Name:  "urlscan",
 		Flags: act.Flags(),
 		Action: func(ctx context.Context, c *cli.Command) error {
+			gt.NoError(t, act.Configure(ctx))
 			resp, err := act.Run(ctx, "urlscan_scan", map[string]any{
 				"url": vars.Get("TEST_URLSCAN_TARGET_URL"),
 			})

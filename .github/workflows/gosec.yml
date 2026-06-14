@@ -42,7 +42,7 @@ jobs:
         # gosec emits null entries in rules[].relationships which violates the SARIF schema.
         # Remove null entries so that upload-sarif accepts the file.
         run: |
-          jq '(.runs[].tool.driver.rules // [])[] |= (if .relationships then .relationships |= map(select(. != null)) else . end)' results.sarif > results-fixed.sarif
+          jq '(.runs[]?.tool.driver.rules[]?) |= (if .relationships then .relationships |= map(select(. != null)) else . end)' results.sarif > results-fixed.sarif
           mv results-fixed.sarif results.sarif
 
       - name: Upload SARIF file
