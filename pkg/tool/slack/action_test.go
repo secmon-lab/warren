@@ -7,11 +7,10 @@ import (
 	"os"
 	"testing"
 
-	extslack "github.com/gollem-dev/tools/slack"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/slack"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
-	"github.com/secmon-lab/warren/pkg/utils/test"
+	"github.com/urfave/cli/v3"
 )
 
 // newAction builds a configured Action pointed at the given stub server URL.
@@ -112,18 +111,38 @@ func TestSlackConfigure(t *testing.T) {
 	})
 }
 
-// TestSlack_OptionAppended verifies that SetTestURL appends WithBaseURL carrying
-// the provided value, by applying the accumulated options to a fresh external
-// ToolSet and reading its unexported field.
-func TestSlack_OptionAppended(t *testing.T) {
-	action := &slack.Action{}
-	action.SetTestURL("https://example.test/api")
+// TestSlack_FlagSetsToken verifies that parsing --slack-tool-user-token via
+// cli.Command.Run binds the value and the configured client sends it as the
+// Bearer token on every API request.
+func TestSlack_FlagSetsToken(t *testing.T) {
+	const successBody = `{"ok": true, "query": "hi", "messages": {"total": 0, "paging": {"count": 0, "total": 0, "page": 1, "pages": 0}, "matches": []}}`
 
-	var ts extslack.ToolSet
-	for _, o := range action.Opts() {
-		o(&ts)
+	var gotAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(successBody))
+	}))
+	defer server.Close()
+
+	var action slack.Action
+	cmd := cli.Command{
+		Name:  "slack",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			action.SetTestURL(server.URL)
+			gt.NoError(t, action.Configure(ctx))
+			_, err := action.Run(ctx, "slack_message_search", map[string]any{"query": "hi"})
+			gt.NoError(t, err)
+			return nil
+		},
 	}
-	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/api")
+
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"slack",
+		"--slack-tool-user-token", "my-secret-token",
+	}))
+	gt.S(t, gotAuth).Equal("Bearer my-secret-token")
 }
 
 func TestSlackMessageSearchIntegration(t *testing.T) {

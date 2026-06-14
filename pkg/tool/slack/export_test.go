@@ -11,9 +11,3 @@ func (x *Action) SetOAuthToken(token string) {
 func (x *Action) SetTestURL(url string) {
 	x.opts = append(x.opts, extslack.WithBaseURL(url))
 }
-
-// Opts exposes the accumulated external options for testing that flag Action
-// callbacks append the expected option.
-func (x *Action) Opts() []extslack.Option {
-	return x.opts
-}

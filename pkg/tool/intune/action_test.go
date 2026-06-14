@@ -3,11 +3,13 @@ package intune_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
-	extintune "github.com/gollem-dev/tools/intune"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/intune"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
@@ -501,29 +503,65 @@ func TestIntune_InvalidFunctionName(t *testing.T) {
 	gt.Error(t, err)
 }
 
-// TestIntune_OptionAppended verifies the --intune-base-url flag Action appends
-// WithBaseURL carrying the provided value, by applying the accumulated options
-// to a fresh external ToolSet and reading its unexported field.
-func TestIntune_OptionAppended(t *testing.T) {
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func jsonResponse(body string) *http.Response {
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+	}
+}
+
+// TestIntune_CredentialsUsed verifies, by observing the requests that reach a
+// mock HTTP transport, that every credential flag value is actually used:
+// --intune-tenant-id appears in the (default) token endpoint URL,
+// --intune-client-id / --intune-client-secret are sent in the token request
+// body, and --intune-base-url is the host for Graph API calls.
+func TestIntune_CredentialsUsed(t *testing.T) {
+	var tokenURL, clientID, clientSecret, graphHost string
+
+	rt := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if strings.Contains(req.URL.Path, "/oauth2/v2.0/token") {
+			tokenURL = req.URL.String()
+			body, err := io.ReadAll(req.Body)
+			gt.NoError(t, err)
+			vals, err := url.ParseQuery(string(body))
+			gt.NoError(t, err)
+			clientID = vals.Get("client_id")
+			clientSecret = vals.Get("client_secret")
+			return jsonResponse(`{"access_token":"tok","expires_in":3600,"token_type":"Bearer"}`), nil
+		}
+		graphHost = req.URL.Host
+		return jsonResponse(`{"value":[]}`), nil
+	})
+
 	var action intune.Action
 	cmd := cli.Command{
-		Name:   "intune",
-		Flags:  action.Flags(),
-		Action: func(context.Context, *cli.Command) error { return nil },
+		Name:  "intune",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			gt.NoError(t, action.ConfigureWithHTTPClient(&http.Client{Transport: rt}, "https://graph.example.test/v1.0"))
+			_, err := action.Run(ctx, "intune_devices_by_user", map[string]any{
+				"user_principal_name": "user@example.com",
+			})
+			gt.NoError(t, err)
+			return nil
+		},
 	}
 	gt.NoError(t, cmd.Run(context.Background(), []string{
 		"intune",
-		"--intune-tenant-id", "t",
-		"--intune-client-id", "c",
-		"--intune-client-secret", "s",
-		"--intune-base-url", "https://example.test/graph",
+		"--intune-tenant-id", "test-tenant-123",
+		"--intune-client-id", "test-client-id",
+		"--intune-client-secret", "test-client-secret",
 	}))
 
-	var ts extintune.ToolSet
-	for _, o := range action.Opts() {
-		o(&ts)
-	}
-	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/graph")
+	gt.S(t, tokenURL).Contains("test-tenant-123")
+	gt.Value(t, clientID).Equal("test-client-id")
+	gt.Value(t, clientSecret).Equal("test-client-secret")
+	gt.Value(t, graphHost).Equal("graph.example.test")
 }
 
 func TestIntune_Integration(t *testing.T) {

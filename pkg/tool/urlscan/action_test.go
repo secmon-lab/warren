@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
-	"time"
 
-	exturlscan "github.com/gollem-dev/tools/urlscan"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/urlscan"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
@@ -16,35 +15,10 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-// TestURLScan_OptionsAppended verifies that the optional flag Action callbacks
-// append the correct external options by applying them to a fresh ToolSet and
-// reading the unexported fields via reflection.
-func TestURLScan_OptionsAppended(t *testing.T) {
-	var action urlscan.Action
-	cmd := cli.Command{
-		Name:   "urlscan",
-		Flags:  action.Flags(),
-		Action: func(context.Context, *cli.Command) error { return nil },
-	}
-	gt.NoError(t, cmd.Run(context.Background(), []string{
-		"urlscan",
-		"--urlscan-api-key", "k",
-		"--urlscan-base-url", "https://example.test/api",
-		"--urlscan-backoff", "7s",
-		"--urlscan-timeout", "42s",
-	}))
-
-	var ts exturlscan.ToolSet
-	for _, o := range action.Opts() {
-		o(&ts)
-	}
-	gt.Value(t, test.PrivateField(t, &ts, "baseURL")).Equal("https://example.test/api")
-	gt.Value(t, test.PrivateField(t, &ts, "backoff")).Equal(7 * time.Second)
-	gt.Value(t, test.PrivateField(t, &ts, "timeout")).Equal(42 * time.Second)
-}
-
 // TestURLScan_Delegation verifies that the warren wrapper builds the external
 // toolset on Configure and delegates Run to it (against a stub server).
+// It also confirms that --urlscan-api-key sets the API-Key header and
+// --urlscan-base-url redirects requests to the stub.
 func TestURLScan_Delegation(t *testing.T) {
 	// The external module POSTs to /scan/ and then GETs /result/<uuid>/.
 	// We respond to both in this single handler.
@@ -94,6 +68,58 @@ func TestURLScan_Delegation(t *testing.T) {
 		"--urlscan-backoff", "1ms",
 	}))
 	gt.Value(t, scanHits).Equal(1)
+}
+
+// TestURLScan_BackoffTimeout verifies that --urlscan-backoff and --urlscan-timeout
+// are wired through to the underlying toolset. The stub always returns 404 on
+// poll so the scan times out, and we assert at least 2 poll attempts were made
+// (proving the backoff loop actually iterated before the timeout fired).
+func TestURLScan_BackoffTimeout(t *testing.T) {
+	const fakeUUID = "aaaaaaaa-bbbb-cccc-dddd-ffffffffffff"
+	var pollCount atomic.Int64
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/scan/":
+			w.WriteHeader(http.StatusOK)
+			resp := map[string]string{"uuid": fakeUUID, "result": "https://urlscan.io/result/" + fakeUUID + "/"}
+			b, _ := json.Marshal(resp)
+			_, _ = w.Write(b)
+
+		case r.Method == http.MethodGet && r.URL.Path == "/result/"+fakeUUID+"/":
+			pollCount.Add(1)
+			// Always respond "not ready" so the client keeps polling until timeout.
+			w.WriteHeader(http.StatusNotFound)
+
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer ts.Close()
+
+	var action urlscan.Action
+	cmd := cli.Command{
+		Name:  "urlscan",
+		Flags: action.Flags(),
+		Action: func(ctx context.Context, c *cli.Command) error {
+			gt.NoError(t, action.Configure(ctx))
+			_, err := action.Run(ctx, "urlscan_scan", map[string]any{"url": "https://example.com"})
+			// Must time out — error is expected.
+			gt.Error(t, err)
+			return nil
+		},
+	}
+
+	gt.NoError(t, cmd.Run(context.Background(), []string{
+		"urlscan",
+		"--urlscan-api-key", "test-key",
+		"--urlscan-base-url", ts.URL,
+		"--urlscan-backoff", "20ms",
+		"--urlscan-timeout", "80ms",
+	}))
+
+	// With backoff=20ms and timeout=80ms we expect at least 2 poll attempts.
+	gt.B(t, pollCount.Load() >= 2).True()
 }
 
 func TestURLScan_Specs(t *testing.T) {
