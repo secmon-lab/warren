@@ -408,10 +408,14 @@ func (x *UseCases) buildChatContext(ctx context.Context, t *ticket.Ticket, slack
 
 	chatCtx.Tools = allTools
 
-	// Load history (skip for ticketless and when no Session was
-	// resolved — the latter leaves working memory empty so the next
-	// turn starts fresh rather than resurrecting pre-redesign data).
-	if !ticketless && sess != nil {
+	// Load history whenever a Session was resolved, regardless of
+	// ticket association. Session history is keyed by SessionID (not
+	// TicketID), and ticketless Slack threads get a deterministic
+	// SessionID, so loading here lets ticketless threads continue a
+	// conversation across turns just like ticketed ones. When no
+	// Session was resolved we leave working memory empty so the next
+	// turn starts fresh rather than resurrecting pre-redesign data.
+	if sess != nil {
 		storageSvc := storage.New(x.storageClient, storage.WithPrefix(x.storagePrefix))
 		history, err := chatpkg.LoadSessionHistory(ctx, sess.ID, storageSvc)
 		if err != nil {

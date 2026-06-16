@@ -13,7 +13,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/gt"
+	storageAdapter "github.com/secmon-lab/warren/pkg/adapter/storage"
 	sessSvcDomain "github.com/secmon-lab/warren/pkg/domain/interfaces"
 	chatModel "github.com/secmon-lab/warren/pkg/domain/model/chat"
 	sessModel "github.com/secmon-lab/warren/pkg/domain/model/session"
@@ -23,6 +25,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	slackSvc "github.com/secmon-lab/warren/pkg/service/slack"
 	"github.com/secmon-lab/warren/pkg/service/slack/testutil"
+	storageSvc "github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase"
 )
 
@@ -30,16 +33,18 @@ import (
 // without pulling in the full LLM stack. It also lets a test pause the
 // Execute call so the lock can be inspected while a run is in flight.
 type stubChatUC struct {
-	mu      sync.Mutex
-	runs    int
-	release chan struct{}
-	err     error
-	onExec  func(ctx context.Context)
+	mu          sync.Mutex
+	runs        int
+	release     chan struct{}
+	err         error
+	onExec      func(ctx context.Context)
+	lastChatCtx chatModel.ChatContext
 }
 
 func (s *stubChatUC) Execute(ctx context.Context, message string, chatCtx chatModel.ChatContext) error {
 	s.mu.Lock()
 	s.runs++
+	s.lastChatCtx = chatCtx
 	release := s.release
 	onExec := s.onExec
 	s.mu.Unlock()
@@ -52,10 +57,19 @@ func (s *stubChatUC) Execute(ctx context.Context, message string, chatCtx chatMo
 	return s.err
 }
 
+// LastChatCtx returns the ChatContext captured by the most recent Execute
+// call so tests can assert on what ChatFromSlack assembled (e.g. whether
+// session history was restored).
+func (s *stubChatUC) LastChatCtx() chatModel.ChatContext {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastChatCtx
+}
+
 // ensure stubChatUC implements the interface expected by usecase.UseCases.
 var _ sessSvcDomain.ChatUseCase = (*stubChatUC)(nil)
 
-func setupUseCases(t *testing.T, stub *stubChatUC) (*usecase.UseCases, *testutil.Recorder, *repository.Memory) {
+func setupUseCases(t *testing.T, stub *stubChatUC) (*usecase.UseCases, *testutil.Recorder, *repository.Memory, sessSvcDomain.StorageClient) {
 	t.Helper()
 	repo := repository.NewMemory()
 
@@ -64,18 +78,21 @@ func setupUseCases(t *testing.T, stub *stubChatUC) (*usecase.UseCases, *testutil
 	slack, err := slackSvc.New(client, "C_DEFAULT")
 	gt.NoError(t, err).Required()
 
+	storageClient := storageAdapter.NewMock()
+
 	uc := usecase.New(
 		usecase.WithRepository(repo),
 		usecase.WithSlackService(slack),
 		usecase.WithChatUseCase(stub),
+		usecase.WithStorageClient(storageClient),
 	)
-	return uc, rec, repo
+	return uc, rec, repo, storageClient
 }
 
 func TestChatFromSlack_AcquiresLockAndCreatesTurn(t *testing.T) {
 	ctx := context.Background()
 	stub := &stubChatUC{}
-	uc, _, repo := setupUseCases(t, stub)
+	uc, _, repo, _ := setupUseCases(t, stub)
 
 	// Seed a Ticket so ChatFromSlack takes the "with ticket" path.
 	thread := slackModel.Thread{ChannelID: "C1", ThreadID: "t1", TeamID: "T1"}
@@ -112,7 +129,7 @@ func TestChatFromSlack_AcquiresLockAndCreatesTurn(t *testing.T) {
 func TestChatFromSlack_DoubleMention_BlocksSecondAndPostsBusyNotice(t *testing.T) {
 	ctx := context.Background()
 	stub := &stubChatUC{release: make(chan struct{})}
-	uc, rec, repo := setupUseCases(t, stub)
+	uc, rec, repo, _ := setupUseCases(t, stub)
 
 	thread := slackModel.Thread{ChannelID: "C1", ThreadID: "t1", TeamID: "T1"}
 	tk := ticket.Ticket{
@@ -175,7 +192,7 @@ func TestChatFromSlack_ConcurrentMentions_OneWinsRestBusy(t *testing.T) {
 	var execStarted atomic.Int32
 	stub := &stubChatUC{release: make(chan struct{})}
 	stub.onExec = func(ctx context.Context) { execStarted.Add(1) }
-	uc, _, repo := setupUseCases(t, stub)
+	uc, _, repo, _ := setupUseCases(t, stub)
 
 	thread := slackModel.Thread{ChannelID: "C1", ThreadID: "t1", TeamID: "T1"}
 	tk := ticket.Ticket{
@@ -221,6 +238,52 @@ func TestChatFromSlack_ConcurrentMentions_OneWinsRestBusy(t *testing.T) {
 	if err := <-first; err != nil {
 		t.Fatalf("first ChatFromSlack returned error: %v", err)
 	}
+}
+
+// TestChatFromSlack_TicketlessContinuesConversation verifies that a Slack
+// thread with no associated Ticket still restores its gollem working memory
+// across mentions: the deterministic ticketless Session is reused, and
+// history saved under its SessionID is loaded back into chatCtx.History on
+// the next mention.
+func TestChatFromSlack_TicketlessContinuesConversation(t *testing.T) {
+	ctx := context.Background()
+	stub := &stubChatUC{}
+	uc, _, _, storageClient := setupUseCases(t, stub)
+
+	// No Ticket is seeded for this thread, so ChatFromSlack takes the
+	// ticketless path and resolves a deterministic slack_ticketless_* Session.
+	thread := slackModel.Thread{ChannelID: "C9", ThreadID: "t9", TeamID: "T9"}
+	msg := slackModel.NewTestMessage(thread.ChannelID, thread.ThreadID, thread.TeamID, "m1", "U1", "@warren question")
+
+	// First mention: nothing has been persisted yet, so working memory
+	// starts empty.
+	gt.NoError(t, uc.ChatFromSlack(ctx, &msg, "question"))
+	first := stub.LastChatCtx()
+	gt.V(t, first.Session != nil).Equal(true)
+	gt.V(t, first.IsTicketless()).Equal(true)
+	gt.V(t, first.History == nil).Equal(true)
+
+	sessID := first.Session.ID
+
+	// Simulate the chat strategy persisting working memory for this
+	// ticketless Session (keyed by SessionID, not TicketID).
+	svc := storageSvc.New(storageClient)
+	want := &gollem.History{
+		Version:  gollem.HistoryVersion,
+		Messages: []gollem.Message{{Role: gollem.RoleUser}},
+	}
+	gt.NoError(t, svc.PutSessionHistory(ctx, sessID, want))
+
+	// Second mention on the same thread reuses the deterministic Session and
+	// restores its working memory into chatCtx.History.
+	msg2 := slackModel.NewTestMessage(thread.ChannelID, thread.ThreadID, thread.TeamID, "m2", "U1", "@warren follow up")
+	gt.NoError(t, uc.ChatFromSlack(ctx, &msg2, "follow up"))
+	second := stub.LastChatCtx()
+	gt.V(t, second.Session != nil).Equal(true)
+	gt.V(t, second.Session.ID).Equal(sessID)
+	gt.V(t, second.History != nil).Equal(true)
+	gt.A(t, second.History.Messages).Length(1)
+	gt.V(t, second.History.Messages[0].Role).Equal(gollem.RoleUser)
 }
 
 // waitUntil polls cond for up to ~2 seconds and fails the test otherwise.

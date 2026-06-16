@@ -274,12 +274,11 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 		msg.Notify(ctx, "💬 %s", planResult.Message)
 	}
 
-	// Direct response (no tasks)
+	// Direct response (no tasks). saveSessionHistory is keyed by
+	// SessionID, so it persists working memory for ticketless threads
+	// too (no-op when no Session was resolved).
 	if len(planResult.Tasks) == 0 {
-		if !ticketless {
-			return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
-		}
-		return nil
+		return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 	}
 
 	// Execute phases
@@ -406,11 +405,11 @@ func (c *BluebellChat) executeBluebell(ctx context.Context, ssn *session.Session
 
 	c.triggerFactReflection(ctx, buildReflectionSummary(allResults), chatCtx)
 
-	if !ticketless {
-		logger.Debug("bluebell executeBluebell: completed, saving history")
-		return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
-	}
-	return nil
+	// Persist working memory keyed by SessionID for both ticketed and
+	// ticketless threads so the next turn on this thread continues the
+	// conversation (no-op when no Session was resolved).
+	logger.Debug("bluebell executeBluebell: completed, saving history")
+	return c.saveSessionHistory(ctx, planSession, *chatCtx, storageSvc)
 }
 
 // buildReflectionSummary aggregates all task results into a text summary for reflection.

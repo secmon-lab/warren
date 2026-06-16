@@ -11,6 +11,7 @@ import (
 	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/m-mizutani/gt"
+	adapter "github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/mock"
 	"github.com/secmon-lab/warren/pkg/domain/model/alert"
@@ -22,6 +23,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/repository"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	slackService "github.com/secmon-lab/warren/pkg/service/slack"
+	storage_svc "github.com/secmon-lab/warren/pkg/service/storage"
 	"github.com/secmon-lab/warren/pkg/usecase/chat"
 	"github.com/secmon-lab/warren/pkg/usecase/chat/bluebell"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
@@ -645,4 +647,48 @@ func TestBluebellChat_Ticketless(t *testing.T) {
 		},
 	})
 	gt.NoError(t, err)
+}
+
+func TestBluebellChat_TicketlessSavesSessionHistory(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	knowledgeSvc := svcknowledge.New(repo, newMockEmbeddingClient())
+	mockStorage := adapter.NewMock()
+
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			ssn := newMockSession()
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+				return &gollem.Response{
+					Texts: []string{`{"message": "Here is the answer.", "tasks": []}`},
+				}, nil
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC, err := bluebell.New(repo, mockLLM,
+		bluebell.WithKnowledgeService(knowledgeSvc),
+		bluebell.WithStorageClient(mockStorage),
+	)
+	gt.NoError(t, err)
+
+	// Ticketless thread, but a Session is resolved (the deterministic
+	// slack_ticketless_* Session). Working memory must be persisted under the
+	// SessionID so the next mention on this thread continues the conversation.
+	sess := newDummySession("")
+	err = chatUC.Execute(ctx, &chat.RunContext{
+		Session: sess,
+		Message: "General question",
+		ChatCtx: &chatModel.ChatContext{
+			Ticket:  &ticket.Ticket{},
+			Session: sess,
+		},
+	})
+	gt.NoError(t, err)
+
+	storageSvc := storage_svc.New(mockStorage)
+	saved, err := storageSvc.GetSessionHistory(ctx, sess.ID)
+	gt.NoError(t, err)
+	gt.V(t, saved).NotNil()
 }
