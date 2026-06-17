@@ -17,3 +17,12 @@ type ToolSetFactory interface {
 	// Returns (nil, nil) if the agent is not configured.
 	Configure(ctx context.Context) (interfaces.ToolSet, error)
 }
+
+// StorageAware is an optional interface for factories that need the
+// warren-wide storage client and prefix (e.g. for snapshotting large
+// result sets to shared object storage). ConfigureAll injects these
+// before calling Configure. Factories that do not need storage simply
+// omit this interface.
+type StorageAware interface {
+	SetStorage(client interfaces.StorageClient, prefix string)
+}

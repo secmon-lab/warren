@@ -30,10 +30,20 @@ func AllFlags() []cli.Flag {
 
 // ConfigureAll initializes all configured agents and returns a slice of ToolSets.
 // Agents that are not configured will return nil and be skipped.
-func ConfigureAll(ctx context.Context) ([]interfaces.ToolSet, error) {
+//
+// storageClient and storagePrefix are the warren-wide shared storage client
+// (bucket already bound) and object-key prefix. They are injected into any
+// factory implementing StorageAware before Configure is called. storageClient
+// may be nil when storage is not configured; storage-aware agents must degrade
+// gracefully in that case.
+func ConfigureAll(ctx context.Context, storageClient interfaces.StorageClient, storagePrefix string) ([]interfaces.ToolSet, error) {
 	var toolSets []interfaces.ToolSet
 
 	for _, factory := range All {
+		if aware, ok := factory.(StorageAware); ok {
+			aware.SetStorage(storageClient, storagePrefix)
+		}
+
 		ts, err := factory.Configure(ctx)
 		if err != nil {
 			return nil, goerr.Wrap(err, "failed to configure agent")

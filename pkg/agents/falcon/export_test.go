@@ -1,6 +1,10 @@
 package falcon
 
-import "context"
+import (
+	"context"
+
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+)
 
 // TokenProviderForTest wraps tokenProvider for testing purposes.
 type TokenProviderForTest struct {
@@ -29,11 +33,21 @@ type InternalToolForTest struct {
 	tool *internalTool
 }
 
-// NewInternalToolForTest creates an internalTool wrapper for testing.
+// NewInternalToolForTest creates an internalTool wrapper for testing without
+// storage (event search returns the first page directly).
 func NewInternalToolForTest(clientID, clientSecret, baseURL string) *InternalToolForTest {
 	tp := newTokenProvider(clientID, clientSecret, baseURL)
 	return &InternalToolForTest{
-		tool: newInternalTool(tp, baseURL),
+		tool: newInternalTool(tp, baseURL, nil, ""),
+	}
+}
+
+// NewInternalToolForTestWithStorage creates an internalTool wrapper backed by
+// the given storage client, enabling result-set snapshotting and pagination.
+func NewInternalToolForTestWithStorage(clientID, clientSecret, baseURL string, storage interfaces.StorageClient, prefix string) *InternalToolForTest {
+	tp := newTokenProvider(clientID, clientSecret, baseURL)
+	return &InternalToolForTest{
+		tool: newInternalTool(tp, baseURL, storage, prefix),
 	}
 }
 
@@ -49,4 +63,15 @@ func (t *InternalToolForTest) SpecCount(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	return len(specs), nil
+}
+
+// ParseLimit exposes parseLimit for testing.
+func ParseLimit(args map[string]any) int { return parseLimit(args) }
+
+// ParseOffset exposes parseOffset for testing.
+func ParseOffset(args map[string]any) int { return parseOffset(args) }
+
+// Paginate exposes paginate for testing.
+func Paginate(events []any, offset, limit int) ([]any, int, bool) {
+	return paginate(events, offset, limit)
 }

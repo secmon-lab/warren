@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/m-mizutani/gt"
+	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	"github.com/secmon-lab/warren/pkg/agents/falcon"
 )
 
@@ -412,8 +413,22 @@ func TestInternalTool_SearchEvents_Immediate(t *testing.T) {
 	events, ok := result["events"].([]any)
 	gt.True(t, ok)
 	gt.Equal(t, len(events), 1)
+
+	// Pagination metadata is present even without storage.
+	gt.Equal(t, result["total"].(int), 1)
+	gt.Equal(t, result["returned"].(int), 1)
+	gt.Equal(t, result["offset"].(int), 0)
+	gt.Equal(t, result["limit"].(int), 100)
+	gt.Equal(t, result["has_more"].(bool), false)
+	// No storage configured -> no result_set_id for further paging.
+	_, hasID := result["result_set_id"]
+	gt.False(t, hasID)
 }
 
+// TestInternalTool_SearchEvents_WithPolling verifies that polls are not
+// accumulated: the query job returns the cumulative result set on each poll,
+// so only the final (done) response is authoritative and events must not be
+// duplicated across polls.
 func TestInternalTool_SearchEvents_WithPolling(t *testing.T) {
 	var pollCount int
 
@@ -431,26 +446,19 @@ func TestInternalTool_SearchEvents_WithPolling(t *testing.T) {
 			pollCount++
 			w.Header().Set("Content-Type", "application/json")
 
-			if pollCount < 3 {
-				// Not done yet, return partial results
-				err := json.NewEncoder(w).Encode(map[string]any{
-					"done":      false,
-					"cancelled": false,
-					"events": []map[string]any{
-						{"aid": "test", "event": fmt.Sprintf("event-%d", pollCount)},
-					},
-				})
-				gt.NoError(t, err)
-				return
+			// Each poll returns the cumulative result set computed so far.
+			cumulative := []map[string]any{{"aid": "test", "event": "event-1"}}
+			if pollCount >= 2 {
+				cumulative = append(cumulative, map[string]any{"aid": "test", "event": "event-2"})
+			}
+			if pollCount >= 3 {
+				cumulative = append(cumulative, map[string]any{"aid": "test", "event": "event-3"})
 			}
 
-			// Done on third poll
 			err := json.NewEncoder(w).Encode(map[string]any{
-				"done":      true,
+				"done":      pollCount >= 3,
 				"cancelled": false,
-				"events": []map[string]any{
-					{"aid": "test", "event": "event-final"},
-				},
+				"events":    cumulative,
 			})
 			gt.NoError(t, err)
 			return
@@ -473,11 +481,22 @@ func TestInternalTool_SearchEvents_WithPolling(t *testing.T) {
 	gt.True(t, ok)
 	gt.True(t, done)
 
-	// Should have accumulated events from all polls
+	// Only the final cumulative result is used: exactly 3 distinct events,
+	// no duplication from intermediate polls.
 	events, ok := result["events"].([]any)
 	gt.True(t, ok)
-	gt.Equal(t, len(events), 3) // 1 from poll 1 + 1 from poll 2 + 1 from final
+	gt.Equal(t, len(events), 3)
+	gt.Equal(t, result["total"].(int), 3)
 	gt.Equal(t, pollCount, 3)
+
+	seen := map[string]bool{}
+	for _, e := range events {
+		ev := e.(map[string]any)
+		name := ev["event"].(string)
+		gt.False(t, seen[name]) // no duplicates
+		seen[name] = true
+	}
+	gt.True(t, seen["event-1"] && seen["event-2"] && seen["event-3"])
 
 	repo, ok := result["repository"].(string)
 	gt.True(t, ok)
@@ -488,6 +507,172 @@ func TestInternalTool_SearchEvents_MissingQueryString(t *testing.T) {
 	tool := falcon.NewInternalToolForTest("id", "secret", "http://localhost")
 	_, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{})
 	gt.Error(t, err)
+}
+
+// eventsSearchServer returns a test server whose query job completes
+// immediately with the given number of generated events, and counts how many
+// search-related (job create + poll) requests it received.
+func eventsSearchServer(t *testing.T, jobID string, numEvents int, eventCount any, hits *int) *httptest.Server {
+	t.Helper()
+	return newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/queryjobs") {
+			*hits++
+			w.Header().Set("Content-Type", "application/json")
+			gt.NoError(t, json.NewEncoder(w).Encode(map[string]any{"id": jobID}))
+			return
+		}
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/queryjobs/"+jobID) {
+			*hits++
+			events := make([]map[string]any, numEvents)
+			for i := range events {
+				events[i] = map[string]any{"idx": i, "name": fmt.Sprintf("event-%d", i)}
+			}
+			resp := map[string]any{"done": true, "cancelled": false, "events": events}
+			if eventCount != nil {
+				resp["metaData"] = map[string]any{"eventCount": eventCount}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			gt.NoError(t, json.NewEncoder(w).Encode(resp))
+			return
+		}
+		t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+	})
+}
+
+func TestInternalTool_SearchEvents_SnapshotPagination(t *testing.T) {
+	var hits int
+	srv := eventsSearchServer(t, "job-page", 250, nil, &hits)
+	defer srv.Close()
+
+	store := storage.NewMemoryClient()
+	tool := falcon.NewInternalToolForTestWithStorage("id", "secret", srv.URL, store, "tenant/")
+
+	// First call: runs the query, snapshots, returns first page.
+	first, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"query_string": "#event_simpleName=ProcessRollup2 | tail(250)",
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, first["total"].(int), 250)
+	gt.Equal(t, first["returned"].(int), 100)
+	gt.Equal(t, first["has_more"].(bool), true)
+	rsID := first["result_set_id"].(string)
+	gt.Equal(t, rsID, "job-page")
+	firstEvents := first["events"].([]any)
+	gt.Equal(t, len(firstEvents), 100)
+	gt.Equal(t, firstEvents[0].(map[string]any)["idx"].(float64), float64(0))
+
+	hitsAfterFirst := hits
+
+	// Second call: paginate from the snapshot, no re-query.
+	second, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"result_set_id": rsID,
+		"offset":        100,
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, second["total"].(int), 250)
+	gt.Equal(t, second["offset"].(int), 100)
+	gt.Equal(t, second["returned"].(int), 100)
+	gt.Equal(t, second["has_more"].(bool), true)
+	secondEvents := second["events"].([]any)
+	gt.Equal(t, len(secondEvents), 100)
+	gt.Equal(t, secondEvents[0].(map[string]any)["idx"].(float64), float64(100))
+
+	// Last page.
+	third, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"result_set_id": rsID,
+		"offset":        200,
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, third["returned"].(int), 50)
+	gt.Equal(t, third["has_more"].(bool), false)
+	gt.Equal(t, third["events"].([]any)[49].(map[string]any)["idx"].(float64), float64(249))
+
+	// Pagination must not have triggered any additional Falcon API requests.
+	gt.Equal(t, hits, hitsAfterFirst)
+}
+
+func TestInternalTool_SearchEvents_LimitClamp(t *testing.T) {
+	var hits int
+	srv := eventsSearchServer(t, "job-clamp", 150, nil, &hits)
+	defer srv.Close()
+
+	store := storage.NewMemoryClient()
+	tool := falcon.NewInternalToolForTestWithStorage("id", "secret", srv.URL, store, "")
+
+	result, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"query_string": "aid=x | tail(150)",
+		"limit":        500, // exceeds max, must clamp to 100
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, result["limit"].(int), 100)
+	gt.Equal(t, result["returned"].(int), 100)
+	gt.Equal(t, result["total"].(int), 150)
+	gt.Equal(t, result["has_more"].(bool), true)
+}
+
+func TestInternalTool_SearchEvents_TotalMatchedFromMetadata(t *testing.T) {
+	var hits int
+	// API returns 200 events but reports 5000 matched via metaData.eventCount.
+	srv := eventsSearchServer(t, "job-meta", 200, float64(5000), &hits)
+	defer srv.Close()
+
+	store := storage.NewMemoryClient()
+	tool := falcon.NewInternalToolForTestWithStorage("id", "secret", srv.URL, store, "")
+
+	result, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"query_string": "aid=x",
+	})
+	gt.NoError(t, err)
+	// total reflects the pageable snapshot size; total_matched reports the
+	// true match count from the API.
+	gt.Equal(t, result["total"].(int), 200)
+	gt.Equal(t, result["total_matched"].(int), 5000)
+}
+
+func TestInternalTool_SearchEvents_ResultSetNotFound(t *testing.T) {
+	store := storage.NewMemoryClient()
+	tool := falcon.NewInternalToolForTestWithStorage("id", "secret", "http://localhost", store, "")
+
+	_, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"result_set_id": "does-not-exist",
+		"offset":        0,
+	})
+	gt.Error(t, err)
+}
+
+func TestParseLimit(t *testing.T) {
+	gt.Equal(t, falcon.ParseLimit(map[string]any{}), 100)                      // default
+	gt.Equal(t, falcon.ParseLimit(map[string]any{"limit": float64(50)}), 50)   // in range
+	gt.Equal(t, falcon.ParseLimit(map[string]any{"limit": float64(500)}), 100) // clamp
+	gt.Equal(t, falcon.ParseLimit(map[string]any{"limit": float64(0)}), 100)   // invalid -> default
+	gt.Equal(t, falcon.ParseLimit(map[string]any{"limit": "30"}), 30)          // string number
+	gt.Equal(t, falcon.ParseLimit(map[string]any{"limit": "bad"}), 100)        // unparsable -> default
+}
+
+func TestParseOffset(t *testing.T) {
+	gt.Equal(t, falcon.ParseOffset(map[string]any{}), 0)
+	gt.Equal(t, falcon.ParseOffset(map[string]any{"offset": float64(100)}), 100)
+	gt.Equal(t, falcon.ParseOffset(map[string]any{"offset": float64(-5)}), 0) // negative -> 0
+	gt.Equal(t, falcon.ParseOffset(map[string]any{"offset": "20"}), 20)
+}
+
+func TestPaginate(t *testing.T) {
+	events := []any{"a", "b", "c", "d", "e"}
+
+	page, returned, hasMore := falcon.Paginate(events, 0, 2)
+	gt.Equal(t, returned, 2)
+	gt.Equal(t, hasMore, true)
+	gt.Equal(t, page, []any{"a", "b"})
+
+	page, returned, hasMore = falcon.Paginate(events, 4, 2)
+	gt.Equal(t, returned, 1)
+	gt.Equal(t, hasMore, false)
+	gt.Equal(t, page, []any{"e"})
+
+	page, returned, hasMore = falcon.Paginate(events, 10, 2)
+	gt.Equal(t, returned, 0)
+	gt.Equal(t, hasMore, false)
+	gt.Equal(t, len(page), 0)
 }
 
 func TestInternalTool_SearchDevices(t *testing.T) {

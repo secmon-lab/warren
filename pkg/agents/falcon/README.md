@@ -124,6 +124,15 @@ The agent exposes the following read-only tools to the LLM:
 
 > **Note:** Event search uses the Next-Gen SIEM Search API, which runs queries asynchronously. The tool handles job creation and polling internally — results are returned once the search completes.
 
+#### Pagination and result limits
+
+`falcon_search_events` returns events in pages to avoid flooding the agent with large result sets:
+
+- At most **100 events** are returned per call (`limit`, max 100). The response includes `total` (number of events in the result set), `offset`, `returned`, and `has_more`.
+- A filter query returns at most **200 events by default**. To retrieve more (up to **20,000**), append `| tail(N)` to the query string. For the exact number of matching events, use an aggregation such as `| count()` rather than paging through raw events.
+- The first response includes a `result_set_id`. To fetch later pages, call the tool again with that `result_set_id` and an increased `offset` — this serves pages from a stored snapshot **without re-running the query**, so pagination is stable and cheap.
+- Snapshots are written to the configured Cloud Storage bucket (shared `--storage-bucket` / `--storage-prefix`) under `falcon/events/`. When storage is not configured, only the first page is available (no `result_set_id`). Snapshot lifetime is governed by the bucket's object lifecycle (TTL) policy.
+
 ## Troubleshooting
 
 ### Agent not appearing in available tools

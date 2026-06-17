@@ -323,7 +323,7 @@ func cmdServe() *cli.Command {
 			tagService := tag.New(repo)
 
 			// Initialize all configured agents and merge into tool sets
-			agentToolSets, err := agents.ConfigureAll(ctx)
+			agentToolSets, err := agents.ConfigureAll(ctx, storageClient, storageCfg.Prefix())
 			if err != nil {
 				return goerr.Wrap(err, "failed to configure agents")
 			}

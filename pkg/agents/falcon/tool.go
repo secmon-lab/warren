@@ -9,11 +9,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/goerr/v2"
+	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/utils/errutil"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
@@ -24,14 +27,23 @@ type internalTool struct {
 	tokenProvider *tokenProvider
 	baseURL       string
 	httpClient    *http.Client
+
+	// storage holds event search snapshots for stable pagination across
+	// separate tool calls. It is the warren-wide shared client (bucket
+	// bound). When nil, event search degrades to returning the first page
+	// directly without snapshotting. storagePrefix namespaces the objects.
+	storage       interfaces.StorageClient
+	storagePrefix string
 }
 
 // newInternalTool creates a new internalTool for Falcon API calls.
-func newInternalTool(tp *tokenProvider, baseURL string) *internalTool {
+func newInternalTool(tp *tokenProvider, baseURL string, storage interfaces.StorageClient, storagePrefix string) *internalTool {
 	return &internalTool{
 		tokenProvider: tp,
 		baseURL:       baseURL,
 		httpClient:    &http.Client{Timeout: 60 * time.Second},
+		storage:       storage,
+		storagePrefix: storagePrefix,
 	}
 }
 
@@ -176,13 +188,15 @@ func (t *internalTool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
 			},
 		},
 		{
-			Name:        "falcon_search_events",
-			Description: "Search EDR telemetry events using CrowdStrike Query Language (CQL). This uses the Next-Gen SIEM Search API to query raw event data (process executions, network connections, file writes, DNS requests, etc.). The search runs asynchronously and this tool automatically polls until results are ready.",
+			Name: "falcon_search_events",
+			Description: "Search EDR telemetry events using CrowdStrike Query Language (CQL) via the Next-Gen SIEM Search API (process executions, network connections, file writes, DNS requests, etc.). " +
+				"Results are returned in pages: at most 100 events are returned per call along with the total count. " +
+				"NOTE: a filter query returns at most 200 events by default; to retrieve more (up to 20000), append `| tail(N)` to query_string. For the exact number of matching events, use an aggregation like `| count()` instead of paging through raw events. " +
+				"To page through results, pass the returned result_set_id with an increased offset; this avoids re-running the query.",
 			Parameters: map[string]*gollem.Parameter{
 				"query_string": {
 					Type:        gollem.TypeString,
-					Description: "CQL query string (e.g., \"aid=abc123\", \"#event_simpleName=ProcessRollup2 AND FileName=cmd.exe\", \"ComputerName=workstation1 | tail(100)\")",
-					Required:    true,
+					Description: "CQL query string (e.g., \"aid=abc123\", \"#event_simpleName=ProcessRollup2 AND FileName=cmd.exe\", \"ComputerName=workstation1 | tail(1000)\"). Required for a new search; omitted when paging with result_set_id.",
 				},
 				"repository": {
 					Type:        gollem.TypeString,
@@ -195,6 +209,18 @@ func (t *internalTool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
 				"end": {
 					Type:        gollem.TypeString,
 					Description: "End time for the search (e.g., \"now\", \"2025-01-02T00:00:00Z\"). Default: \"now\"",
+				},
+				"limit": {
+					Type:        gollem.TypeNumber,
+					Description: "Maximum number of events to return in this page (default: 100, max: 100).",
+				},
+				"offset": {
+					Type:        gollem.TypeNumber,
+					Description: "Zero-based index of the first event to return for pagination (default: 0).",
+				},
+				"result_set_id": {
+					Type:        gollem.TypeString,
+					Description: "ID of a previously created result set (returned by an earlier call). When set, returns another page from the stored snapshot without re-running the query. Use together with offset/limit.",
 				},
 			},
 		},
@@ -503,14 +529,35 @@ func (t *internalTool) getCrowdScores(ctx context.Context, args map[string]any) 
 	return result, nil
 }
 
-// searchEvents runs a CQL query via the Next-Gen SIEM Search API.
-// It creates a query job and polls until the job completes, returning all events.
+const (
+	defaultEventLimit = 100
+	maxEventLimit     = 100
+	maxEventPolls     = 60
+	eventPollInterval = 2 * time.Second
+)
+
+// searchEvents runs a CQL query via the Next-Gen SIEM Search API and returns
+// events one page at a time (at most maxEventLimit per call) together with the
+// total result-set size.
+//
+// On a new search it polls the query job until completion and, when storage is
+// configured, snapshots the full result set so later pages can be served via
+// result_set_id without re-running the query. The query job poll returns the
+// cumulative result set on every poll, so only the final (done) response is
+// authoritative — earlier polls are not accumulated (doing so would duplicate
+// events).
 func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (map[string]any, error) {
-	log := logging.From(ctx)
+	limit := parseLimit(args)
+	offset := parseOffset(args)
+
+	// Pagination over an existing snapshot: serve from storage, no query run.
+	if resultSetID, ok := args["result_set_id"].(string); ok && resultSetID != "" {
+		return t.paginateEventSnapshot(ctx, resultSetID, offset, limit)
+	}
 
 	queryString, ok := args["query_string"].(string)
 	if !ok || queryString == "" {
-		return nil, goerr.New("query_string is required")
+		return nil, goerr.New("query_string is required", goerr.T(errutil.TagValidation))
 	}
 
 	repository := "search-all"
@@ -518,9 +565,49 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 		repository = repo
 	}
 
-	body := map[string]any{
-		"queryString": queryString,
+	jobID, events, metadata, done, err := t.runEventQuery(ctx, queryString, repository, args)
+	if err != nil {
+		return nil, err
 	}
+
+	// Snapshot for later pagination. Best-effort: a storage failure must not
+	// fail the search, but it does mean only the first page is reachable.
+	resultSetID := ""
+	if t.storage != nil {
+		if err := t.writeEventSnapshot(ctx, jobID, events); err != nil {
+			errutil.Handle(ctx, goerr.Wrap(err, "failed to snapshot falcon events for pagination", goerr.V("job_id", jobID)))
+			msg.Warn(ctx, "⚠️ *[Falcon]* Could not store result set for pagination; only the first page is available")
+		} else {
+			resultSetID = jobID
+		}
+	}
+
+	page, returned, hasMore := paginate(events, offset, limit)
+	result := buildEventResult(resultSetID, page, len(events), offset, limit, returned, hasMore, done)
+	result["repository"] = repository
+	if metadata != nil {
+		result["metadata"] = metadata
+	}
+	// Surface the true match count when the API reports it (it may exceed the
+	// number of events actually returned, e.g. when the query has no tail()).
+	if matched, ok := eventCountFromMetadata(metadata); ok && matched != len(events) {
+		result["total_matched"] = matched
+	}
+	if !done {
+		result["warning"] = "Search did not complete within the polling limit. Partial results returned."
+	}
+	return result, nil
+}
+
+// runEventQuery creates a Next-Gen SIEM query job and polls until completion.
+// It returns the job ID, the final (cumulative) events, the metaData object,
+// and whether the search completed within the poll limit. Intermediate polls
+// overwrite (not append) the events, since each poll returns the full result
+// set computed so far.
+func (t *internalTool) runEventQuery(ctx context.Context, queryString, repository string, args map[string]any) (jobID string, events []any, metadata any, done bool, err error) {
+	log := logging.From(ctx)
+
+	body := map[string]any{"queryString": queryString}
 	if start, ok := args["start"].(string); ok && start != "" {
 		body["start"] = start
 	} else {
@@ -532,13 +619,13 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 		body["end"] = "now"
 	}
 
-	// Step 1: Create query job
 	msg.Trace(ctx, "🔍 Searching events (query: `%s`, repo: `%s`)", queryString, repository)
 	jobPath := fmt.Sprintf("/humio/api/v1/repositories/%s/queryjobs", repository)
 	jobResp, err := t.doRequest(ctx, http.MethodPost, jobPath, body)
 	if err != nil {
 		msg.Warn(ctx, "⚠️ *[Falcon]* Failed to create event search job (query: `%s`): %v", queryString, err)
-		return nil, goerr.Wrap(err, "failed to create event search query job",
+		return "", nil, nil, false, goerr.Wrap(err, "failed to create event search query job",
+			goerr.T(errutil.TagExternal),
 			goerr.V("repository", repository),
 			goerr.V("query", queryString),
 		)
@@ -547,7 +634,8 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 	jobID, ok := jobResp["id"].(string)
 	if !ok || jobID == "" {
 		msg.Warn(ctx, "⚠️ *[Falcon]* No job ID returned from event search (query: `%s`)", queryString)
-		return nil, goerr.New("no job ID returned from query job creation",
+		return "", nil, nil, false, goerr.New("no job ID returned from query job creation",
+			goerr.T(errutil.TagExternal),
 			goerr.V("response", jobResp),
 		)
 	}
@@ -555,81 +643,220 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 	log.Debug("Event search query job created", "job_id", jobID, "repository", repository)
 	msg.Trace(ctx, "⏳ Event search job created (job_id: `%s`), polling for results...", jobID)
 
-	// Step 2: Poll for results until done
 	resultPath := fmt.Sprintf("/humio/api/v1/repositories/%s/queryjobs/%s", repository, jobID)
-	const (
-		maxPolls     = 60
-		pollInterval = 2 * time.Second
-	)
 
-	var allEvents []any
+	var lastEvents []any
+	var lastMeta any
 
-	for i := range maxPolls {
+	for i := range maxEventPolls {
 		if i > 0 {
 			select {
 			case <-ctx.Done():
-				return nil, goerr.Wrap(ctx.Err(), "context canceled while polling event search")
-			case <-time.After(pollInterval):
+				return "", nil, nil, false, goerr.Wrap(ctx.Err(), "context canceled while polling event search", goerr.T(errutil.TagTimeout))
+			case <-time.After(eventPollInterval):
 			}
 		}
 
 		pollResp, err := t.doRequest(ctx, http.MethodGet, resultPath, nil)
 		if err != nil {
 			msg.Warn(ctx, "⚠️ *[Falcon]* Failed to poll event search results (job: `%s`, attempt %d): %v", jobID, i+1, err)
-			return nil, goerr.Wrap(err, "failed to poll event search results",
+			return "", nil, nil, false, goerr.Wrap(err, "failed to poll event search results",
+				goerr.T(errutil.TagExternal),
 				goerr.V("job_id", jobID),
 				goerr.V("poll_attempt", i+1),
 			)
 		}
 
-		// Collect events from this poll
-		if events, ok := pollResp["events"].([]any); ok {
-			allEvents = append(allEvents, events...)
+		// Each poll returns the cumulative result set, so overwrite rather
+		// than append to avoid duplicating events across polls.
+		if evs, ok := pollResp["events"].([]any); ok {
+			lastEvents = evs
+		}
+		if meta, ok := pollResp["metaData"]; ok {
+			lastMeta = meta
 		}
 
-		// Check if done
-		if done, ok := pollResp["done"].(bool); ok && done {
-			log.Debug("Event search completed",
-				"job_id", jobID,
-				"total_events", len(allEvents),
-				"polls", i+1,
-			)
-			msg.Trace(ctx, "✅ Event search completed: %d events retrieved", len(allEvents))
-
-			result := map[string]any{
-				"done":       true,
-				"events":     allEvents,
-				"repository": repository,
-			}
-
-			// Include metadata if available
-			if meta, ok := pollResp["metadataResult"]; ok {
-				result["metadata"] = meta
-			}
-
-			return result, nil
+		if isDone, _ := pollResp["done"].(bool); isDone {
+			log.Debug("Event search completed", "job_id", jobID, "total_events", len(lastEvents), "polls", i+1)
+			msg.Trace(ctx, "✅ Event search completed: %d events retrieved", len(lastEvents))
+			return jobID, lastEvents, lastMeta, true, nil
 		}
 
-		log.Debug("Event search still running, polling...",
-			"job_id", jobID,
-			"poll_attempt", i+1,
-			"events_so_far", len(allEvents),
-		)
+		log.Debug("Event search still running, polling...", "job_id", jobID, "poll_attempt", i+1, "events_so_far", len(lastEvents))
 	}
 
-	// Return partial results if max polls reached
-	log.Warn("Event search reached max poll limit, returning partial results",
-		"job_id", jobID,
-		"total_events", len(allEvents),
-	)
-	msg.Trace(ctx, "⚠️ Event search reached poll limit, returning %d partial results", len(allEvents))
+	log.Warn("Event search reached max poll limit, returning partial results", "job_id", jobID, "total_events", len(lastEvents))
+	msg.Trace(ctx, "⚠️ Event search reached poll limit, returning %d partial results", len(lastEvents))
+	return jobID, lastEvents, lastMeta, false, nil
+}
 
-	return map[string]any{
-		"done":       false,
-		"events":     allEvents,
-		"repository": repository,
-		"warning":    "Search did not complete within the polling limit. Partial results returned.",
-	}, nil
+// paginateEventSnapshot serves a page of events from a previously stored
+// snapshot, reading the newline-delimited JSON without holding the whole
+// document as a single combined structure.
+func (t *internalTool) paginateEventSnapshot(ctx context.Context, resultSetID string, offset, limit int) (map[string]any, error) {
+	if t.storage == nil {
+		return nil, goerr.New("result set pagination is unavailable because storage is not configured",
+			goerr.T(errutil.TagInvalidState), goerr.V("result_set_id", resultSetID))
+	}
+
+	path := t.eventSnapshotPath(resultSetID)
+	r, err := t.storage.GetObject(ctx, path)
+	if err != nil {
+		msg.Warn(ctx, "⚠️ *[Falcon]* Result set `%s` not found; re-run the search without result_set_id", resultSetID)
+		return nil, goerr.Wrap(err, "failed to open event snapshot",
+			goerr.T(errutil.TagNotFound), goerr.V("result_set_id", resultSetID))
+	}
+	defer safe.Close(ctx, r)
+
+	events, err := decodeNDJSON(r)
+	if err != nil {
+		return nil, goerr.Wrap(err, "failed to read event snapshot",
+			goerr.T(errutil.TagInternal), goerr.V("result_set_id", resultSetID))
+	}
+
+	page, returned, hasMore := paginate(events, offset, limit)
+	msg.Trace(ctx, "📄 Returning events page from result set `%s` (offset: %d, returned: %d, total: %d)", resultSetID, offset, returned, len(events))
+	return buildEventResult(resultSetID, page, len(events), offset, limit, returned, hasMore, true), nil
+}
+
+// writeEventSnapshot streams the events to object storage as newline-delimited
+// JSON (one event per line) so later pages can be read back without re-running
+// the query. Events are encoded one line at a time rather than as one combined
+// document to avoid building a large intermediate payload.
+func (t *internalTool) writeEventSnapshot(ctx context.Context, resultSetID string, events []any) error {
+	w := t.storage.PutObject(ctx, t.eventSnapshotPath(resultSetID))
+
+	enc := json.NewEncoder(w)
+	for _, ev := range events {
+		if err := enc.Encode(ev); err != nil {
+			// Skip Close so the partial object is never committed (GCS and the
+			// in-memory client both commit on Close).
+			return goerr.Wrap(err, "failed to encode event to snapshot", goerr.T(errutil.TagInternal))
+		}
+	}
+
+	if err := w.Close(); err != nil {
+		return goerr.Wrap(err, "failed to finalize event snapshot", goerr.T(errutil.TagInternal))
+	}
+	return nil
+}
+
+// eventSnapshotPath builds the storage object key for an event result set,
+// honoring the warren-wide storage prefix.
+func (t *internalTool) eventSnapshotPath(resultSetID string) string {
+	return fmt.Sprintf("%sfalcon/events/%s.ndjson", t.storagePrefix, resultSetID)
+}
+
+// decodeNDJSON reads newline-delimited JSON events from r, decoding one value
+// at a time off the stream.
+func decodeNDJSON(r io.Reader) ([]any, error) {
+	events := []any{}
+	dec := json.NewDecoder(r)
+	for {
+		var ev any
+		if err := dec.Decode(&ev); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, goerr.Wrap(err, "failed to decode snapshot event")
+		}
+		events = append(events, ev)
+	}
+	return events, nil
+}
+
+// parseLimit returns the page size bounded to [1, maxEventLimit], defaulting to
+// defaultEventLimit for missing or invalid input.
+func parseLimit(args map[string]any) int {
+	n, ok := parseIntArg(args["limit"])
+	if !ok || n < 1 {
+		return defaultEventLimit
+	}
+	if n > maxEventLimit {
+		return maxEventLimit
+	}
+	return n
+}
+
+// parseOffset returns a non-negative pagination offset, defaulting to 0.
+func parseOffset(args map[string]any) int {
+	n, ok := parseIntArg(args["offset"])
+	if !ok || n < 0 {
+		return 0
+	}
+	return n
+}
+
+// parseIntArg interprets a tool argument as an int. gollem may deliver numbers
+// as float64 or as strings, so both are accepted.
+func parseIntArg(v any) (int, bool) {
+	switch n := v.(type) {
+	case float64:
+		return int(n), true
+	case int:
+		return n, true
+	case string:
+		trimmed := strings.TrimSpace(n)
+		if trimmed == "" {
+			return 0, false
+		}
+		i, err := strconv.Atoi(trimmed)
+		if err != nil {
+			return 0, false
+		}
+		return i, true
+	default:
+		return 0, false
+	}
+}
+
+// paginate returns events[offset:offset+limit] along with the number returned
+// and whether any events remain beyond the page.
+func paginate(events []any, offset, limit int) (page []any, returned int, hasMore bool) {
+	total := len(events)
+	if offset >= total {
+		return []any{}, 0, false
+	}
+	end := min(offset+limit, total)
+	page = events[offset:end]
+	return page, len(page), end < total
+}
+
+// eventCountFromMetadata extracts the total matched event count from the query
+// job metaData, when present.
+func eventCountFromMetadata(metadata any) (int, bool) {
+	m, ok := metadata.(map[string]any)
+	if !ok {
+		return 0, false
+	}
+	switch ec := m["eventCount"].(type) {
+	case float64:
+		return int(ec), true
+	case int:
+		return ec, true
+	default:
+		return 0, false
+	}
+}
+
+// buildEventResult assembles the common paginated event response fields.
+func buildEventResult(resultSetID string, page []any, total, offset, limit, returned int, hasMore, done bool) map[string]any {
+	if page == nil {
+		page = []any{}
+	}
+	result := map[string]any{
+		"done":     done,
+		"events":   page,
+		"total":    total,
+		"limit":    limit,
+		"offset":   offset,
+		"returned": returned,
+		"has_more": hasMore,
+	}
+	if resultSetID != "" {
+		result["result_set_id"] = resultSetID
+	}
+	return result
 }
 
 // buildQueryParams constructs URL query parameters from tool arguments.

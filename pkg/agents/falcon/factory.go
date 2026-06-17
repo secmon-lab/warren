@@ -15,6 +15,17 @@ type Factory struct {
 	clientID     string
 	clientSecret string
 	baseURL      string
+
+	storageClient interfaces.StorageClient
+	storagePrefix string
+}
+
+// SetStorage implements agents.StorageAware. It receives the warren-wide
+// shared storage client and prefix, used to snapshot large event result
+// sets for stable pagination.
+func (f *Factory) SetStorage(client interfaces.StorageClient, prefix string) {
+	f.storageClient = client
+	f.storagePrefix = prefix
 }
 
 // Flags implements agents.ToolSetFactory.
@@ -66,6 +77,6 @@ func (f *Factory) Configure(ctx context.Context) (interfaces.ToolSet, error) {
 	)
 
 	return &toolSet{
-		internal: newInternalTool(tp, baseURL),
+		internal: newInternalTool(tp, baseURL, f.storageClient, f.storagePrefix),
 	}, nil
 }
