@@ -560,6 +560,43 @@ func TestAsterChat_LatestHistorySavedOnDirectResponse(t *testing.T) {
 	gt.V(t, latest).NotNil()
 }
 
+func TestAsterChat_TicketlessSavesSessionHistory(t *testing.T) {
+	ctx := setupTestContext(t)
+	repo := repository.NewMemory()
+	mockStorage := adapter.NewMock()
+
+	mockLLM := &mock.LLMClientMock{
+		NewSessionFunc: func(ctx context.Context, opts ...gollem.SessionOption) (gollem.Session, error) {
+			ssn := newMockSession()
+			ssn.GenerateFunc = func(ctx context.Context, input []gollem.Input, opts ...gollem.GenerateOption) (*gollem.Response, error) {
+				return &gollem.Response{
+					Texts: []string{`{"message": "Direct response.", "tasks": []}`},
+				}, nil
+			}
+			return ssn, nil
+		},
+	}
+
+	chatUC := aster.New(repo, mockLLM,
+		aster.WithStorageClient(mockStorage),
+	)
+
+	// Ticketless thread with a resolved Session. Working memory must be
+	// persisted under the SessionID so the next mention continues the
+	// conversation, even without a Ticket.
+	sess := newDummySession("")
+	gt.NoError(t, chatUC.Execute(ctx, &chat.RunContext{
+		Session: sess,
+		Message: "Hello",
+		ChatCtx: &chatModel.ChatContext{Ticket: &ticket.Ticket{}, Session: sess},
+	}))
+
+	storageSvc := storage_svc.New(mockStorage)
+	saved, err := storageSvc.GetSessionHistory(ctx, sess.ID)
+	gt.NoError(t, err)
+	gt.V(t, saved).NotNil()
+}
+
 func TestAsterChat_LatestHistorySavedAfterReplan(t *testing.T) {
 	ctx := setupTestContext(t)
 	repo := repository.NewMemory()
