@@ -708,15 +708,16 @@ func (t *internalTool) paginateEventSnapshot(ctx context.Context, resultSetID st
 	}
 	defer safe.Close(ctx, r)
 
-	events, err := decodeNDJSON(r)
+	page, total, err := decodeNDJSON(r, offset, limit)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to read event snapshot",
 			goerr.T(errutil.TagInternal), goerr.V("result_set_id", resultSetID))
 	}
 
-	page, returned, hasMore := paginate(events, offset, limit)
-	msg.Trace(ctx, "📄 Returning events page from result set `%s` (offset: %d, returned: %d, total: %d)", resultSetID, offset, returned, len(events))
-	return buildEventResult(resultSetID, page, len(events), offset, limit, returned, hasMore, true), nil
+	returned := len(page)
+	hasMore := offset+returned < total
+	msg.Trace(ctx, "📄 Returning events page from result set `%s` (offset: %d, returned: %d, total: %d)", resultSetID, offset, returned, total)
+	return buildEventResult(resultSetID, page, total, offset, limit, returned, hasMore, true), nil
 }
 
 // writeEventSnapshot streams the events to object storage as newline-delimited
@@ -747,22 +748,37 @@ func (t *internalTool) eventSnapshotPath(resultSetID string) string {
 	return fmt.Sprintf("%sfalcon/events/%s.ndjson", t.storagePrefix, resultSetID)
 }
 
-// decodeNDJSON reads newline-delimited JSON events from r, decoding one value
-// at a time off the stream.
-func decodeNDJSON(r io.Reader) ([]any, error) {
-	events := []any{}
+// decodeNDJSON streams newline-delimited JSON events from r, materializing only
+// the requested page (events at index [offset, offset+limit)) and counting the
+// rest. Events outside the page are decoded as raw bytes and discarded, so peak
+// retained memory stays bounded by the page size rather than the full result
+// set (which may hold up to 20,000 events).
+func decodeNDJSON(r io.Reader, offset, limit int) (page []any, total int, err error) {
+	page = []any{}
 	dec := json.NewDecoder(r)
 	for {
-		var ev any
-		if err := dec.Decode(&ev); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
+		if total >= offset && len(page) < limit {
+			var ev any
+			if err := dec.Decode(&ev); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return nil, 0, goerr.Wrap(err, "failed to decode snapshot event")
 			}
-			return nil, goerr.Wrap(err, "failed to decode snapshot event")
+			page = append(page, ev)
+		} else {
+			// Skip events outside the page without parsing them into maps.
+			var raw json.RawMessage
+			if err := dec.Decode(&raw); err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				return nil, 0, goerr.Wrap(err, "failed to decode snapshot event")
+			}
 		}
-		events = append(events, ev)
+		total++
 	}
-	return events, nil
+	return page, total, nil
 }
 
 // parseLimit returns the page size bounded to [1, maxEventLimit], defaulting to

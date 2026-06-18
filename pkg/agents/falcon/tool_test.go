@@ -587,6 +587,17 @@ func TestInternalTool_SearchEvents_SnapshotPagination(t *testing.T) {
 	gt.Equal(t, third["has_more"].(bool), false)
 	gt.Equal(t, third["events"].([]any)[49].(map[string]any)["idx"].(float64), float64(249))
 
+	// Offset beyond the total still reports the full total with an empty page.
+	beyond, err := tool.Run(context.Background(), "falcon_search_events", map[string]any{
+		"result_set_id": rsID,
+		"offset":        1000,
+	})
+	gt.NoError(t, err)
+	gt.Equal(t, beyond["total"].(int), 250)
+	gt.Equal(t, beyond["returned"].(int), 0)
+	gt.Equal(t, beyond["has_more"].(bool), false)
+	gt.Equal(t, len(beyond["events"].([]any)), 0)
+
 	// Pagination must not have triggered any additional Falcon API requests.
 	gt.Equal(t, hits, hitsAfterFirst)
 }
