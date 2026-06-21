@@ -164,6 +164,15 @@ CQL is used with `falcon_search_events` to query raw EDR telemetry data. CQL is 
 - PowerShell executions: `FileName="powershell.exe" AND #event_simpleName=ProcessRollup2 | tail(50)`
 - Events by agent ID in last 24h: `aid=abc123` (use start="1d" parameter)
 
+### Result Limits and Pagination
+
+`falcon_search_events` caps how many events it returns so the context is not flooded:
+
+- A filter (non-aggregate) query returns at most **200 events by default**. To retrieve more (up to **20,000**), append `| tail(N)` to the query string (e.g. `... | tail(5000)`). The tool does NOT add `tail` for you.
+- When you only need the count of matching events, use an aggregation such as `| count()` instead of paging through raw events — it returns the exact total in a single call.
+- Each call returns at most **100 events** (`limit`, max 100). The response includes `total`, `offset`, `returned`, `has_more`, and a `result_set_id`.
+- To page through a larger result set, call again with the same `result_set_id` and an increased `offset`. This serves the next page from a stored snapshot without re-running the query, so paging is stable and cheap. Do not re-issue the original query just to get later pages.
+
 ## Standard Investigation Workflow
 
 ### 1. Understand the Request
