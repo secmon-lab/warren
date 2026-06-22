@@ -17,7 +17,6 @@ import (
 
 	"github.com/secmon-lab/warren/pkg/adapter/storage"
 	traceAdapter "github.com/secmon-lab/warren/pkg/adapter/trace"
-	"github.com/secmon-lab/warren/pkg/agents"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	server "github.com/secmon-lab/warren/pkg/controller/http"
 	websocket_controller "github.com/secmon-lab/warren/pkg/controller/websocket"
@@ -175,7 +174,6 @@ func cmdServe() *cli.Command {
 		storageCfg.Flags(),
 		mcpCfg.Flags(),
 		asyncCfg.Flags(),
-		agents.AllFlags(),
 		traceCfg.Flags(),
 		userSystemPromptCfg.Flags(),
 		strategyPromptsCfg.Flags(),
@@ -321,13 +319,6 @@ func cmdServe() *cli.Command {
 
 			// Create tag service
 			tagService := tag.New(repo)
-
-			// Initialize all configured agents and merge into tool sets
-			agentToolSets, err := agents.ConfigureAll(ctx)
-			if err != nil {
-				return goerr.Wrap(err, "failed to configure agents")
-			}
-			toolSets = append(toolSets, agentToolSets...)
 
 			// Configure user system prompt
 			userSystemPrompt, err := userSystemPromptCfg.Configure()

@@ -41,7 +41,7 @@ Click **[Salvage]** on a ticket to find similar unbound alerts using AI similari
 
 ### Talking to Warren
 
-Mention `@warren` in a ticket's Slack thread to start an AI-powered investigation. Warren will analyze the ticket's alerts using available tools and sub-agents.
+Mention `@warren` in a ticket's Slack thread to start an AI-powered investigation. Warren will analyze the ticket's alerts using the available tools.
 
 ```
 @warren Check if the source IPs in this ticket are malicious
@@ -142,6 +142,9 @@ Warren's AI agent has access to the following tools during investigation. Tools 
 |------|-------------|---------|
 | GitHub | Code search, issue search, file content, commit history, file blame | [README](../../pkg/tool/github/README.md) |
 | Microsoft Intune | Device compliance, sign-in history | [README](../../pkg/tool/intune/README.md) |
+| CrowdStrike Falcon | EDR incidents, alerts, behaviors, devices, CrowdScores, telemetry events | [README](../../pkg/tool/falcon/README.md) |
+| BigQuery | Query security log data with SQL and runbooks | [configuration](../reference/configuration.md#bigquery-tool) |
+| Jira | List projects, search issues via JQL, fetch issue content | [README](../../pkg/tool/jira/README.md) |
 
 ### Other Tools
 
@@ -150,16 +153,6 @@ Warren's AI agent has access to the following tools during investigation. Tools 
 | Slack Message Search | Search workspace messages | [README](../../pkg/tool/slack/README.md) |
 | Knowledge | Save/retrieve investigation knowledge | [README](../../pkg/tool/knowledge/README.md) |
 | WebFetch | Fetch a web page and return Markdown (with indirect-prompt-injection screening) | [README](../../pkg/tool/webfetch/README.md) |
-
-## Sub-Agents
-
-Sub-agents are specialized AI agents that handle complex, multi-step operations. The main agent delegates to them when needed.
-
-| Sub-Agent | Description | Details |
-|-----------|-------------|---------|
-| BigQuery Agent | Query security log data via natural language | [README](../../pkg/agents/bigquery/README.md) |
-| CrowdStrike Falcon Agent | Query EDR incidents, alerts, and events | [README](../../pkg/agents/falcon/README.md) |
-| Slack Search Agent | Search Slack messages for context | [README](../../pkg/agents/slack/README.md) |
 
 ## Chat Strategy
 

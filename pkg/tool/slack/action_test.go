@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/gt"
 	"github.com/secmon-lab/warren/pkg/tool/slack"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
@@ -93,9 +94,17 @@ func TestSlackMessageSearch_Specs(t *testing.T) {
 	action := newAction(t, server.URL)
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(1)
-	gt.Value(t, specs[0].Name).Equal("slack_message_search")
-	gt.Map(t, specs[0].Parameters).HasKey("query")
+	gt.A(t, specs).Length(2)
+
+	byName := map[string]gollem.ToolSpec{}
+	for _, s := range specs {
+		byName[s.Name] = s
+	}
+	search, ok := byName["slack_message_search"]
+	gt.True(t, ok)
+	gt.Map(t, search.Parameters).HasKey("query")
+	_, ok = byName["slack_get_messages"]
+	gt.True(t, ok)
 }
 
 func TestSlackConfigure(t *testing.T) {

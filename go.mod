@@ -15,15 +15,17 @@ require (
 	github.com/gollem-dev/gollem v0.26.0
 	github.com/gollem-dev/tools/abusech v0.1.0
 	github.com/gollem-dev/tools/bigquery v0.1.0
-	github.com/gollem-dev/tools/github v0.1.0
+	github.com/gollem-dev/tools/falcon v0.1.0
+	github.com/gollem-dev/tools/github v0.2.0
 	github.com/gollem-dev/tools/intune v0.1.0
 	github.com/gollem-dev/tools/ipdb v0.1.0
+	github.com/gollem-dev/tools/jira v0.1.0
 	github.com/gollem-dev/tools/otx v0.1.0
 	github.com/gollem-dev/tools/shodan v0.1.0
-	github.com/gollem-dev/tools/slack v0.1.0
+	github.com/gollem-dev/tools/slack v0.2.0
 	github.com/gollem-dev/tools/urlscan v0.1.0
 	github.com/gollem-dev/tools/vt v0.1.0
-	github.com/gollem-dev/tools/webfetch v0.1.0
+	github.com/gollem-dev/tools/webfetch v0.2.0
 	github.com/gollem-dev/tools/whois v0.1.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/uuid v1.6.0
@@ -210,7 +212,7 @@ require (
 	golang.org/x/mod v0.35.0 // indirect
 	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260409153401-be6f6cb8b1fa // indirect
 	golang.org/x/term v0.43.0 // indirect

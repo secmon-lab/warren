@@ -11,7 +11,6 @@ import (
 	"github.com/m-mizutani/goerr/v2"
 
 	"github.com/secmon-lab/warren/pkg/adapter/trace"
-	"github.com/secmon-lab/warren/pkg/agents"
 	"github.com/secmon-lab/warren/pkg/cli/config"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
@@ -68,7 +67,6 @@ func cmdChat() *cli.Command {
 		storageCfg.Flags(),
 		tools.Flags(),
 		mcpCfg.Flags(),
-		agents.AllFlags(),
 		traceCfg.Flags(),
 		userSystemPromptCfg.Flags(),
 	)
@@ -133,13 +131,6 @@ func cmdChat() *cli.Command {
 			if err != nil {
 				return goerr.Wrap(err, "failed to get tool sets")
 			}
-
-			// Initialize all configured agents and merge into tool sets
-			agentToolSets, err := agents.ConfigureAll(ctx)
-			if err != nil {
-				return goerr.Wrap(err, "failed to configure agents")
-			}
-			allToolSets = append(allToolSets, agentToolSets...)
 
 			// Show ticket information
 			fmt.Printf("\n🎫 Ticket Information:\n")
