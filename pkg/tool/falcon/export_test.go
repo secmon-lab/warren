@@ -1,7 +1,5 @@
 package falcon
 
-import extfalcon "github.com/gollem-dev/tools/falcon"
-
 // SetCredentials sets the client credentials directly (test-only).
 func (x *Action) SetCredentials(clientID, clientSecret string) {
 	x.clientID = clientID
@@ -10,5 +8,5 @@ func (x *Action) SetCredentials(clientID, clientSecret string) {
 
 // SetTestURL points the underlying toolset at a stub server (test-only).
 func (x *Action) SetTestURL(url string) {
-	x.opts = append(x.opts, extfalcon.WithBaseURL(url))
+	x.baseURL = url
 }

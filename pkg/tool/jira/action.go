@@ -21,7 +21,6 @@ type Action struct {
 	email    string
 	apiToken string
 
-	opts  []extjira.Option
 	inner gollem.ToolSet
 }
 
@@ -70,7 +69,7 @@ func (x *Action) Configure(_ context.Context) error {
 		return errutil.ErrActionUnavailable
 	}
 
-	ts, err := extjira.New(x.baseURL, x.email, x.apiToken, x.opts...)
+	ts, err := extjira.New(x.baseURL, x.email, x.apiToken)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure Jira tool")
 	}

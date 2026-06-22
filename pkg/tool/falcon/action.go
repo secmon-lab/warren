@@ -24,7 +24,6 @@ type Action struct {
 	clientSecret string
 	baseURL      string
 
-	opts  []extfalcon.Option
 	inner gollem.ToolSet
 }
 
@@ -65,10 +64,6 @@ func (x *Action) Flags() []cli.Flag {
 			Category:    "Tool",
 			Value:       defaultBaseURL,
 			Sources:     cli.EnvVars("WARREN_FALCON_BASE_URL"),
-			Action: func(_ context.Context, _ *cli.Command, v string) error {
-				x.opts = append(x.opts, extfalcon.WithBaseURL(v))
-				return nil
-			},
 		},
 	}
 }
@@ -78,7 +73,12 @@ func (x *Action) Configure(_ context.Context) error {
 		return errutil.ErrActionUnavailable
 	}
 
-	ts, err := extfalcon.New(x.clientID, x.clientSecret, x.opts...)
+	var opts []extfalcon.Option
+	if x.baseURL != "" {
+		opts = append(opts, extfalcon.WithBaseURL(x.baseURL))
+	}
+
+	ts, err := extfalcon.New(x.clientID, x.clientSecret, opts...)
 	if err != nil {
 		return goerr.Wrap(err, "failed to configure Falcon tool")
 	}
