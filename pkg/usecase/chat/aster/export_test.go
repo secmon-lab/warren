@@ -40,16 +40,6 @@ func NewBudgetToolMiddleware(tracker *BudgetTracker) gollem.ToolMiddleware {
 	return newBudgetToolMiddleware(tracker)
 }
 
-// NewContextAwareBudgetMiddleware exposes newContextAwareBudgetMiddleware for testing.
-func NewContextAwareBudgetMiddleware() gollem.ToolMiddleware {
-	return newContextAwareBudgetMiddleware()
-}
-
-// WithBudgetTracker exposes withBudgetTracker for testing.
-func WithBudgetTracker(ctx context.Context, tracker *BudgetTracker) context.Context {
-	return withBudgetTracker(ctx, tracker)
-}
-
 // FilterToolSets exposes filterToolSets for testing.
 func FilterToolSets(allTools []interfaces.ToolSet, allowedIDs []string) []interfaces.ToolSet {
 	return filterToolSets(allTools, allowedIDs)

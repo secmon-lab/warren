@@ -165,6 +165,42 @@ Tools are automatically enabled when their API key is configured. Missing keys a
 | `WARREN_INTUNE_CLIENT_SECRET` | `--intune-client-secret` | - | Azure AD client secret |
 | `WARREN_INTUNE_BASE_URL` | `--intune-base-url` | `https://graph.microsoft.com/v1.0` | Graph API base URL |
 
+### CrowdStrike Falcon
+
+Read-only CrowdStrike Falcon queries (incidents, alerts, behaviors, devices, CrowdScores, EDR telemetry events). Enabled when both client ID and secret are set. See [pkg/tool/falcon/README.md](../../pkg/tool/falcon/README.md).
+
+| Environment Variable | CLI Flag | Default | Description |
+|---|---|---|---|
+| `WARREN_FALCON_CLIENT_ID` | `--falcon-client-id` | - | CrowdStrike API client ID |
+| `WARREN_FALCON_CLIENT_SECRET` | `--falcon-client-secret` | - | CrowdStrike API client secret |
+| `WARREN_FALCON_BASE_URL` | `--falcon-base-url` | `https://api.crowdstrike.com` | API base URL (match your CrowdStrike cloud region) |
+
+### Jira
+
+Read-only Jira Cloud access (list projects, search issues via JQL, fetch issue content). Enabled when all three values are set. See [pkg/tool/jira/README.md](../../pkg/tool/jira/README.md).
+
+| Environment Variable | CLI Flag | Default | Description |
+|---|---|---|---|
+| `WARREN_JIRA_BASE_URL` | `--jira-base-url` | - | Jira site URL (`https://<your-domain>.atlassian.net`) |
+| `WARREN_JIRA_USER_EMAIL` | `--jira-user-email` | - | Jira account email for Basic auth |
+| `WARREN_JIRA_API_TOKEN` | `--jira-api-token` | - | Jira Cloud API token |
+
+### BigQuery Tool
+
+Query security log data with SQL, table schema introspection, and SQL runbooks. Enabled when `WARREN_BIGQUERY_PROJECT_ID` is set together with at least one `WARREN_BIGQUERY_CONFIG` file.
+
+| Environment Variable | CLI Flag | Default | Description |
+|---|---|---|---|
+| `WARREN_BIGQUERY_PROJECT_ID` | `--bigquery-project-id` | - | Google Cloud project ID |
+| `WARREN_BIGQUERY_CONFIG` | `--bigquery-config` | - | Configuration YAML file path(s) (multiple allowed) |
+| `WARREN_BIGQUERY_CREDENTIALS` | `--bigquery-credentials` | - | Path to Google Cloud credentials JSON file (optional) |
+| `WARREN_BIGQUERY_IMPERSONATE_SERVICE_ACCOUNT` | `--bigquery-impersonate-service-account` | - | Service account email for impersonation |
+| `WARREN_BIGQUERY_RUNBOOK_PATH` | `--bigquery-runbook-path` | - | SQL runbook file or directory path(s) (multiple allowed) |
+| `WARREN_BIGQUERY_STORAGE_BUCKET` | `--bigquery-storage-bucket` | - | GCS bucket for storing query results |
+| `WARREN_BIGQUERY_STORAGE_PREFIX` | `--bigquery-storage-prefix` | - | GCS object path prefix for stored results |
+| `WARREN_BIGQUERY_TIMEOUT` | `--bigquery-timeout` | `5m` | Query execution timeout |
+| `WARREN_BIGQUERY_SCAN_LIMIT` | `--bigquery-scan-limit` | `10GB` | Per-query scan size limit |
+
 ### Slack Message Search (Tool)
 
 | Environment Variable | CLI Flag | Default | Description |
@@ -238,32 +274,6 @@ LLM analysis disabled (HITL approval gates every call):
 warren chat   # no --webfetch-llm-* flags
 ```
 
-## Sub-Agent Configuration
-
-### BigQuery Agent
-
-| Environment Variable | CLI Flag | Default | Description |
-|---|---|---|---|
-| `WARREN_AGENT_BIGQUERY_CONFIG` | `--agent-bigquery-config` | - | YAML config file path (required) |
-| `WARREN_AGENT_BIGQUERY_PROJECT_ID` | `--agent-bigquery-project-id` | - | GCP project ID |
-| `WARREN_AGENT_BIGQUERY_SCAN_SIZE_LIMIT` | `--agent-bigquery-scan-size-limit` | - | Override scan limit |
-| `WARREN_AGENT_BIGQUERY_RUNBOOK_DIR` | `--agent-bigquery-runbook-dir` | - | SQL runbook paths (multiple allowed) |
-| `WARREN_AGENT_BIGQUERY_IMPERSONATE_SERVICE_ACCOUNT` | `--agent-bigquery-impersonate-service-account` | - | Service account to impersonate |
-
-### CrowdStrike Falcon Agent
-
-| Environment Variable | CLI Flag | Default | Description |
-|---|---|---|---|
-| `WARREN_AGENT_FALCON_CLIENT_ID` | `--agent-falcon-client-id` | - | CrowdStrike API client ID |
-| `WARREN_AGENT_FALCON_CLIENT_SECRET` | `--agent-falcon-client-secret` | - | CrowdStrike API client secret |
-| `WARREN_AGENT_FALCON_BASE_URL` | `--agent-falcon-base-url` | `https://api.crowdstrike.com` | API base URL |
-
-### Slack Search Agent
-
-| Environment Variable | CLI Flag | Default | Description |
-|---|---|---|---|
-| `WARREN_AGENT_SLACK_USER_TOKEN` | `--agent-slack-user-token` | - | Slack User token (`xoxp-...`) with `search:read` scope |
-
 ## Command-Specific Options
 
 ### `warren serve`
@@ -305,20 +315,33 @@ local:
     args: ["--mcp-mode"]
 ```
 
-### BigQuery Agent Configuration
+### BigQuery Tool Configuration
+
+Each `--bigquery-config` file describes one table the tool may query. Pass the flag multiple times (or set multiple `WARREN_BIGQUERY_CONFIG` entries) to register several tables. Scan limit and timeout are CLI flags (`--bigquery-scan-limit`, `--bigquery-timeout`), not config-file fields.
 
 ```yaml
-tables:
-  - project_id: my-project
-    dataset_id: security_logs
-    table_id: events
-    description: Security event logs
-
-scan_size_limit: "10GB"
-query_timeout: 5m
+dataset_id: security_logs
+table_id: events
+description: Security event logs
+columns:
+  - name: timestamp
+    description: Event timestamp
+    value_example: "2024-03-20T12:00:00Z"
+    type: TIMESTAMP
+  - name: src_ip
+    description: Source IP address
+    value_example: "192.168.1.1"
+    type: STRING
+partitioning:
+  field: timestamp
+  type: time
+  time_unit: daily
+# Optional: SQL runbooks (also settable via --bigquery-runbook-path)
+runbook_paths:
+  - ./runbooks/failed_logins.sql
 ```
 
-See [BigQuery Agent README](../../pkg/agents/bigquery/README.md) for detailed configuration.
+See the [BigQuery Tool](#bigquery-tool) settings above for the full flag/environment-variable list.
 
 ## Asynchronous Alert Processing
 

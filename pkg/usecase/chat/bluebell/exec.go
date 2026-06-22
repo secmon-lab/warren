@@ -166,7 +166,6 @@ func (c *BluebellChat) executeTask(ctx context.Context, task TaskPlan, chatCtx *
 	var tracker *BudgetTracker
 	if c.budgetStrategy != nil {
 		tracker = newBudgetTracker(c.budgetStrategy)
-		taskCtx = withBudgetTracker(taskCtx, tracker)
 	}
 
 	// Build agent options

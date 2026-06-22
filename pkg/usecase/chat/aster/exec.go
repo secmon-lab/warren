@@ -169,7 +169,6 @@ func (c *AsterChat) executeTask(ctx context.Context, task TaskPlan, chatCtx *cha
 	var tracker *BudgetTracker
 	if c.budgetStrategy != nil {
 		tracker = newBudgetTracker(c.budgetStrategy)
-		taskCtx = withBudgetTracker(taskCtx, tracker)
 	}
 
 	// Build agent options

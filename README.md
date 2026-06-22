@@ -33,20 +33,21 @@ This is not a generic AI agent with security tools bolted on. Warren is purpose-
 
 ## How It Works
 
-### Slack-Based Multi-Agent Investigation
+### Slack-Based AI Investigation
 
-Warren operates as a **Slack-native multi-agent system**. When an alert arrives, it is posted to a Slack channel with AI-generated analysis. Team members interact with Warren directly in Slack threads — `@warren` triggers an investigation agent that can delegate work to specialized sub-agents in parallel:
+Warren operates as a **Slack-native investigation system**. When an alert arrives, it is posted to a Slack channel with AI-generated analysis. Team members interact with Warren directly in Slack threads — `@warren` triggers an investigation agent that can call specialized tools as it works:
 
 ```
 User asks @warren in Slack thread
-  └─ Orchestrator Agent
-       ├─ BigQuery Agent  → query audit logs, access patterns
-       ├─ Falcon Agent    → pull EDR endpoint data from CrowdStrike
-       ├─ Slack Agent     → search related conversations
-       └─ Direct tools    → VirusTotal, OTX, Shodan, AbuseIPDB, URLScan
+  └─ Investigation Agent
+       ├─ BigQuery   → query audit logs, access patterns
+       ├─ Falcon     → pull EDR endpoint data from CrowdStrike
+       ├─ Slack      → search related conversations
+       ├─ Jira       → correlate with tracked tickets
+       └─ Threat intel → VirusTotal, OTX, Shodan, AbuseIPDB, URLScan
 ```
 
-Each sub-agent autonomously decides what queries to run and how to interpret results. Real-time progress traces in the Slack thread show what the agent is doing as it works.
+The agent autonomously decides which tools to call and how to interpret results. Real-time progress traces in the Slack thread show what the agent is doing as it works.
 
 <p align="center">
   <img src="./doc/images/slack.png" width="600" alt="Slack integration with interactive investigation" />
@@ -126,14 +127,11 @@ Visit http://127.0.0.1:8080 to access the dashboard.
 
 - [**GitHub App**](./pkg/tool/github/README.md) — code search, issue search, file content retrieval, commit history, file blame
 - [**Microsoft Intune**](./pkg/tool/intune/README.md) — device compliance status, sign-in history
+- [**CrowdStrike Falcon**](./pkg/tool/falcon/README.md) — EDR incidents, alerts, behaviors, devices, CrowdScores, and telemetry events
 - [**Slack Message Search**](./pkg/tool/slack/README.md) — search workspace messages for context
+- [**Jira**](./pkg/tool/jira/README.md) — list projects, search issues via JQL, fetch issue content
+- [**BigQuery**](./doc/reference/configuration.md#bigquery-tool) — query security log data with SQL and runbooks
 - [**WebFetch**](./pkg/tool/webfetch/README.md) — fetch a web page and return clean Markdown with indirect-prompt-injection screening
-
-### Sub-Agents
-
-- [**BigQuery Agent**](./pkg/agents/bigquery/README.md) — query security log data via natural language
-- [**CrowdStrike Falcon Agent**](./pkg/agents/falcon/README.md) — query EDR incidents, alerts, and endpoint events
-- [**Slack Search Agent**](./pkg/agents/slack/README.md) — search and summarize Slack conversations
 
 ### Collaboration & UI
 

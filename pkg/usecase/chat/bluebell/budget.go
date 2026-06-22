@@ -189,22 +189,6 @@ func (t *BudgetTracker) GenerateHandoverInfo() string {
 	return b.String()
 }
 
-// budgetTrackerCtxKeyType is a context key type for budget tracker.
-type budgetTrackerCtxKeyType struct{}
-
-// withBudgetTracker stores a BudgetTracker in the context.
-func withBudgetTracker(ctx context.Context, tracker *BudgetTracker) context.Context {
-	return context.WithValue(ctx, budgetTrackerCtxKeyType{}, tracker)
-}
-
-// subAgentToolNames contains tool names for sub-agent invocations.
-// These have zero cost because their internal tool calls are tracked individually.
-var subAgentToolNames = map[string]bool{
-	"query_bigquery": true,
-	"query_falcon":   true,
-	"query_slack":    true,
-}
-
 // DefaultBudgetStrategy implements BudgetStrategy with sensible defaults.
 // Target: ~16 tool calls or ~3.5 minutes per task.
 type DefaultBudgetStrategy struct{}
@@ -223,12 +207,10 @@ func (s *DefaultBudgetStrategy) InitialBudget() float64 {
 // Cost = tool fixed cost + time cost delta.
 func (s *DefaultBudgetStrategy) BeforeToolCall(ctx ToolCallContext) float64 {
 	var toolCost float64
-	switch {
-	case subAgentToolNames[ctx.ToolName]:
-		toolCost = 0
-	case ctx.ToolName == "bigquery_query":
+	switch ctx.ToolName {
+	case "bigquery_query":
 		toolCost = 15.0
-	case ctx.ToolName == "bigquery_list_datasets" || ctx.ToolName == "bigquery_get_table_schema":
+	case "bigquery_list_datasets", "bigquery_get_table_schema":
 		toolCost = 3.0
 	default:
 		toolCost = 6.25

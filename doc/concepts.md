@@ -225,14 +225,3 @@ Slack command:
 Limitations:
 - Unbound alert processing is capped at 100 alerts per run
 - Each consolidation group contains 2-10 alerts
-
-### Agent Memory
-
-Warren's AI agents can learn from previous investigations through agent memory:
-
-- **Quality Scoring**: Memories rated from -10 (harmful) to +10 (helpful)
-- **Adaptive Search**: Re-ranks memories by similarity (50%) + quality (30%) + recency (20%)
-- **LLM Feedback**: Automatically evaluates memory usefulness after each agent execution
-- **Conservative Pruning**: Strict deletion criteria to preserve valuable memories
-
-Agent memory is enabled automatically for sub-agents (BigQuery, Falcon, Slack). Memories are scoped per agent and accumulate over time.
