@@ -12,19 +12,19 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/getsentry/sentry-go v0.44.1
 	github.com/go-chi/chi/v5 v5.2.5
-	github.com/gollem-dev/gollem v0.26.0
-	github.com/gollem-dev/tools/abusech v0.1.0
-	github.com/gollem-dev/tools/bigquery v0.1.0
-	github.com/gollem-dev/tools/github v0.1.0
-	github.com/gollem-dev/tools/intune v0.1.0
-	github.com/gollem-dev/tools/ipdb v0.1.0
-	github.com/gollem-dev/tools/otx v0.1.0
-	github.com/gollem-dev/tools/shodan v0.1.0
-	github.com/gollem-dev/tools/slack v0.1.0
-	github.com/gollem-dev/tools/urlscan v0.1.0
-	github.com/gollem-dev/tools/vt v0.1.0
-	github.com/gollem-dev/tools/webfetch v0.1.0
-	github.com/gollem-dev/tools/whois v0.1.0
+	github.com/gollem-dev/gollem v0.26.2-0.20260630002044-aed22083a5b0
+	github.com/gollem-dev/tools/abusech v0.2.0
+	github.com/gollem-dev/tools/bigquery v0.2.0
+	github.com/gollem-dev/tools/github v0.3.0
+	github.com/gollem-dev/tools/intune v0.2.0
+	github.com/gollem-dev/tools/ipdb v0.2.0
+	github.com/gollem-dev/tools/otx v0.2.0
+	github.com/gollem-dev/tools/shodan v0.2.0
+	github.com/gollem-dev/tools/slack v0.3.0
+	github.com/gollem-dev/tools/urlscan v0.2.0
+	github.com/gollem-dev/tools/vt v0.2.0
+	github.com/gollem-dev/tools/webfetch v0.3.0
+	github.com/gollem-dev/tools/whois v0.2.0
 	github.com/google/go-github/v74 v74.0.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
@@ -205,13 +205,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.51.0 // indirect
+	golang.org/x/crypto v0.52.0 // indirect
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.35.0 // indirect
-	golang.org/x/net v0.54.0 // indirect
+	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.44.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260409153401-be6f6cb8b1fa // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect

@@ -19,25 +19,14 @@ import (
 // ticket-scoped through the Repository method, we expose it as another
 // function on the ticket-scoped warren tool rather than a separate
 // package.
-func (x *Warren) searchSessionMessages(ctx context.Context, args map[string]any) (map[string]any, error) {
-	query, err := getArg[string](args, "query")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get query",
-			goerr.TV(errutil.ParameterKey, "query"),
-			goerr.T(errutil.TagValidation))
-	}
+func (x *Warren) searchSessionMessages(ctx context.Context, in searchSessionMessagesInput) (map[string]any, error) {
+	query := in.Query
 	if query == "" {
 		return nil, goerr.New("query is required",
 			goerr.TV(errutil.ParameterKey, "query"),
 			goerr.T(errutil.TagValidation))
 	}
-	limitVal, err := getArg[int64](args, "limit")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit",
-			goerr.TV(errutil.ParameterKey, "limit"),
-			goerr.T(errutil.TagValidation))
-	}
-	limit := int(limitVal)
+	limit := int(in.Limit)
 	if limit <= 0 {
 		limit = DefaultCommentsLimit
 	}

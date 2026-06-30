@@ -8,21 +8,13 @@ import (
 func NewToolSetForTest(config *Config, projectID string, impersonateServiceAccount string) *toolSet {
 	return &toolSet{
 		config: config,
-		tool: &internalTool{
-			config:                    config,
-			projectID:                 projectID,
-			impersonateServiceAccount: impersonateServiceAccount,
-		},
+		tool:   newInternalTool(config, projectID, impersonateServiceAccount),
 	}
 }
 
 // ExportNewInternalTool creates a new internalTool instance for testing
 func ExportNewInternalTool(config *Config, projectID string, impersonateServiceAccount string) gollem.ToolSet {
-	return &internalTool{
-		config:                    config,
-		projectID:                 projectID,
-		impersonateServiceAccount: impersonateServiceAccount,
-	}
+	return newInternalTool(config, projectID, impersonateServiceAccount)
 }
 
 // ToolSpec is exported for testing

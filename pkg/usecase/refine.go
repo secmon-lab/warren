@@ -20,6 +20,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/clock"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/toolset"
 	slackSDK "github.com/slack-go/slack"
 )
 
@@ -224,62 +225,47 @@ func (uc *UseCases) reviewSingleTicket(ctx context.Context, t *ticket.Ticket) er
 	return nil
 }
 
-// slackPostMessageTool implements gollem.ToolSet for posting messages to a ticket's Slack thread.
-type slackPostMessageTool struct {
-	uc     *UseCases
-	ticket *ticket.Ticket
+// slackPostMessageInput is the typed argument for the slack_post_message tool.
+// The schema (name, description, required) is inferred from these struct tags by
+// gollem.NewTool, replacing the hand-written gollem.ToolSpec literal.
+type slackPostMessageInput struct {
+	Message string `json:"message" required:"true" description:"The message to post in the ticket's Slack thread. Supports Slack mrkdwn format. Use <@USER_ID> for mentions."`
 }
 
-func newSlackPostMessageTool(uc *UseCases, t *ticket.Ticket) *slackPostMessageTool {
-	return &slackPostMessageTool{uc: uc, ticket: t}
-}
+// newSlackPostMessageTool builds a gollem.ToolSet exposing slack_post_message,
+// which posts a follow-up message to the ticket's Slack thread during the refine
+// agent loop.
+func newSlackPostMessageTool(uc *UseCases, t *ticket.Ticket) gollem.ToolSet {
+	return toolset.New(
+		gollem.MustNewTool(
+			"slack_post_message",
+			"Post a message to the ticket's Slack thread. Use Slack mrkdwn format. For mentions, use <@USER_ID> format.",
+			func(ctx context.Context, in slackPostMessageInput) (map[string]any, error) {
+				if in.Message == "" {
+					return map[string]any{"error": "message parameter is required and must be a non-empty string"}, nil
+				}
 
-// Specs implements gollem.ToolSet.
-func (t *slackPostMessageTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        "slack_post_message",
-			Description: "Post a message to the ticket's Slack thread. Use Slack mrkdwn format. For mentions, use <@USER_ID> format.",
-			Parameters: map[string]*gollem.Parameter{
-				"message": {
-					Type:        gollem.TypeString,
-					Description: "The message to post in the ticket's Slack thread. Supports Slack mrkdwn format. Use <@USER_ID> for mentions.",
-					Required:    true,
-				},
+				logger := logging.From(ctx)
+
+				if uc.slackService != nil && t.SlackThread != nil {
+					threadSvc := uc.slackService.NewThread(*t.SlackThread)
+					if err := threadSvc.PostComment(ctx, in.Message); err != nil {
+						logger.Error("failed to post refine message to ticket thread",
+							"ticket_id", t.ID, "error", err)
+						return map[string]any{"error": fmt.Sprintf("failed to post message: %v", err)}, nil
+					}
+					return map[string]any{"status": "posted"}, nil
+				}
+
+				// CLI mode fallback
+				logger.Info("refine follow-up",
+					"ticket_id", t.ID,
+					"message", in.Message,
+				)
+				return map[string]any{"status": "logged (CLI mode)"}, nil
 			},
-		},
-	}, nil
-}
-
-// Run implements gollem.ToolSet.
-func (t *slackPostMessageTool) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	if name != "slack_post_message" {
-		return nil, goerr.New("unknown tool", goerr.V("name", name))
-	}
-
-	message, ok := args["message"].(string)
-	if !ok || message == "" {
-		return map[string]any{"error": "message parameter is required and must be a non-empty string"}, nil
-	}
-
-	logger := logging.From(ctx)
-
-	if t.uc.slackService != nil && t.ticket.SlackThread != nil {
-		threadSvc := t.uc.slackService.NewThread(*t.ticket.SlackThread)
-		if err := threadSvc.PostComment(ctx, message); err != nil {
-			logger.Error("failed to post refine message to ticket thread",
-				"ticket_id", t.ticket.ID, "error", err)
-			return map[string]any{"error": fmt.Sprintf("failed to post message: %v", err)}, nil
-		}
-		return map[string]any{"status": "posted"}, nil
-	}
-
-	// CLI mode fallback
-	logger.Info("refine follow-up",
-		"ticket_id", t.ticket.ID,
-		"message", message,
+		),
 	)
-	return map[string]any{"status": "logged (CLI mode)"}, nil
 }
 
 // consolidateUnboundAlerts finds unbound alerts that can be grouped and proposes consolidation.

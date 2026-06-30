@@ -3,13 +3,12 @@ package base
 import (
 	"context"
 	"log/slog"
-	"reflect"
 
 	"github.com/gollem-dev/gollem"
-	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
 	"github.com/secmon-lab/warren/pkg/domain/model/ticket"
 	"github.com/secmon-lab/warren/pkg/domain/types"
+	"github.com/secmon-lab/warren/pkg/utils/toolset"
 	"github.com/urfave/cli/v3"
 )
 
@@ -21,39 +20,14 @@ type Warren struct {
 	ticketID    types.TicketID
 	slackUpdate SlackUpdateFunc
 	llmClient   gollem.LLMClient
+
+	tools gollem.ToolSet
 }
 
 var _ interfaces.Tool = &Warren{}
 
 func (x *Warren) Helper() *cli.Command {
 	return nil
-}
-
-func getArg[T any](args map[string]any, key string) (T, error) {
-	var null T
-	val, ok := args[key]
-	if !ok {
-		return null, nil
-	}
-
-	// Handle special case for numeric types from JSON (which come as float64)
-	if reflect.TypeOf(null).Kind() == reflect.Int64 {
-		if floatVal, ok := val.(float64); ok {
-			result := int64(floatVal)
-			return any(result).(T), nil
-		}
-	}
-
-	typedVal, ok := val.(T)
-	if !ok {
-		return null, goerr.New("invalid parameter type",
-			goerr.V("key", key),
-			goerr.V("expected_type", reflect.TypeOf(null).String()),
-			goerr.V("actual_type", reflect.TypeOf(val).String()),
-			goerr.V("value", val))
-	}
-
-	return typedVal, nil
 }
 
 func New(repo interfaces.Repository, ticketID types.TicketID, opts ...func(*Warren)) *Warren {
@@ -65,6 +39,18 @@ func New(repo interfaces.Repository, ticketID types.TicketID, opts ...func(*Warr
 	for _, opt := range opts {
 		opt(w)
 	}
+
+	// Build the type-safe tool set once the dependencies from opts are wired in.
+	// Each tool's schema is inferred from its typed input struct, replacing the
+	// hand-written ToolSpec literals and the getArg map[string]any extraction.
+	w.tools = toolset.New(
+		gollem.MustNewTool(cmdGetAlerts, descGetAlerts, w.getAlerts),
+		gollem.MustNewTool(cmdFindNearestTicket, descFindNearestTicket, w.findNearestTicket),
+		gollem.MustNewTool(cmdSearchTicketsByWords, descSearchTicketsByWords, w.searchTicketsByWords),
+		gollem.MustNewTool(cmdUpdateFinding, descUpdateFinding, w.updateFinding),
+		gollem.MustNewTool(cmdGetTicketSessionMessages, descGetTicketSessionMessages, w.getTicketSessionMessages),
+		gollem.MustNewTool(cmdSearchSessionMessages, descSearchSessionMessages, w.searchSessionMessages),
+	)
 
 	return w
 }
@@ -131,136 +117,58 @@ func IgnorableTool(name string) bool {
 	}
 }
 
+// Tool descriptions. Kept as constants so the typed-tool registration in New
+// stays readable and the wire-level descriptions remain unchanged.
+const (
+	descGetAlerts                = "Get a set of alerts that is bound to the ticket with pagination support"
+	descFindNearestTicket        = "Search the previous tickets that are similar to the current ticket"
+	descSearchTicketsByWords     = "Search tickets using natural language query or keywords. Uses semantic similarity to find relevant tickets."
+	descUpdateFinding            = "Update the finding information of the current ticket with analysis results"
+	descGetTicketSessionMessages = "Get chat messages (user inputs, AI responses, traces, plans, warnings) from every Session attached to the current ticket. Supersedes warren_get_ticket_comments by returning both human-authored messages and AI-produced outputs across Slack/Web/CLI channels in a unified shape."
+	descSearchSessionMessages    = "Full-text search across every Session.Message attached to the current ticket. Returns the top matching messages (case-insensitive substring match). Use this when you need to look up prior discussion or investigation traces by keyword rather than by source/type."
+)
+
+// Typed inputs for each tool. The schema (field names, types, required,
+// descriptions) is inferred from these struct tags by gollem.NewTool.
+type getAlertsInput struct {
+	Limit  int64 `json:"limit" description:"Maximum number of alerts to return"`
+	Offset int64 `json:"offset" description:"Number of alerts to skip"`
+}
+
+type findNearestTicketInput struct {
+	Limit    int64 `json:"limit" description:"Maximum number of tickets to return"`
+	Duration int64 `json:"duration" description:"Duration of the ticket in days"`
+}
+
+type searchTicketsByWordsInput struct {
+	Query    string `json:"query" required:"true" description:"Search query using natural language or keywords to find similar tickets"`
+	Limit    int64  `json:"limit" description:"Maximum number of tickets to return (default: 10)"`
+	Duration int64  `json:"duration" description:"Duration to search back in days (default: 30)"`
+}
+
+type updateFindingInput struct {
+	Summary        string `json:"summary" required:"true" description:"Summary of the investigation results analyzed by the agent"`
+	Severity       string `json:"severity" required:"true" description:"Severity level of the finding. Must be one of: 'low', 'medium', 'high', 'critical'"`
+	Reason         string `json:"reason" required:"true" description:"Detailed reasoning and justification for the severity assessment"`
+	Recommendation string `json:"recommendation" required:"true" description:"Recommended actions based on the analysis results"`
+}
+
+type getTicketSessionMessagesInput struct {
+	Source string `json:"source" description:"Optional filter by Session source: 'slack', 'web', or 'cli'. Omit to include all sources."`
+	Type   string `json:"type" description:"Optional filter by Message type: 'user', 'trace', 'plan', 'response', or 'warning'. Omit to include all types."`
+	Limit  int64  `json:"limit" description:"Maximum number of messages to return (default: 50)"`
+	Offset int64  `json:"offset" description:"Number of messages to skip for pagination (default: 0)"`
+}
+
+type searchSessionMessagesInput struct {
+	Query string `json:"query" required:"true" description:"Case-insensitive substring to search for across message content."`
+	Limit int64  `json:"limit" description:"Maximum number of messages to return (default: 50)"`
+}
+
 func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        cmdGetAlerts,
-			Description: "Get a set of alerts that is bound to the ticket with pagination support",
-			Parameters: map[string]*gollem.Parameter{
-				"limit": {
-					Type:        gollem.TypeInteger,
-					Description: "Maximum number of alerts to return",
-				},
-				"offset": {
-					Type:        gollem.TypeInteger,
-					Description: "Number of alerts to skip",
-				},
-			},
-		},
-		{
-			Name:        cmdFindNearestTicket,
-			Description: "Search the previous tickets that are similar to the current ticket",
-			Parameters: map[string]*gollem.Parameter{
-				"limit": {
-					Type:        gollem.TypeInteger,
-					Description: "Maximum number of tickets to return",
-				},
-				"duration": {
-					Type:        gollem.TypeInteger,
-					Description: "Duration of the ticket in days",
-				},
-			},
-		},
-		{
-			Name:        cmdSearchTicketsByWords,
-			Description: "Search tickets using natural language query or keywords. Uses semantic similarity to find relevant tickets.",
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "Search query using natural language or keywords to find similar tickets",
-					Required:    true,
-				},
-				"limit": {
-					Type:        gollem.TypeInteger,
-					Description: "Maximum number of tickets to return (default: 10)",
-				},
-				"duration": {
-					Type:        gollem.TypeInteger,
-					Description: "Duration to search back in days (default: 30)",
-				},
-			},
-		},
-		{
-			Name:        cmdUpdateFinding,
-			Description: "Update the finding information of the current ticket with analysis results",
-			Parameters: map[string]*gollem.Parameter{
-				"summary": {
-					Type:        gollem.TypeString,
-					Description: "Summary of the investigation results analyzed by the agent",
-					Required:    true,
-				},
-				"severity": {
-					Type:        gollem.TypeString,
-					Description: "Severity level of the finding. Must be one of: 'low', 'medium', 'high', 'critical'",
-					Required:    true,
-				},
-				"reason": {
-					Type:        gollem.TypeString,
-					Description: "Detailed reasoning and justification for the severity assessment",
-					Required:    true,
-				},
-				"recommendation": {
-					Type:        gollem.TypeString,
-					Description: "Recommended actions based on the analysis results",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        cmdGetTicketSessionMessages,
-			Description: "Get chat messages (user inputs, AI responses, traces, plans, warnings) from every Session attached to the current ticket. Supersedes warren_get_ticket_comments by returning both human-authored messages and AI-produced outputs across Slack/Web/CLI channels in a unified shape.",
-			Parameters: map[string]*gollem.Parameter{
-				"source": {
-					Type:        gollem.TypeString,
-					Description: "Optional filter by Session source: 'slack', 'web', or 'cli'. Omit to include all sources.",
-				},
-				"type": {
-					Type:        gollem.TypeString,
-					Description: "Optional filter by Message type: 'user', 'trace', 'plan', 'response', or 'warning'. Omit to include all types.",
-				},
-				"limit": {
-					Type:        gollem.TypeInteger,
-					Description: "Maximum number of messages to return (default: 50)",
-				},
-				"offset": {
-					Type:        gollem.TypeInteger,
-					Description: "Number of messages to skip for pagination (default: 0)",
-				},
-			},
-		},
-		{
-			Name:        cmdSearchSessionMessages,
-			Description: "Full-text search across every Session.Message attached to the current ticket. Returns the top matching messages (case-insensitive substring match). Use this when you need to look up prior discussion or investigation traces by keyword rather than by source/type.",
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "Case-insensitive substring to search for across message content.",
-					Required:    true,
-				},
-				"limit": {
-					Type:        gollem.TypeInteger,
-					Description: "Maximum number of messages to return (default: 50)",
-				},
-			},
-		},
-	}, nil
+	return x.tools.Specs(ctx)
 }
 
 func (x *Warren) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	switch name {
-	case cmdGetAlerts:
-		return x.getAlerts(ctx, args)
-	case cmdFindNearestTicket:
-		return x.findNearestTicket(ctx, args)
-	case cmdSearchTicketsByWords:
-		return x.searchTicketsByWords(ctx, args)
-	case cmdUpdateFinding:
-		return x.updateFinding(ctx, args)
-	case cmdGetTicketSessionMessages:
-		return x.getTicketSessionMessages(ctx, args)
-	case cmdSearchSessionMessages:
-		return x.searchSessionMessages(ctx, args)
-	default:
-		return nil, goerr.New("invalid function name", goerr.V("name", name))
-	}
+	return x.tools.Run(ctx, name, args)
 }

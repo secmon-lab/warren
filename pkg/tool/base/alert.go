@@ -9,20 +9,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
-func (x *Warren) getAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
-	limit, err := getArg[int64](args, "limit")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit",
-			goerr.TV(errutil.ParameterKey, "limit"),
-			goerr.T(errutil.TagValidation))
-	}
-
-	offset, err := getArg[int64](args, "offset")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get offset",
-			goerr.TV(errutil.ParameterKey, "offset"),
-			goerr.T(errutil.TagValidation))
-	}
+func (x *Warren) getAlerts(ctx context.Context, in getAlertsInput) (map[string]any, error) {
+	limit := in.Limit
+	offset := in.Offset
 
 	// Get current ticket
 	currentTicket, err := x.repo.GetTicket(ctx, x.ticketID)

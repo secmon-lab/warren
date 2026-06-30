@@ -17,6 +17,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
 	"github.com/secmon-lab/warren/pkg/utils/safe"
+	"github.com/secmon-lab/warren/pkg/utils/toolset"
 )
 
 // internalTool implements gollem.ToolSet for CrowdStrike Falcon API operations.
@@ -24,208 +25,116 @@ type internalTool struct {
 	tokenProvider *tokenProvider
 	baseURL       string
 	httpClient    *http.Client
+
+	tools gollem.ToolSet
 }
 
 // newInternalTool creates a new internalTool for Falcon API calls.
 func newInternalTool(tp *tokenProvider, baseURL string) *internalTool {
-	return &internalTool{
+	t := &internalTool{
 		tokenProvider: tp,
 		baseURL:       baseURL,
 		httpClient:    &http.Client{Timeout: 60 * time.Second},
 	}
+
+	// Build the type-safe tool set. Each tool's schema is inferred from its
+	// typed input struct, replacing the hand-written ToolSpec literals and the
+	// args[...] map extraction.
+	t.tools = toolset.New(
+		gollem.MustNewTool("falcon_search_incidents", descSearchIncidents, t.searchIncidents),
+		gollem.MustNewTool("falcon_get_incidents", descGetIncidents, t.getIncidents),
+		gollem.MustNewTool("falcon_search_alerts", descSearchAlerts, t.searchAlerts),
+		gollem.MustNewTool("falcon_get_alerts", descGetAlerts, t.getAlerts),
+		gollem.MustNewTool("falcon_search_behaviors", descSearchBehaviors, t.searchBehaviors),
+		gollem.MustNewTool("falcon_get_behaviors", descGetBehaviors, t.getBehaviors),
+		gollem.MustNewTool("falcon_get_crowdscores", descGetCrowdScores, t.getCrowdScores),
+		gollem.MustNewTool("falcon_search_devices", descSearchDevices, t.searchDevices),
+		gollem.MustNewTool("falcon_get_devices", descGetDevices, t.getDevices),
+		gollem.MustNewTool("falcon_search_events", descSearchEvents, t.searchEvents),
+	)
+
+	return t
 }
 
-func (t *internalTool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        "falcon_search_incidents",
-			Description: "Search for incident IDs using FQL (Falcon Query Language) filters. Returns a list of incident IDs that can be used with falcon_get_incidents to retrieve full details.",
-			Parameters: map[string]*gollem.Parameter{
-				"filter": {
-					Type:        gollem.TypeString,
-					Description: "FQL filter expression (e.g., \"status:'30'\", \"tags:'critical'\", \"start:>'2025-01-01'\")",
-				},
-				"sort": {
-					Type:        gollem.TypeString,
-					Description: "Sort expression (e.g., \"start.desc\", \"end.asc\")",
-				},
-				"limit": {
-					Type:        gollem.TypeNumber,
-					Description: "Maximum number of IDs to return (default: 100, max: 500)",
-				},
-				"offset": {
-					Type:        gollem.TypeNumber,
-					Description: "Pagination offset",
-				},
-			},
-		},
-		{
-			Name:        "falcon_get_incidents",
-			Description: "Get detailed information for specific incidents by their IDs. Returns full incident details including status, tactics, techniques, hosts, and users involved.",
-			Parameters: map[string]*gollem.Parameter{
-				"ids": {
-					Type:        gollem.TypeString,
-					Description: "Comma-separated incident IDs (e.g., \"inc:abc123:def456,inc:abc123:ghi789\")",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "falcon_search_alerts",
-			Description: "Search and retrieve alert details in one call using FQL filters with cursor-based pagination. Returns full alert objects including severity, tactic, technique, and device info.",
-			Parameters: map[string]*gollem.Parameter{
-				"filter": {
-					Type:        gollem.TypeString,
-					Description: "FQL filter expression (e.g., \"status:'new'\", \"severity:>50\", \"tactics:'Lateral Movement'\")",
-				},
-				"sort": {
-					Type:        gollem.TypeString,
-					Description: "Sort property (e.g., \"timestamp|desc\", \"severity|asc\")",
-				},
-				"limit": {
-					Type:        gollem.TypeNumber,
-					Description: "Maximum number of alerts to return (default: 100, max: 1000)",
-				},
-				"after": {
-					Type:        gollem.TypeString,
-					Description: "Cursor pagination token from a previous response for fetching next page",
-				},
-			},
-		},
-		{
-			Name:        "falcon_get_alerts",
-			Description: "Get detailed alert information by composite IDs. Use this when you already have specific alert IDs.",
-			Parameters: map[string]*gollem.Parameter{
-				"composite_ids": {
-					Type:        gollem.TypeString,
-					Description: "Comma-separated composite alert IDs",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "falcon_search_behaviors",
-			Description: "Search for behavior IDs using FQL filters. Returns behavior IDs that can be used with falcon_get_behaviors for full details.",
-			Parameters: map[string]*gollem.Parameter{
-				"filter": {
-					Type:        gollem.TypeString,
-					Description: "FQL filter expression",
-				},
-				"limit": {
-					Type:        gollem.TypeNumber,
-					Description: "Maximum number of IDs to return (default: 100, max: 500)",
-				},
-				"offset": {
-					Type:        gollem.TypeNumber,
-					Description: "Pagination offset",
-				},
-			},
-		},
-		{
-			Name:        "falcon_get_behaviors",
-			Description: "Get detailed behavior information by IDs. Returns behavior details including tactic, technique, severity, pattern, and associated device info.",
-			Parameters: map[string]*gollem.Parameter{
-				"ids": {
-					Type:        gollem.TypeString,
-					Description: "Comma-separated behavior IDs",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "falcon_get_crowdscores",
-			Description: "Get CrowdScore values for the environment. CrowdScore is an overall threat level indicator.",
-			Parameters: map[string]*gollem.Parameter{
-				"filter": {
-					Type:        gollem.TypeString,
-					Description: "FQL filter expression (e.g., \"timestamp:>'2025-01-01'\")",
-				},
-			},
-		},
-		{
-			Name:        "falcon_search_devices",
-			Description: "Search for device (host) IDs using FQL filters. Returns a list of device IDs that can be used with falcon_get_devices to retrieve full host details including OS, IP addresses, sensor version, and containment status.",
-			Parameters: map[string]*gollem.Parameter{
-				"filter": {
-					Type:        gollem.TypeString,
-					Description: "FQL filter expression (e.g., \"hostname:'*web*'\", \"platform_name:'Windows'\", \"last_seen:>='2025-01-01'\", \"external_ip:'10.0.0.*'\")",
-				},
-				"sort": {
-					Type:        gollem.TypeString,
-					Description: "Sort expression (e.g., \"hostname.asc\", \"last_seen.desc\")",
-				},
-				"limit": {
-					Type:        gollem.TypeNumber,
-					Description: "Maximum number of IDs to return (default: 100, max: 5000)",
-				},
-				"offset": {
-					Type:        gollem.TypeString,
-					Description: "Pagination offset token from a previous response",
-				},
-			},
-		},
-		{
-			Name:        "falcon_get_devices",
-			Description: "Get detailed device (host) information by device IDs. Returns full host details including hostname, OS, IP addresses, sensor version, tags, and containment status.",
-			Parameters: map[string]*gollem.Parameter{
-				"ids": {
-					Type:        gollem.TypeString,
-					Description: "Comma-separated device IDs (up to 5000, e.g., \"abc123def456,ghi789jkl012\")",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "falcon_search_events",
-			Description: "Search EDR telemetry events using CrowdStrike Query Language (CQL). This uses the Next-Gen SIEM Search API to query raw event data (process executions, network connections, file writes, DNS requests, etc.). The search runs asynchronously and this tool automatically polls until results are ready.",
-			Parameters: map[string]*gollem.Parameter{
-				"query_string": {
-					Type:        gollem.TypeString,
-					Description: "CQL query string (e.g., \"aid=abc123\", \"#event_simpleName=ProcessRollup2 AND FileName=cmd.exe\", \"ComputerName=workstation1 | tail(100)\")",
-					Required:    true,
-				},
-				"repository": {
-					Type:        gollem.TypeString,
-					Description: "Repository to search. Values: \"search-all\" (all data, default), \"investigate_view\" (Falcon EDR), \"third-party\" (third-party data), \"falcon_for_it_view\" (IT Automation), \"forensics_view\" (Forensics)",
-				},
-				"start": {
-					Type:        gollem.TypeString,
-					Description: "Start time for the search (e.g., \"1d\" for last 1 day, \"24h\" for last 24 hours, \"2025-01-01T00:00:00Z\" for absolute time). Default: \"1d\"",
-				},
-				"end": {
-					Type:        gollem.TypeString,
-					Description: "End time for the search (e.g., \"now\", \"2025-01-02T00:00:00Z\"). Default: \"now\"",
-				},
-			},
-		},
-	}, nil
+// Tool descriptions. Kept as constants so the typed-tool registration in
+// newInternalTool stays readable and the wire-level descriptions are unchanged.
+const (
+	descSearchIncidents = "Search for incident IDs using FQL (Falcon Query Language) filters. Returns a list of incident IDs that can be used with falcon_get_incidents to retrieve full details."
+	descGetIncidents    = "Get detailed information for specific incidents by their IDs. Returns full incident details including status, tactics, techniques, hosts, and users involved."
+	descSearchAlerts    = "Search and retrieve alert details in one call using FQL filters with cursor-based pagination. Returns full alert objects including severity, tactic, technique, and device info."
+	descGetAlerts       = "Get detailed alert information by composite IDs. Use this when you already have specific alert IDs."
+	descSearchBehaviors = "Search for behavior IDs using FQL filters. Returns behavior IDs that can be used with falcon_get_behaviors for full details."
+	descGetBehaviors    = "Get detailed behavior information by IDs. Returns behavior details including tactic, technique, severity, pattern, and associated device info."
+	descGetCrowdScores  = "Get CrowdScore values for the environment. CrowdScore is an overall threat level indicator."
+	descSearchDevices   = "Search for device (host) IDs using FQL filters. Returns a list of device IDs that can be used with falcon_get_devices to retrieve full host details including OS, IP addresses, sensor version, and containment status."
+	descGetDevices      = "Get detailed device (host) information by device IDs. Returns full host details including hostname, OS, IP addresses, sensor version, tags, and containment status."
+	descSearchEvents    = "Search EDR telemetry events using CrowdStrike Query Language (CQL). This uses the Next-Gen SIEM Search API to query raw event data (process executions, network connections, file writes, DNS requests, etc.). The search runs asynchronously and this tool automatically polls until results are ready."
+)
+
+// Typed inputs for each tool. The schema is inferred from these struct tags by
+// gollem.NewTool. Pagination counts use float64 (not int64) so the inferred JSON
+// schema stays "number" — matching the wire-level type the LLM was given before
+// this migration.
+type searchIncidentsInput struct {
+	Filter string  `json:"filter" description:"FQL filter expression (e.g., \"status:'30'\", \"tags:'critical'\", \"start:>'2025-01-01'\")"`
+	Sort   string  `json:"sort" description:"Sort expression (e.g., \"start.desc\", \"end.asc\")"`
+	Limit  float64 `json:"limit" description:"Maximum number of IDs to return (default: 100, max: 500)"`
+	Offset float64 `json:"offset" description:"Pagination offset"`
+}
+
+type getIncidentsInput struct {
+	IDs string `json:"ids" required:"true" description:"Comma-separated incident IDs (e.g., \"inc:abc123:def456,inc:abc123:ghi789\")"`
+}
+
+type searchAlertsInput struct {
+	Filter string  `json:"filter" description:"FQL filter expression (e.g., \"status:'new'\", \"severity:>50\", \"tactics:'Lateral Movement'\")"`
+	Sort   string  `json:"sort" description:"Sort property (e.g., \"timestamp|desc\", \"severity|asc\")"`
+	Limit  float64 `json:"limit" description:"Maximum number of alerts to return (default: 100, max: 1000)"`
+	After  string  `json:"after" description:"Cursor pagination token from a previous response for fetching next page"`
+}
+
+type getAlertsInput struct {
+	CompositeIDs string `json:"composite_ids" required:"true" description:"Comma-separated composite alert IDs"`
+}
+
+type searchBehaviorsInput struct {
+	Filter string  `json:"filter" description:"FQL filter expression"`
+	Limit  float64 `json:"limit" description:"Maximum number of IDs to return (default: 100, max: 500)"`
+	Offset float64 `json:"offset" description:"Pagination offset"`
+}
+
+type getBehaviorsInput struct {
+	IDs string `json:"ids" required:"true" description:"Comma-separated behavior IDs"`
+}
+
+type getCrowdScoresInput struct {
+	Filter string `json:"filter" description:"FQL filter expression (e.g., \"timestamp:>'2025-01-01'\")"`
+}
+
+type searchDevicesInput struct {
+	Filter string  `json:"filter" description:"FQL filter expression (e.g., \"hostname:'*web*'\", \"platform_name:'Windows'\", \"last_seen:>='2025-01-01'\", \"external_ip:'10.0.0.*'\")"`
+	Sort   string  `json:"sort" description:"Sort expression (e.g., \"hostname.asc\", \"last_seen.desc\")"`
+	Limit  float64 `json:"limit" description:"Maximum number of IDs to return (default: 100, max: 5000)"`
+	Offset string  `json:"offset" description:"Pagination offset token from a previous response"`
+}
+
+type getDevicesInput struct {
+	IDs string `json:"ids" required:"true" description:"Comma-separated device IDs (up to 5000, e.g., \"abc123def456,ghi789jkl012\")"`
+}
+
+type searchEventsInput struct {
+	QueryString string `json:"query_string" required:"true" description:"CQL query string (e.g., \"aid=abc123\", \"#event_simpleName=ProcessRollup2 AND FileName=cmd.exe\", \"ComputerName=workstation1 | tail(100)\")"`
+	Repository  string `json:"repository" description:"Repository to search. Values: \"search-all\" (all data, default), \"investigate_view\" (Falcon EDR), \"third-party\" (third-party data), \"falcon_for_it_view\" (IT Automation), \"forensics_view\" (Forensics)"`
+	Start       string `json:"start" description:"Start time for the search (e.g., \"1d\" for last 1 day, \"24h\" for last 24 hours, \"2025-01-01T00:00:00Z\" for absolute time). Default: \"1d\""`
+	End         string `json:"end" description:"End time for the search (e.g., \"now\", \"2025-01-02T00:00:00Z\"). Default: \"now\""`
+}
+
+func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return t.tools.Specs(ctx)
 }
 
 func (t *internalTool) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	switch name {
-	case "falcon_search_incidents":
-		return t.searchIncidents(ctx, args)
-	case "falcon_get_incidents":
-		return t.getIncidents(ctx, args)
-	case "falcon_search_alerts":
-		return t.searchAlerts(ctx, args)
-	case "falcon_get_alerts":
-		return t.getAlerts(ctx, args)
-	case "falcon_search_behaviors":
-		return t.searchBehaviors(ctx, args)
-	case "falcon_get_behaviors":
-		return t.getBehaviors(ctx, args)
-	case "falcon_search_devices":
-		return t.searchDevices(ctx, args)
-	case "falcon_get_devices":
-		return t.getDevices(ctx, args)
-	case "falcon_get_crowdscores":
-		return t.getCrowdScores(ctx, args)
-	case "falcon_search_events":
-		return t.searchEvents(ctx, args)
-	default:
-		return nil, goerr.New("unknown tool name", goerr.V("name", name))
-	}
+	return t.tools.Run(ctx, name, args)
 }
 
 // doRequest performs an authenticated HTTP request to the CrowdStrike API.
@@ -321,12 +230,17 @@ func (t *internalTool) doRequestOnce(ctx context.Context, method, path string, b
 }
 
 // searchIncidents searches for incident IDs using FQL filters.
-func (t *internalTool) searchIncidents(ctx context.Context, args map[string]any) (map[string]any, error) {
-	filter, _ := args["filter"].(string)
+func (t *internalTool) searchIncidents(ctx context.Context, in searchIncidentsInput) (map[string]any, error) {
+	filter := in.Filter
 	msg.Trace(ctx, "🔍 Searching incidents (filter: `%s`)", filter)
 
 	path := "/incidents/queries/incidents/v1"
-	params := buildQueryParams(args, "filter", "sort", "limit", "offset")
+	params := queryParams(
+		[2]string{"filter", filter},
+		[2]string{"sort", in.Sort},
+		[2]string{"limit", numParam(in.Limit)},
+		[2]string{"offset", numParam(in.Offset)},
+	)
 	if params != "" {
 		path += "?" + params
 	}
@@ -340,9 +254,9 @@ func (t *internalTool) searchIncidents(ctx context.Context, args map[string]any)
 }
 
 // getIncidents retrieves incident details by IDs.
-func (t *internalTool) getIncidents(ctx context.Context, args map[string]any) (map[string]any, error) {
-	ids, ok := args["ids"].(string)
-	if !ok || ids == "" {
+func (t *internalTool) getIncidents(ctx context.Context, in getIncidentsInput) (map[string]any, error) {
+	ids := in.IDs
+	if ids == "" {
 		return nil, goerr.New("ids is required")
 	}
 
@@ -360,22 +274,22 @@ func (t *internalTool) getIncidents(ctx context.Context, args map[string]any) (m
 }
 
 // searchAlerts searches and retrieves alert details using FQL filters.
-func (t *internalTool) searchAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
-	filter, _ := args["filter"].(string)
+func (t *internalTool) searchAlerts(ctx context.Context, in searchAlertsInput) (map[string]any, error) {
+	filter := in.Filter
 	msg.Trace(ctx, "🔍 Searching alerts (filter: `%s`)", filter)
 
 	body := make(map[string]any)
 	if filter != "" {
 		body["filter"] = filter
 	}
-	if sort, ok := args["sort"].(string); ok && sort != "" {
-		body["sort"] = sort
+	if in.Sort != "" {
+		body["sort"] = in.Sort
 	}
-	if limit, ok := args["limit"].(float64); ok {
-		body["limit"] = int(limit)
+	if in.Limit > 0 {
+		body["limit"] = int(in.Limit)
 	}
-	if after, ok := args["after"].(string); ok && after != "" {
-		body["after"] = after
+	if in.After != "" {
+		body["after"] = in.After
 	}
 	result, err := t.doRequest(ctx, http.MethodPost, "/alerts/combined/alerts/v1", body)
 	if err != nil {
@@ -387,9 +301,9 @@ func (t *internalTool) searchAlerts(ctx context.Context, args map[string]any) (m
 }
 
 // getAlerts retrieves alert details by composite IDs.
-func (t *internalTool) getAlerts(ctx context.Context, args map[string]any) (map[string]any, error) {
-	compositeIDs, ok := args["composite_ids"].(string)
-	if !ok || compositeIDs == "" {
+func (t *internalTool) getAlerts(ctx context.Context, in getAlertsInput) (map[string]any, error) {
+	compositeIDs := in.CompositeIDs
+	if compositeIDs == "" {
 		return nil, goerr.New("composite_ids is required")
 	}
 
@@ -407,12 +321,16 @@ func (t *internalTool) getAlerts(ctx context.Context, args map[string]any) (map[
 }
 
 // searchBehaviors searches for behavior IDs using FQL filters.
-func (t *internalTool) searchBehaviors(ctx context.Context, args map[string]any) (map[string]any, error) {
-	filter, _ := args["filter"].(string)
+func (t *internalTool) searchBehaviors(ctx context.Context, in searchBehaviorsInput) (map[string]any, error) {
+	filter := in.Filter
 	msg.Trace(ctx, "🔍 Searching behaviors (filter: `%s`)", filter)
 
 	path := "/incidents/queries/behaviors/v1"
-	params := buildQueryParams(args, "filter", "limit", "offset")
+	params := queryParams(
+		[2]string{"filter", filter},
+		[2]string{"limit", numParam(in.Limit)},
+		[2]string{"offset", numParam(in.Offset)},
+	)
 	if params != "" {
 		path += "?" + params
 	}
@@ -426,9 +344,9 @@ func (t *internalTool) searchBehaviors(ctx context.Context, args map[string]any)
 }
 
 // getBehaviors retrieves behavior details by IDs.
-func (t *internalTool) getBehaviors(ctx context.Context, args map[string]any) (map[string]any, error) {
-	ids, ok := args["ids"].(string)
-	if !ok || ids == "" {
+func (t *internalTool) getBehaviors(ctx context.Context, in getBehaviorsInput) (map[string]any, error) {
+	ids := in.IDs
+	if ids == "" {
 		return nil, goerr.New("ids is required")
 	}
 
@@ -446,12 +364,18 @@ func (t *internalTool) getBehaviors(ctx context.Context, args map[string]any) (m
 }
 
 // searchDevices searches for device (host) IDs using FQL filters.
-func (t *internalTool) searchDevices(ctx context.Context, args map[string]any) (map[string]any, error) {
-	filter, _ := args["filter"].(string)
+func (t *internalTool) searchDevices(ctx context.Context, in searchDevicesInput) (map[string]any, error) {
+	filter := in.Filter
 	msg.Trace(ctx, "🔍 Searching devices (filter: `%s`)", filter)
 
 	path := "/devices/queries/devices-scroll/v1"
-	params := buildQueryParams(args, "filter", "sort", "limit", "offset")
+	// Note: device offset is a scroll token (string), not a numeric offset.
+	params := queryParams(
+		[2]string{"filter", filter},
+		[2]string{"sort", in.Sort},
+		[2]string{"limit", numParam(in.Limit)},
+		[2]string{"offset", in.Offset},
+	)
 	if params != "" {
 		path += "?" + params
 	}
@@ -465,9 +389,9 @@ func (t *internalTool) searchDevices(ctx context.Context, args map[string]any) (
 }
 
 // getDevices retrieves device (host) details by IDs.
-func (t *internalTool) getDevices(ctx context.Context, args map[string]any) (map[string]any, error) {
-	ids, ok := args["ids"].(string)
-	if !ok || ids == "" {
+func (t *internalTool) getDevices(ctx context.Context, in getDevicesInput) (map[string]any, error) {
+	ids := in.IDs
+	if ids == "" {
 		return nil, goerr.New("ids is required")
 	}
 
@@ -485,12 +409,12 @@ func (t *internalTool) getDevices(ctx context.Context, args map[string]any) (map
 }
 
 // getCrowdScores retrieves CrowdScore values.
-func (t *internalTool) getCrowdScores(ctx context.Context, args map[string]any) (map[string]any, error) {
-	filter, _ := args["filter"].(string)
+func (t *internalTool) getCrowdScores(ctx context.Context, in getCrowdScoresInput) (map[string]any, error) {
+	filter := in.Filter
 	msg.Trace(ctx, "📊 Retrieving CrowdScores (filter: `%s`)", filter)
 
 	path := "/incidents/combined/crowdscores/v1"
-	params := buildQueryParams(args, "filter")
+	params := queryParams([2]string{"filter", filter})
 	if params != "" {
 		path += "?" + params
 	}
@@ -505,29 +429,29 @@ func (t *internalTool) getCrowdScores(ctx context.Context, args map[string]any) 
 
 // searchEvents runs a CQL query via the Next-Gen SIEM Search API.
 // It creates a query job and polls until the job completes, returning all events.
-func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (map[string]any, error) {
+func (t *internalTool) searchEvents(ctx context.Context, in searchEventsInput) (map[string]any, error) {
 	log := logging.From(ctx)
 
-	queryString, ok := args["query_string"].(string)
-	if !ok || queryString == "" {
+	queryString := in.QueryString
+	if queryString == "" {
 		return nil, goerr.New("query_string is required")
 	}
 
 	repository := "search-all"
-	if repo, ok := args["repository"].(string); ok && repo != "" {
-		repository = repo
+	if in.Repository != "" {
+		repository = in.Repository
 	}
 
 	body := map[string]any{
 		"queryString": queryString,
 	}
-	if start, ok := args["start"].(string); ok && start != "" {
-		body["start"] = start
+	if in.Start != "" {
+		body["start"] = in.Start
 	} else {
 		body["start"] = "1d"
 	}
-	if end, ok := args["end"].(string); ok && end != "" {
-		body["end"] = end
+	if in.End != "" {
+		body["end"] = in.End
 	} else {
 		body["end"] = "now"
 	}
@@ -632,22 +556,27 @@ func (t *internalTool) searchEvents(ctx context.Context, args map[string]any) (m
 	}, nil
 }
 
-// buildQueryParams constructs URL query parameters from tool arguments.
-func buildQueryParams(args map[string]any, keys ...string) string {
+// queryParams constructs a URL query string from string key/value pairs,
+// skipping empty values. Callers pre-format non-string values (e.g. numeric
+// limits) before passing them in.
+func queryParams(pairs ...[2]string) string {
 	params := url.Values{}
-	for _, key := range keys {
-		if val, ok := args[key]; ok {
-			switch v := val.(type) {
-			case string:
-				if v != "" {
-					params.Set(key, v)
-				}
-			case float64:
-				params.Set(key, fmt.Sprintf("%d", int(v)))
-			}
+	for _, kv := range pairs {
+		if kv[1] != "" {
+			params.Set(kv[0], kv[1])
 		}
 	}
 	return params.Encode()
+}
+
+// numParam formats a numeric pagination value for a query string. Zero is
+// treated as "absent" (returns ""), matching the previous behavior where a
+// missing limit/offset argument was simply omitted from the request.
+func numParam(v float64) string {
+	if v <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", int(v))
 }
 
 // splitAndTrim splits a comma-separated string and trims whitespace from each element.

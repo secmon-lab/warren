@@ -13,6 +13,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	svcknowledge "github.com/secmon-lab/warren/pkg/service/knowledge"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/toolset"
 	"github.com/urfave/cli/v3"
 )
 
@@ -34,6 +35,8 @@ type Tool struct {
 	svc      *svcknowledge.Service
 	category types.KnowledgeCategory
 	mode     Mode
+
+	tools gollem.ToolSet
 }
 
 var _ interfaces.Tool = &Tool{}
@@ -41,11 +44,39 @@ var _ interfaces.Tool = &Tool{}
 // New creates a new knowledge v2 tool.
 // category is fixed per use case (e.g., "fact" for investigation context, "technique" for analysis procedures).
 func New(svc *svcknowledge.Service, category types.KnowledgeCategory, mode Mode) *Tool {
-	return &Tool{
+	x := &Tool{
 		svc:      svc,
 		category: category,
 		mode:     mode,
 	}
+
+	// The available tool set depends on the mode: search-only agents get just
+	// knowledge_search, read-only agents also get knowledge_tag_list, and
+	// read-write agents get the full CRUD + tag-management surface. Building the
+	// set here (rather than branching inside Specs/Run) keeps the mode logic in
+	// one place while each tool stays type-safe via gollem.NewTool.
+	tools := []gollem.Tool{
+		gollem.MustNewTool(cmdSearch, descSearch, x.search),
+	}
+	if mode != ModeSearchOnly {
+		tools = append(tools, gollem.MustNewTool(cmdTagList, descTagList, x.tagList))
+	}
+	if mode == ModeReadWrite {
+		tools = append(tools,
+			gollem.MustNewTool(cmdSave, descSave, x.save),
+			gollem.MustNewTool(cmdDelete, descDelete, x.delete),
+			gollem.MustNewTool(cmdList, descList, x.list),
+			gollem.MustNewTool(cmdGet, descGet, x.get),
+			gollem.MustNewTool(cmdHistory, descHistory, x.history),
+			gollem.MustNewTool(cmdTagCreate, descTagCreate, x.tagCreate),
+			gollem.MustNewTool(cmdTagUpdate, descTagUpdate, x.tagUpdate),
+			gollem.MustNewTool(cmdTagDelete, descTagDelete, x.tagDelete),
+			gollem.MustNewTool(cmdTagMerge, descTagMerge, x.tagMerge),
+		)
+	}
+	x.tools = toolset.New(tools...)
+
+	return x
 }
 
 func (x *Tool) ID() string {
@@ -106,234 +137,93 @@ const (
 	cmdTagMerge  = "knowledge_tag_merge"
 )
 
-func (x *Tool) Specs(_ context.Context) ([]gollem.ToolSpec, error) {
-	searchSpec := gollem.ToolSpec{
-		Name:        cmdSearch,
-		Description: "Search for knowledge. Returns lightweight summaries (ID, title, tags only). Use knowledge_get to retrieve full details.",
-		Parameters: map[string]*gollem.Parameter{
-			"query": {
-				Type:        gollem.TypeString,
-				Description: "Natural language query to search for",
-				Required:    true,
-			},
-			"tags": {
-				Type:        gollem.TypeArray,
-				Items:       &gollem.Parameter{Type: gollem.TypeString},
-				Description: "Tag IDs to filter by (at least one required)",
-				Required:    true,
-			},
-		},
-	}
+// Tool descriptions. Kept as constants so the typed-tool registration in New
+// stays readable and the wire-level descriptions are unchanged.
+const (
+	descSearch    = "Search for knowledge. Returns lightweight summaries (ID, title, tags only). Use knowledge_get to retrieve full details."
+	descTagList   = "List all available knowledge tags with their IDs and descriptions."
+	descSave      = "Create or update a knowledge entry. Specify ID to update existing, omit for new."
+	descDelete    = "Delete a knowledge entry that contains incorrect information. Records the reason in the log."
+	descList      = "List knowledge entries (ID, title, tags only - lightweight for browsing). Use knowledge_get to retrieve full details."
+	descGet       = "Get full details (including claim) of one or more knowledge entries by ID."
+	descHistory   = "Get change history of a knowledge entry."
+	descTagCreate = "Create a new tag."
+	descTagUpdate = "Update an existing tag."
+	descTagDelete = "Delete a tag. Removes it from all knowledge entries that reference it."
+	descTagMerge  = "Merge two tags: replaces old_id with new_id in all knowledge entries, then deletes old_id."
+)
 
-	if x.mode == ModeSearchOnly {
-		return []gollem.ToolSpec{searchSpec}, nil
-	}
+// Typed inputs for each tool. The schema is inferred from these struct tags.
+type searchInput struct {
+	Query string   `json:"query" required:"true" description:"Natural language query to search for"`
+	Tags  []string `json:"tags" required:"true" description:"Tag IDs to filter by (at least one required)"`
+}
 
-	specs := []gollem.ToolSpec{
-		searchSpec,
-		{
-			Name:        cmdTagList,
-			Description: "List all available knowledge tags with their IDs and descriptions.",
-		},
-	}
+// emptyInput is used for tools that take no arguments (knowledge_tag_list).
+type emptyInput struct{}
 
-	if x.mode == ModeReadWrite {
-		specs = append(specs,
-			gollem.ToolSpec{
-				Name:        cmdSave,
-				Description: "Create or update a knowledge entry. Specify ID to update existing, omit for new.",
-				Parameters: map[string]*gollem.Parameter{
-					"id": {
-						Type:        gollem.TypeString,
-						Description: "Knowledge ID (for update). Omit for new entry.",
-					},
-					"title": {
-						Type:        gollem.TypeString,
-						Description: "Title of the knowledge entry (topic name)",
-						Required:    true,
-					},
-					"claim": {
-						Type:        gollem.TypeString,
-						Description: "Markdown content with facts or techniques",
-						Required:    true,
-					},
-					"tags": {
-						Type:        gollem.TypeArray,
-						Items:       &gollem.Parameter{Type: gollem.TypeString},
-						Description: "Tag IDs to associate (at least one required)",
-						Required:    true,
-					},
-					"message": {
-						Type:        gollem.TypeString,
-						Description: "Reason for this change",
-						Required:    true,
-					},
-					"ticket_id": {
-						Type:        gollem.TypeString,
-						Description: "Related ticket ID (optional)",
-					},
-				},
-			},
-			gollem.ToolSpec{
-				Name:        cmdDelete,
-				Description: "Delete a knowledge entry that contains incorrect information. Records the reason in the log.",
-				Parameters: map[string]*gollem.Parameter{
-					"id": {
-						Type:        gollem.TypeString,
-						Description: "Knowledge ID to delete",
-						Required:    true,
-					},
-					"reason": {
-						Type:        gollem.TypeString,
-						Description: "Reason for deletion",
-						Required:    true,
-					},
-				},
-			},
-			gollem.ToolSpec{
-				Name:        cmdList,
-				Description: "List knowledge entries (ID, title, tags only - lightweight for browsing). Use knowledge_get to retrieve full details.",
-				Parameters: map[string]*gollem.Parameter{
-					"limit": {
-						Type:        gollem.TypeInteger,
-						Description: "Maximum number of entries to return (default: 25, max: 100)",
-					},
-					"offset": {
-						Type:        gollem.TypeInteger,
-						Description: "Number of entries to skip for pagination (default: 0)",
-					},
-				},
-			},
-			gollem.ToolSpec{
-				Name:        cmdGet,
-				Description: "Get full details (including claim) of one or more knowledge entries by ID.",
-				Parameters: map[string]*gollem.Parameter{
-					"ids": {
-						Type:        gollem.TypeArray,
-						Items:       &gollem.Parameter{Type: gollem.TypeString},
-						Description: "Knowledge IDs to retrieve (1-10 IDs)",
-						Required:    true,
-					},
-				},
-			},
-			gollem.ToolSpec{
-				Name:        cmdHistory,
-				Description: "Get change history of a knowledge entry.",
-				Parameters: map[string]*gollem.Parameter{
-					"id": {
-						Type:        gollem.TypeString,
-						Description: "Knowledge ID",
-						Required:    true,
-					},
-				},
-			},
-			gollem.ToolSpec{
-				Name:        cmdTagCreate,
-				Description: "Create a new tag.",
-				Parameters: map[string]*gollem.Parameter{
-					"name": {
-						Type:        gollem.TypeString,
-						Description: "Tag name (lowercase, short)",
-						Required:    true,
-					},
-					"description": {
-						Type:        gollem.TypeString,
-						Description: "Description of what this tag represents",
-					},
-				},
-			},
-			gollem.ToolSpec{
-				Name:        cmdTagUpdate,
-				Description: "Update an existing tag.",
-				Parameters: map[string]*gollem.Parameter{
-					"id": {
-						Type:        gollem.TypeString,
-						Description: "Tag ID",
-						Required:    true,
-					},
-					"name": {
-						Type:        gollem.TypeString,
-						Description: "New tag name",
-						Required:    true,
-					},
-					"description": {
-						Type:        gollem.TypeString,
-						Description: "New description",
-					},
-				},
-			},
-			gollem.ToolSpec{
-				Name:        cmdTagDelete,
-				Description: "Delete a tag. Removes it from all knowledge entries that reference it.",
-				Parameters: map[string]*gollem.Parameter{
-					"id": {
-						Type:        gollem.TypeString,
-						Description: "Tag ID to delete",
-						Required:    true,
-					},
-				},
-			},
-			gollem.ToolSpec{
-				Name:        cmdTagMerge,
-				Description: "Merge two tags: replaces old_id with new_id in all knowledge entries, then deletes old_id.",
-				Parameters: map[string]*gollem.Parameter{
-					"old_id": {
-						Type:        gollem.TypeString,
-						Description: "Tag ID to be merged (will be deleted)",
-						Required:    true,
-					},
-					"new_id": {
-						Type:        gollem.TypeString,
-						Description: "Tag ID to merge into (will be kept)",
-						Required:    true,
-					},
-				},
-			},
-		)
-	}
+type saveInput struct {
+	ID       string   `json:"id" description:"Knowledge ID (for update). Omit for new entry."`
+	Title    string   `json:"title" required:"true" description:"Title of the knowledge entry (topic name)"`
+	Claim    string   `json:"claim" required:"true" description:"Markdown content with facts or techniques"`
+	Tags     []string `json:"tags" required:"true" description:"Tag IDs to associate (at least one required)"`
+	Message  string   `json:"message" required:"true" description:"Reason for this change"`
+	TicketID string   `json:"ticket_id" description:"Related ticket ID (optional)"`
+}
 
-	return specs, nil
+type deleteInput struct {
+	ID     string `json:"id" required:"true" description:"Knowledge ID to delete"`
+	Reason string `json:"reason" required:"true" description:"Reason for deletion"`
+}
+
+type listInput struct {
+	Limit  int64 `json:"limit" description:"Maximum number of entries to return (default: 25, max: 100)"`
+	Offset int64 `json:"offset" description:"Number of entries to skip for pagination (default: 0)"`
+}
+
+type getInput struct {
+	IDs []string `json:"ids" required:"true" description:"Knowledge IDs to retrieve (1-10 IDs)"`
+}
+
+type historyInput struct {
+	ID string `json:"id" required:"true" description:"Knowledge ID"`
+}
+
+type tagCreateInput struct {
+	Name        string `json:"name" required:"true" description:"Tag name (lowercase, short)"`
+	Description string `json:"description" description:"Description of what this tag represents"`
+}
+
+type tagUpdateInput struct {
+	ID          string `json:"id" required:"true" description:"Tag ID"`
+	Name        string `json:"name" required:"true" description:"New tag name"`
+	Description string `json:"description" description:"New description"`
+}
+
+type tagDeleteInput struct {
+	ID string `json:"id" required:"true" description:"Tag ID to delete"`
+}
+
+type tagMergeInput struct {
+	OldID string `json:"old_id" required:"true" description:"Tag ID to be merged (will be deleted)"`
+	NewID string `json:"new_id" required:"true" description:"Tag ID to merge into (will be kept)"`
+}
+
+func (x *Tool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return x.tools.Specs(ctx)
 }
 
 func (x *Tool) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	switch name {
-	case cmdSearch:
-		return x.search(ctx, args)
-	case cmdTagList:
-		return x.tagList(ctx)
-	case cmdSave:
-		return x.save(ctx, args)
-	case cmdDelete:
-		return x.delete(ctx, args)
-	case cmdList:
-		return x.list(ctx, args)
-	case cmdGet:
-		return x.get(ctx, args)
-	case cmdHistory:
-		return x.history(ctx, args)
-	case cmdTagCreate:
-		return x.tagCreate(ctx, args)
-	case cmdTagUpdate:
-		return x.tagUpdate(ctx, args)
-	case cmdTagDelete:
-		return x.tagDelete(ctx, args)
-	case cmdTagMerge:
-		return x.tagMerge(ctx, args)
-	default:
-		return nil, goerr.New("unknown command", goerr.V("name", name))
-	}
+	return x.tools.Run(ctx, name, args)
 }
 
-func (x *Tool) search(ctx context.Context, args map[string]any) (map[string]any, error) {
-	query, _ := args["query"].(string)
+func (x *Tool) search(ctx context.Context, in searchInput) (map[string]any, error) {
+	query := in.Query
 	if query == "" {
 		return nil, goerr.New("query is required")
 	}
 
-	tagIDs, err := extractTagIDs(args, "tags")
-	if err != nil {
-		return nil, err
-	}
+	tagIDs := toTagIDs(in.Tags)
 	if len(tagIDs) == 0 {
 		return nil, goerr.New("at least one tag is required")
 	}
@@ -351,17 +241,14 @@ func (x *Tool) search(ctx context.Context, args map[string]any) (map[string]any,
 	}, nil
 }
 
-func (x *Tool) save(ctx context.Context, args map[string]any) (map[string]any, error) {
-	title, _ := args["title"].(string)
-	claim, _ := args["claim"].(string)
-	message, _ := args["message"].(string)
-	ticketID, _ := args["ticket_id"].(string)
-	id, _ := args["id"].(string)
+func (x *Tool) save(ctx context.Context, in saveInput) (map[string]any, error) {
+	title := in.Title
+	claim := in.Claim
+	message := in.Message
+	ticketID := in.TicketID
+	id := in.ID
 
-	tagIDs, err := extractTagIDs(args, "tags")
-	if err != nil {
-		return nil, err
-	}
+	tagIDs := toTagIDs(in.Tags)
 
 	k := &knowledgeModel.Knowledge{
 		ID:       types.KnowledgeID(id),
@@ -384,9 +271,9 @@ func (x *Tool) save(ctx context.Context, args map[string]any) (map[string]any, e
 	}, nil
 }
 
-func (x *Tool) delete(ctx context.Context, args map[string]any) (map[string]any, error) {
-	id, _ := args["id"].(string)
-	reason, _ := args["reason"].(string)
+func (x *Tool) delete(ctx context.Context, in deleteInput) (map[string]any, error) {
+	id := in.ID
+	reason := in.Reason
 	if id == "" {
 		return nil, goerr.New("id is required")
 	}
@@ -403,16 +290,16 @@ func (x *Tool) delete(ctx context.Context, args map[string]any) (map[string]any,
 	return map[string]any{"success": true}, nil
 }
 
-func (x *Tool) list(ctx context.Context, args map[string]any) (map[string]any, error) {
+func (x *Tool) list(ctx context.Context, in listInput) (map[string]any, error) {
 	// Extract limit and offset parameters
 	limit := 25 // default
 	offset := 0 // default
 
-	if l, ok := args["limit"].(float64); ok {
-		limit = int(l)
+	if in.Limit > 0 {
+		limit = int(in.Limit)
 	}
-	if o, ok := args["offset"].(float64); ok {
-		offset = int(o)
+	if in.Offset > 0 {
+		offset = int(in.Offset)
 	}
 
 	// Apply max limit
@@ -480,30 +367,15 @@ func (x *Tool) list(ctx context.Context, args map[string]any) (map[string]any, e
 	}, nil
 }
 
-func (x *Tool) get(ctx context.Context, args map[string]any) (map[string]any, error) {
-	// Extract IDs array
-	idsRaw, ok := args["ids"]
-	if !ok {
-		return nil, goerr.New("ids parameter is required")
-	}
-
-	idsArray, ok := idsRaw.([]any)
-	if !ok {
-		return nil, goerr.New("ids must be an array")
-	}
-
-	if len(idsArray) == 0 {
+func (x *Tool) get(ctx context.Context, in getInput) (map[string]any, error) {
+	if len(in.IDs) == 0 {
 		return nil, goerr.New("at least one ID is required")
 	}
 
 	// Convert to KnowledgeID slice and deduplicate
 	idMap := make(map[types.KnowledgeID]struct{})
 	var ids []types.KnowledgeID
-	for _, v := range idsArray {
-		s, ok := v.(string)
-		if !ok {
-			return nil, goerr.New("ID must be a string")
-		}
+	for _, s := range in.IDs {
 		id := types.KnowledgeID(s)
 		if _, exists := idMap[id]; !exists {
 			idMap[id] = struct{}{}
@@ -526,8 +398,8 @@ func (x *Tool) get(ctx context.Context, args map[string]any) (map[string]any, er
 	}, nil
 }
 
-func (x *Tool) history(ctx context.Context, args map[string]any) (map[string]any, error) {
-	id, _ := args["id"].(string)
+func (x *Tool) history(ctx context.Context, in historyInput) (map[string]any, error) {
+	id := in.ID
 	if id == "" {
 		return nil, goerr.New("id is required")
 	}
@@ -551,7 +423,7 @@ func (x *Tool) history(ctx context.Context, args map[string]any) (map[string]any
 	return map[string]any{"logs": entries, "count": len(entries)}, nil
 }
 
-func (x *Tool) tagList(ctx context.Context) (map[string]any, error) {
+func (x *Tool) tagList(ctx context.Context, _ emptyInput) (map[string]any, error) {
 	tags, err := x.svc.ListTags(ctx)
 	if err != nil {
 		return nil, goerr.Wrap(err, "failed to list tags")
@@ -569,9 +441,9 @@ func (x *Tool) tagList(ctx context.Context) (map[string]any, error) {
 	return map[string]any{"tags": entries, "count": len(entries)}, nil
 }
 
-func (x *Tool) tagCreate(ctx context.Context, args map[string]any) (map[string]any, error) {
-	name, _ := args["name"].(string)
-	description, _ := args["description"].(string)
+func (x *Tool) tagCreate(ctx context.Context, in tagCreateInput) (map[string]any, error) {
+	name := in.Name
+	description := in.Description
 
 	tag, err := x.svc.CreateTag(ctx, name, description)
 	if err != nil {
@@ -583,10 +455,10 @@ func (x *Tool) tagCreate(ctx context.Context, args map[string]any) (map[string]a
 	return map[string]any{"success": true, "id": tag.ID.String()}, nil
 }
 
-func (x *Tool) tagUpdate(ctx context.Context, args map[string]any) (map[string]any, error) {
-	id, _ := args["id"].(string)
-	name, _ := args["name"].(string)
-	description, _ := args["description"].(string)
+func (x *Tool) tagUpdate(ctx context.Context, in tagUpdateInput) (map[string]any, error) {
+	id := in.ID
+	name := in.Name
+	description := in.Description
 	if id == "" {
 		return nil, goerr.New("id is required")
 	}
@@ -599,8 +471,8 @@ func (x *Tool) tagUpdate(ctx context.Context, args map[string]any) (map[string]a
 	return map[string]any{"success": true, "id": tag.ID.String()}, nil
 }
 
-func (x *Tool) tagDelete(ctx context.Context, args map[string]any) (map[string]any, error) {
-	id, _ := args["id"].(string)
+func (x *Tool) tagDelete(ctx context.Context, in tagDeleteInput) (map[string]any, error) {
+	id := in.ID
 	if id == "" {
 		return nil, goerr.New("id is required")
 	}
@@ -614,9 +486,9 @@ func (x *Tool) tagDelete(ctx context.Context, args map[string]any) (map[string]a
 	return map[string]any{"success": true}, nil
 }
 
-func (x *Tool) tagMerge(ctx context.Context, args map[string]any) (map[string]any, error) {
-	oldID, _ := args["old_id"].(string)
-	newID, _ := args["new_id"].(string)
+func (x *Tool) tagMerge(ctx context.Context, in tagMergeInput) (map[string]any, error) {
+	oldID := in.OldID
+	newID := in.NewID
 	if oldID == "" || newID == "" {
 		return nil, goerr.New("old_id and new_id are required")
 	}
@@ -630,27 +502,13 @@ func (x *Tool) tagMerge(ctx context.Context, args map[string]any) (map[string]an
 	return map[string]any{"success": true}, nil
 }
 
-// extractTagIDs extracts tag IDs from tool arguments.
-func extractTagIDs(args map[string]any, key string) ([]types.KnowledgeTagID, error) {
-	raw, ok := args[key]
-	if !ok {
-		return nil, nil
-	}
-
-	arr, ok := raw.([]any)
-	if !ok {
-		return nil, goerr.New("tags must be an array")
-	}
-
-	ids := make([]types.KnowledgeTagID, 0, len(arr))
-	for _, v := range arr {
-		s, ok := v.(string)
-		if !ok {
-			return nil, goerr.New("tag ID must be a string")
-		}
+// toTagIDs converts decoded string tag IDs into the typed KnowledgeTagID slice.
+func toTagIDs(tags []string) []types.KnowledgeTagID {
+	ids := make([]types.KnowledgeTagID, 0, len(tags))
+	for _, s := range tags {
 		ids = append(ids, types.KnowledgeTagID(s))
 	}
-	return ids, nil
+	return ids
 }
 
 // formatKnowledgeSummary formats knowledges as lightweight summaries (no claim).

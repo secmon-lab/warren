@@ -17,34 +17,12 @@ import (
 // warren_get_ticket_comments. It returns a strictly richer payload
 // (author information, AI output types, turn grouping) while covering
 // the same ground on the Slack/user-comment side.
-func (x *Warren) getTicketSessionMessages(ctx context.Context, args map[string]any) (map[string]any, error) {
-	limitVal, err := getArg[int64](args, "limit")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit",
-			goerr.TV(errutil.ParameterKey, "limit"),
-			goerr.T(errutil.TagValidation))
-	}
-	offsetVal, err := getArg[int64](args, "offset")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get offset",
-			goerr.TV(errutil.ParameterKey, "offset"),
-			goerr.T(errutil.TagValidation))
-	}
-	sourceStr, err := getArg[string](args, "source")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get source",
-			goerr.TV(errutil.ParameterKey, "source"),
-			goerr.T(errutil.TagValidation))
-	}
-	typeStr, err := getArg[string](args, "type")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get type",
-			goerr.TV(errutil.ParameterKey, "type"),
-			goerr.T(errutil.TagValidation))
-	}
+func (x *Warren) getTicketSessionMessages(ctx context.Context, in getTicketSessionMessagesInput) (map[string]any, error) {
+	sourceStr := in.Source
+	typeStr := in.Type
 
-	limit := int(limitVal)
-	offset := int(offsetVal)
+	limit := int(in.Limit)
+	offset := int(in.Offset)
 	if limit <= 0 {
 		limit = DefaultCommentsLimit
 	}

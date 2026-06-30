@@ -37,7 +37,7 @@ func (f *Factory) Configure(ctx context.Context) (interfaces.ToolSet, error) {
 	slackClient := slackSDK.New(f.oauthToken)
 
 	ts := &toolSet{
-		tool: &internalTool{slackClient: slackClient},
+		tool: newInternalTool(slackClient, 0),
 	}
 
 	logging.From(ctx).Info("Slack Search Agent configured")

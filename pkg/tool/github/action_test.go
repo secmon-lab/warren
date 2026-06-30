@@ -138,7 +138,7 @@ func TestGitHubSpecsDelegation(t *testing.T) {
 
 	specs, err := action.Specs(context.Background())
 	gt.NoError(t, err)
-	gt.A(t, specs).Length(5)
+	gt.A(t, specs).Length(7)
 
 	names := map[string]bool{}
 	for _, s := range specs {
@@ -150,6 +150,8 @@ func TestGitHubSpecsDelegation(t *testing.T) {
 		"github_get_content",
 		"github_list_commits",
 		"github_get_blame",
+		"github_get_issue",
+		"github_get_pull_request",
 	} {
 		gt.Value(t, names[want]).Equal(true)
 	}

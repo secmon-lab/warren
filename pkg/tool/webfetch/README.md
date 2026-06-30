@@ -104,7 +104,7 @@ No external API keys are required when running in LLM-disabled mode (every call 
 ## Limitations
 
 - **No URL allow/deny filtering.** Access control is delegated to the HITL approval dialog (LLM-disabled mode) and / or the LLM IPI screen (LLM-enabled mode).
-- **No SSRF protection** beyond scheme restriction. Internal IPs and metadata endpoints are not blocked at this layer.
+- **SSRF guard blocks private/internal IPs by default.** The underlying `github.com/gollem-dev/tools/webfetch` module refuses to fetch URLs that resolve to private, loopback, or link-local IP ranges (including cloud metadata endpoints), so internal-network targets are rejected before the request is sent. warren runs with this guard enabled and does not expose an opt-out, so `web_fetch` cannot reach internal hosts.
 - **UTF-8 assumed.** The `Content-Type` charset is not honored; non-UTF-8 pages may produce garbled output.
 - **No summarization.** The LLM only reformats — it does not condense the body. Large pages (after extraction) are passed to the upstream agent as-is.
 - **No retries.** Transient LLM or HTTP failures bubble up to the agent loop, which owns the retry strategy.
