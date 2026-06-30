@@ -55,6 +55,14 @@ type getRunbookInput struct {
 	RunbookID string `json:"runbook_id" required:"true" description:"The ID of the runbook to retrieve"`
 }
 
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[bigqueryQueryInput, map[string]any]()
+	_ = gollem.MustToolSchema[bigquerySchemaInput, map[string]any]()
+	_ = gollem.MustToolSchema[getRunbookInput, map[string]any]()
+)
+
 // newInternalTool creates an internalTool and builds its type-safe tool set.
 // The get_runbook tool is included only when runbooks are configured, preserving
 // the previous mode-dependent tool surface.

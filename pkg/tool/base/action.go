@@ -165,6 +165,17 @@ type searchSessionMessagesInput struct {
 	Limit int64  `json:"limit" description:"Maximum number of messages to return (default: 50)"`
 }
 
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[getAlertsInput, map[string]any]()
+	_ = gollem.MustToolSchema[findNearestTicketInput, map[string]any]()
+	_ = gollem.MustToolSchema[searchTicketsByWordsInput, map[string]any]()
+	_ = gollem.MustToolSchema[updateFindingInput, map[string]any]()
+	_ = gollem.MustToolSchema[getTicketSessionMessagesInput, map[string]any]()
+	_ = gollem.MustToolSchema[searchSessionMessagesInput, map[string]any]()
+)
+
 func (x *Warren) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return x.tools.Specs(ctx)
 }

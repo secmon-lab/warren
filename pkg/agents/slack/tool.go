@@ -104,6 +104,14 @@ type getContextMessagesInput struct {
 	After    float64 `json:"after" description:"Number of messages after the timestamp (default: 10)"`
 }
 
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[searchMessagesInput, map[string]any]()
+	_ = gollem.MustToolSchema[getThreadMessagesInput, map[string]any]()
+	_ = gollem.MustToolSchema[getContextMessagesInput, map[string]any]()
+)
+
 func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return t.tools.Specs(ctx)
 }

@@ -209,6 +209,22 @@ type tagMergeInput struct {
 	NewID string `json:"new_id" required:"true" description:"Tag ID to merge into (will be kept)"`
 }
 
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[searchInput, map[string]any]()
+	_ = gollem.MustToolSchema[emptyInput, map[string]any]()
+	_ = gollem.MustToolSchema[saveInput, map[string]any]()
+	_ = gollem.MustToolSchema[deleteInput, map[string]any]()
+	_ = gollem.MustToolSchema[listInput, map[string]any]()
+	_ = gollem.MustToolSchema[getInput, map[string]any]()
+	_ = gollem.MustToolSchema[historyInput, map[string]any]()
+	_ = gollem.MustToolSchema[tagCreateInput, map[string]any]()
+	_ = gollem.MustToolSchema[tagUpdateInput, map[string]any]()
+	_ = gollem.MustToolSchema[tagDeleteInput, map[string]any]()
+	_ = gollem.MustToolSchema[tagMergeInput, map[string]any]()
+)
+
 func (x *Tool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return x.tools.Specs(ctx)
 }

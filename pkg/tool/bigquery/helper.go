@@ -411,6 +411,13 @@ type generateConfigToolInput struct {
 	Config map[string]any `json:"config" required:"true" description:"The complete configuration object"`
 }
 
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[configQueryInput, map[string]any]()
+	_ = gollem.MustToolSchema[generateConfigToolInput, map[string]any]()
+)
+
 // newConfigGeneratorTools builds the configGeneratorTools and its type-safe tool
 // set. The bigquery_query description embeds the configured scan-size limit.
 func newConfigGeneratorTools(t *configGeneratorTools) *configGeneratorTools {

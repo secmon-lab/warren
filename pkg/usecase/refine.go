@@ -232,6 +232,10 @@ type slackPostMessageInput struct {
 	Message string `json:"message" required:"true" description:"The message to post in the ticket's Slack thread. Supports Slack mrkdwn format. Use <@USER_ID> for mentions."`
 }
 
+// Startup assertion: validate the tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var _ = gollem.MustToolSchema[slackPostMessageInput, map[string]any]()
+
 // newSlackPostMessageTool builds a gollem.ToolSet exposing slack_post_message,
 // which posts a follow-up message to the ticket's Slack thread during the refine
 // agent loop.

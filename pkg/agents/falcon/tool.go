@@ -129,6 +129,21 @@ type searchEventsInput struct {
 	End         string `json:"end" description:"End time for the search (e.g., \"now\", \"2025-01-02T00:00:00Z\"). Default: \"now\""`
 }
 
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[searchIncidentsInput, map[string]any]()
+	_ = gollem.MustToolSchema[getIncidentsInput, map[string]any]()
+	_ = gollem.MustToolSchema[searchAlertsInput, map[string]any]()
+	_ = gollem.MustToolSchema[getAlertsInput, map[string]any]()
+	_ = gollem.MustToolSchema[searchBehaviorsInput, map[string]any]()
+	_ = gollem.MustToolSchema[getBehaviorsInput, map[string]any]()
+	_ = gollem.MustToolSchema[getCrowdScoresInput, map[string]any]()
+	_ = gollem.MustToolSchema[searchDevicesInput, map[string]any]()
+	_ = gollem.MustToolSchema[getDevicesInput, map[string]any]()
+	_ = gollem.MustToolSchema[searchEventsInput, map[string]any]()
+)
+
 func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
 	return t.tools.Specs(ctx)
 }
