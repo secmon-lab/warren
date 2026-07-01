@@ -332,14 +332,12 @@ func generateConfigWithFactory(ctx context.Context, cfg generateConfigInput, fac
 		gollem.WithLogger(logger),
 		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(llmClient, logger)),
 		gollem.WithContentStreamMiddleware(llm.NewCompactionStreamMiddleware(llmClient)),
-		gollem.WithToolSets(newConfigGeneratorTools(&configGeneratorTools{
-			bqClient:       bqClient,
-			scanLimit:      cfg.ScanLimit,
-			tableDatasetID: cfg.TableDatasetID,
-			tableTableID:   cfg.TableTableID,
-			outputPath:     outputPath,
-			metadata:       tableMetadata,
-		})),
+		gollem.WithToolSets(newConfigGeneratorTools(
+			bqClient,
+			cfg.ScanLimit,
+			outputPath,
+			tableMetadata,
+		)),
 	)
 
 	if _, err := agent.Execute(ctx, gollem.Text("Generate configuration")); err != nil {
@@ -388,12 +386,10 @@ func generateConfigSchema() string {
 
 // configGeneratorTools implements gollem.ToolSet
 type configGeneratorTools struct {
-	bqClient       BigQueryClient
-	scanLimit      uint64
-	tableDatasetID string
-	tableTableID   string
-	outputPath     string
-	metadata       *bigquery.TableMetadata
+	bqClient   BigQueryClient
+	scanLimit  uint64
+	outputPath string
+	metadata   *bigquery.TableMetadata
 
 	tools gollem.ToolSet
 }
@@ -420,8 +416,14 @@ var (
 
 // newConfigGeneratorTools builds the configGeneratorTools and its type-safe tool
 // set. The bigquery_query description embeds the configured scan-size limit.
-func newConfigGeneratorTools(t *configGeneratorTools) *configGeneratorTools {
-	queryDesc := fmt.Sprintf("Execute SQL query against BigQuery. Performs dry run to check scan size (limit: %s). Only use field names from the provided schema.", humanize.Bytes(t.scanLimit))
+func newConfigGeneratorTools(bqClient BigQueryClient, scanLimit uint64, outputPath string, metadata *bigquery.TableMetadata) *configGeneratorTools {
+	t := &configGeneratorTools{
+		bqClient:   bqClient,
+		scanLimit:  scanLimit,
+		outputPath: outputPath,
+		metadata:   metadata,
+	}
+	queryDesc := fmt.Sprintf("Execute SQL query against BigQuery. Performs dry run to check scan size (limit: %s). Only use field names from the provided schema.", humanize.Bytes(scanLimit))
 	t.tools = toolset.New(
 		gollem.MustNewTool("bigquery_query", queryDesc, t.executeBigQueryQuery),
 		gollem.MustNewTool("generate_config", "Generate the final YAML configuration. This validates the config against the actual schema and saves it to a file.", t.generateConfigOutput),
