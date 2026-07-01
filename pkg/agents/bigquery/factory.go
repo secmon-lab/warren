@@ -98,11 +98,7 @@ func (f *Factory) Configure(ctx context.Context) (interfaces.ToolSet, error) {
 	// Create and return toolSet
 	ts := &toolSet{
 		config: cfg,
-		tool: &internalTool{
-			config:                    cfg,
-			projectID:                 f.projectID,
-			impersonateServiceAccount: f.impersonateServiceAccount,
-		},
+		tool:   newInternalTool(cfg, f.projectID, f.impersonateServiceAccount),
 	}
 
 	return ts, nil

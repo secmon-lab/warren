@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"cloud.google.com/go/bigquery"
 	"github.com/dustin/go-humanize"
@@ -13,6 +14,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/types"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
 	"github.com/secmon-lab/warren/pkg/utils/msg"
+	"github.com/secmon-lab/warren/pkg/utils/toolset"
 	"google.golang.org/api/impersonate"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -23,26 +25,77 @@ type internalTool struct {
 	config                    *Config
 	projectID                 string
 	impersonateServiceAccount string
+
+	tools gollem.ToolSet
 }
 
-// ID implements gollem.ToolSet
-func (t *internalTool) ID() string {
-	return "bigquery_agent"
+// Static tool descriptions. The bigquery_query description is built per-config
+// in newInternalTool because it interpolates the available tables and scan
+// limit; the rest are constant.
+const (
+	descBigQuerySchema = `Get detailed schema information for a specific BigQuery table.
+Use this to understand available fields, data types, and nested structures before constructing queries.
+Returns complete schema including nested RECORD fields.`
+	descGetRunbook = "Get the full SQL content of a runbook by its ID. Use this when you want to see or adapt a pre-written query template."
+)
+
+// Typed inputs for each tool; the schema is inferred from these struct tags.
+type bigqueryQueryInput struct {
+	SQL         string `json:"sql" required:"true" description:"The SQL query to execute. Must be a valid BigQuery SQL query."`
+	Description string `json:"description" description:"Brief description of what this query is trying to achieve (optional, for logging/tracking)"`
 }
 
-// Specs implements gollem.ToolSet
-func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
-	// Build table descriptions for the prompt
-	tableDescriptions := ""
-	for i, table := range t.config.Tables {
-		tableDescriptions += fmt.Sprintf("\n%d. %s.%s.%s: %s",
-			i+1, table.ProjectID, table.DatasetID, table.TableID, table.Description)
+type bigquerySchemaInput struct {
+	ProjectID string `json:"project_id" required:"true" description:"The project ID of the table"`
+	DatasetID string `json:"dataset_id" required:"true" description:"The dataset ID of the table"`
+	TableID   string `json:"table_id" required:"true" description:"The table ID to get schema for"`
+}
+
+type getRunbookInput struct {
+	RunbookID string `json:"runbook_id" required:"true" description:"The ID of the runbook to retrieve"`
+}
+
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[bigqueryQueryInput, map[string]any]()
+	_ = gollem.MustToolSchema[bigquerySchemaInput, map[string]any]()
+	_ = gollem.MustToolSchema[getRunbookInput, map[string]any]()
+)
+
+// newInternalTool creates an internalTool and builds its type-safe tool set.
+// The get_runbook tool is included only when runbooks are configured, preserving
+// the previous mode-dependent tool surface.
+func newInternalTool(config *Config, projectID, impersonateServiceAccount string) *internalTool {
+	t := &internalTool{
+		config:                    config,
+		projectID:                 projectID,
+		impersonateServiceAccount: impersonateServiceAccount,
 	}
 
-	specs := []gollem.ToolSpec{
-		{
-			Name: "bigquery_query",
-			Description: fmt.Sprintf(`Execute a BigQuery SQL query to retrieve data.
+	tools := []gollem.Tool{
+		gollem.MustNewTool("bigquery_query", buildQueryDescription(config), t.executeQuery),
+		gollem.MustNewTool("bigquery_schema", descBigQuerySchema, t.getTableSchema),
+	}
+	if len(config.Runbooks) > 0 {
+		tools = append(tools, gollem.MustNewTool("get_runbook", descGetRunbook, t.getRunbook))
+	}
+	t.tools = toolset.New(tools...)
+
+	return t
+}
+
+// buildQueryDescription renders the bigquery_query tool description, embedding
+// the available tables and the configured scan-size limit.
+func buildQueryDescription(config *Config) string {
+	var sb strings.Builder
+	for i, table := range config.Tables {
+		fmt.Fprintf(&sb, "\n%d. %s.%s.%s: %s",
+			i+1, table.ProjectID, table.DatasetID, table.TableID, table.Description)
+	}
+	tableDescriptions := sb.String()
+
+	return fmt.Sprintf(`Execute a BigQuery SQL query to retrieve data.
 Available tables:%s
 
 Important guidelines:
@@ -58,88 +111,32 @@ Best practices:
 - Start with schema inspection if unfamiliar with table structure
 - Apply time range filters to reduce scan size
 - Use LIMIT to restrict rows appropriately`,
-				tableDescriptions,
-				humanize.Bytes(t.config.ScanSizeLimit),
-			),
-			Parameters: map[string]*gollem.Parameter{
-				"sql": {
-					Type:        gollem.TypeString,
-					Description: "The SQL query to execute. Must be a valid BigQuery SQL query.",
-					Required:    true,
-				},
-				"description": {
-					Type:        gollem.TypeString,
-					Description: "Brief description of what this query is trying to achieve (optional, for logging/tracking)",
-				},
-			},
-		},
-		{
-			Name: "bigquery_schema",
-			Description: `Get detailed schema information for a specific BigQuery table.
-Use this to understand available fields, data types, and nested structures before constructing queries.
-Returns complete schema including nested RECORD fields.`,
-			Parameters: map[string]*gollem.Parameter{
-				"project_id": {
-					Type:        gollem.TypeString,
-					Description: "The project ID of the table",
-					Required:    true,
-				},
-				"dataset_id": {
-					Type:        gollem.TypeString,
-					Description: "The dataset ID of the table",
-					Required:    true,
-				},
-				"table_id": {
-					Type:        gollem.TypeString,
-					Description: "The table ID to get schema for",
-					Required:    true,
-				},
-			},
-		},
-	}
+		tableDescriptions,
+		humanize.Bytes(config.ScanSizeLimit),
+	)
+}
 
-	// Add get_runbook tool if runbooks are configured
-	if len(t.config.Runbooks) > 0 {
-		specs = append(specs, gollem.ToolSpec{
-			Name:        "get_runbook",
-			Description: "Get the full SQL content of a runbook by its ID. Use this when you want to see or adapt a pre-written query template.",
-			Parameters: map[string]*gollem.Parameter{
-				"runbook_id": {
-					Type:        gollem.TypeString,
-					Description: "The ID of the runbook to retrieve",
-					Required:    true,
-				},
-			},
-		})
-	}
+// ID implements gollem.ToolSet
+func (t *internalTool) ID() string {
+	return "bigquery_agent"
+}
 
-	return specs, nil
+// Specs implements gollem.ToolSet
+func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
+	return t.tools.Specs(ctx)
 }
 
 // Run implements gollem.ToolSet
 func (t *internalTool) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	log := logging.From(ctx)
-	log.Debug("Internal tool run started", "function", name, "args_keys", getMapKeys(args))
-
-	switch name {
-	case "bigquery_query":
-		return t.executeQuery(ctx, args)
-	case "bigquery_schema":
-		return t.getTableSchema(ctx, args)
-	case "get_runbook":
-		return t.getRunbook(ctx, args)
-	default:
-		log.Debug("Unknown internal tool function", "name", name)
-		return nil, goerr.New("unknown function", goerr.V("name", name))
-	}
+	return t.tools.Run(ctx, name, args)
 }
 
-func (t *internalTool) executeQuery(ctx context.Context, args map[string]any) (map[string]any, error) {
+func (t *internalTool) executeQuery(ctx context.Context, in bigqueryQueryInput) (map[string]any, error) {
 	log := logging.From(ctx)
 	log.Debug("Executing BigQuery query")
 
-	sql, ok := args["sql"].(string)
-	if !ok {
+	sql := in.SQL
+	if sql == "" {
 		log.Debug("SQL parameter is missing or invalid")
 		return nil, goerr.New("sql parameter is required")
 	}
@@ -312,22 +309,22 @@ func (t *internalTool) executeQuery(ctx context.Context, args map[string]any) (m
 }
 
 // getTableSchema retrieves detailed schema information for a BigQuery table
-func (t *internalTool) getTableSchema(ctx context.Context, args map[string]any) (map[string]any, error) {
+func (t *internalTool) getTableSchema(ctx context.Context, in bigquerySchemaInput) (map[string]any, error) {
 	log := logging.From(ctx)
 	log.Debug("Getting BigQuery table schema")
 
-	projectID, ok := args["project_id"].(string)
-	if !ok {
+	projectID := in.ProjectID
+	if projectID == "" {
 		log.Debug("project_id parameter is missing or invalid")
 		return nil, goerr.New("project_id parameter is required")
 	}
-	datasetID, ok := args["dataset_id"].(string)
-	if !ok {
+	datasetID := in.DatasetID
+	if datasetID == "" {
 		log.Debug("dataset_id parameter is missing or invalid")
 		return nil, goerr.New("dataset_id parameter is required")
 	}
-	tableID, ok := args["table_id"].(string)
-	if !ok {
+	tableID := in.TableID
+	if tableID == "" {
 		log.Debug("table_id parameter is missing or invalid")
 		return nil, goerr.New("table_id parameter is required")
 	}
@@ -458,12 +455,12 @@ func convertBigQueryValue(val bigquery.Value) any {
 }
 
 // getRunbook retrieves a runbook entry by ID
-func (t *internalTool) getRunbook(ctx context.Context, args map[string]any) (map[string]any, error) {
+func (t *internalTool) getRunbook(ctx context.Context, in getRunbookInput) (map[string]any, error) {
 	log := logging.From(ctx)
 	log.Debug("Getting runbook")
 
-	runbookIDStr, ok := args["runbook_id"].(string)
-	if !ok {
+	runbookIDStr := in.RunbookID
+	if runbookIDStr == "" {
 		log.Debug("runbook_id parameter is missing or invalid")
 		return nil, goerr.New("runbook_id parameter is required")
 	}
@@ -488,13 +485,4 @@ func (t *internalTool) getRunbook(ctx context.Context, args map[string]any) (map
 		"description": entry.Description,
 		"sql":         entry.SQLContent,
 	}, nil
-}
-
-// getMapKeys returns the keys of a map as a slice
-func getMapKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }

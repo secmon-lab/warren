@@ -11,16 +11,13 @@ type InternalTool = internalTool
 
 // NewInternalToolForTest creates an internalTool for testing
 func NewInternalToolForTest(slackClient interfaces.SlackClient, maxLimit int) *internalTool {
-	return &internalTool{
-		slackClient: slackClient,
-		maxLimit:    maxLimit,
-	}
+	return newInternalTool(slackClient, maxLimit)
 }
 
 // NewToolSetForTest creates a toolSet instance for testing
 func NewToolSetForTest(slackClient interfaces.SlackClient) *toolSet {
 	return &toolSet{
-		tool: &internalTool{slackClient: slackClient},
+		tool: newInternalTool(slackClient, 0),
 	}
 }
 

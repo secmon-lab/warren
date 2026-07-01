@@ -13,20 +13,9 @@ import (
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
 )
 
-func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (map[string]any, error) {
-	limit, err := getArg[int64](args, "limit")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit",
-			goerr.TV(errutil.ParameterKey, "limit"),
-			goerr.T(errutil.TagValidation))
-	}
-
-	duration, err := getArg[int64](args, "duration")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get duration",
-			goerr.TV(errutil.ParameterKey, "duration"),
-			goerr.T(errutil.TagValidation))
-	}
+func (x *Warren) findNearestTicket(ctx context.Context, in findNearestTicketInput) (map[string]any, error) {
+	limit := in.Limit
+	duration := in.Duration
 
 	// Get current ticket
 	currentTicket, err := x.repo.GetTicket(ctx, x.ticketID)
@@ -64,13 +53,8 @@ func (x *Warren) findNearestTicket(ctx context.Context, args map[string]any) (ma
 	}, nil
 }
 
-func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) (map[string]any, error) {
-	query, err := getArg[string](args, "query")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get query",
-			goerr.TV(errutil.ParameterKey, "query"),
-			goerr.T(errutil.TagValidation))
-	}
+func (x *Warren) searchTicketsByWords(ctx context.Context, in searchTicketsByWordsInput) (map[string]any, error) {
+	query := in.Query
 	if query == "" {
 		return nil, goerr.New("query is required",
 			goerr.TV(errutil.ParameterKey, "query"),
@@ -83,22 +67,12 @@ func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) 
 			goerr.T(errutil.TagInternal))
 	}
 
-	limit, err := getArg[int64](args, "limit")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get limit",
-			goerr.TV(errutil.ParameterKey, "limit"),
-			goerr.T(errutil.TagValidation))
-	}
+	limit := in.Limit
 	if limit <= 0 {
 		limit = DefaultSearchTicketsLimit
 	}
 
-	duration, err := getArg[int64](args, "duration")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get duration",
-			goerr.TV(errutil.ParameterKey, "duration"),
-			goerr.T(errutil.TagValidation))
-	}
+	duration := in.Duration
 	if duration <= 0 {
 		duration = DefaultSearchTicketsDuration
 	}
@@ -131,49 +105,29 @@ func (x *Warren) searchTicketsByWords(ctx context.Context, args map[string]any) 
 	}, nil
 }
 
-func (x *Warren) updateFinding(ctx context.Context, args map[string]any) (map[string]any, error) {
-	summary, err := getArg[string](args, "summary")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get summary",
-			goerr.TV(errutil.ParameterKey, "summary"),
-			goerr.T(errutil.TagValidation))
-	}
+func (x *Warren) updateFinding(ctx context.Context, in updateFindingInput) (map[string]any, error) {
+	summary := in.Summary
 	if summary == "" {
 		return nil, goerr.New("summary is required",
 			goerr.TV(errutil.ParameterKey, "summary"),
 			goerr.T(errutil.TagValidation))
 	}
 
-	severityStr, err := getArg[string](args, "severity")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get severity",
-			goerr.TV(errutil.ParameterKey, "severity"),
-			goerr.T(errutil.TagValidation))
-	}
+	severityStr := in.Severity
 	if severityStr == "" {
 		return nil, goerr.New("severity is required",
 			goerr.TV(errutil.ParameterKey, "severity"),
 			goerr.T(errutil.TagValidation))
 	}
 
-	reason, err := getArg[string](args, "reason")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get reason",
-			goerr.TV(errutil.ParameterKey, "reason"),
-			goerr.T(errutil.TagValidation))
-	}
+	reason := in.Reason
 	if reason == "" {
 		return nil, goerr.New("reason is required",
 			goerr.TV(errutil.ParameterKey, "reason"),
 			goerr.T(errutil.TagValidation))
 	}
 
-	recommendation, err := getArg[string](args, "recommendation")
-	if err != nil {
-		return nil, goerr.Wrap(err, "failed to get recommendation",
-			goerr.TV(errutil.ParameterKey, "recommendation"),
-			goerr.T(errutil.TagValidation))
-	}
+	recommendation := in.Recommendation
 	if recommendation == "" {
 		return nil, goerr.New("recommendation is required",
 			goerr.TV(errutil.ParameterKey, "recommendation"),

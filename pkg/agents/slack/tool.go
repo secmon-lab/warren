@@ -10,12 +10,31 @@ import (
 	"github.com/gollem-dev/gollem"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/utils/toolset"
 	slackSDK "github.com/slack-go/slack"
 )
 
 type internalTool struct {
 	slackClient interfaces.SlackClient
 	maxLimit    int // Maximum number of results allowed from search
+
+	tools gollem.ToolSet
+}
+
+// newInternalTool creates an internalTool and builds its type-safe tool set.
+func newInternalTool(slackClient interfaces.SlackClient, maxLimit int) *internalTool {
+	t := &internalTool{
+		slackClient: slackClient,
+		maxLimit:    maxLimit,
+	}
+
+	t.tools = toolset.New(
+		gollem.MustNewTool("slack_search_messages", descSearchMessages, t.searchMessages),
+		gollem.MustNewTool("slack_get_thread_messages", descGetThreadMessages, t.getThreadMessages),
+		gollem.MustNewTool("slack_get_context_messages", descGetContextMessages, t.getContextMessages),
+	)
+
+	return t
 }
 
 // parseSlackTimestamp parses a Slack timestamp string (e.g., "1234567890.123456")
@@ -53,102 +72,57 @@ func parseSlackTimestamp(tsStr string) time.Time {
 	return time.Unix(sec, nsec)
 }
 
+// Tool descriptions. Kept as constants so the typed-tool registration stays
+// readable and the wire-level descriptions are unchanged.
+const (
+	descSearchMessages     = "Search for messages in Slack workspace using the search.messages API"
+	descGetThreadMessages  = "Get all messages in a thread"
+	descGetContextMessages = "Get messages before and after a specific message timestamp"
+)
+
+// Typed inputs for each tool. Counts use float64 so the inferred JSON schema
+// stays "number", matching the wire-level type given before this migration.
+type searchMessagesInput struct {
+	Query     string  `json:"query" required:"true" description:"The search query (e.g., 'from:@user', 'in:general', 'has:link')"`
+	Sort      string  `json:"sort" description:"Sort order: 'score' (relevance) or 'timestamp' (newest first)"`
+	SortDir   string  `json:"sort_dir" description:"Sort direction: 'asc' or 'desc'"`
+	Count     float64 `json:"count" description:"Number of results to return (default: 20, max: 100)"`
+	Page      float64 `json:"page" description:"Page number for pagination (default: 1)"`
+	Highlight bool    `json:"highlight" description:"Enable highlighting of search terms in results"`
+}
+
+type getThreadMessagesInput struct {
+	Channel  string  `json:"channel" required:"true" description:"Channel ID"`
+	ThreadTS string  `json:"thread_ts" required:"true" description:"Thread timestamp (ts of the parent message)"`
+	Limit    float64 `json:"limit" description:"Maximum number of messages to return (default: 50, max: 200)"`
+}
+
+type getContextMessagesInput struct {
+	Channel  string  `json:"channel" required:"true" description:"Channel ID"`
+	AroundTS string  `json:"around_ts" required:"true" description:"Timestamp of the message to get context around"`
+	Before   float64 `json:"before" description:"Number of messages before the timestamp (default: 10)"`
+	After    float64 `json:"after" description:"Number of messages after the timestamp (default: 10)"`
+}
+
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[searchMessagesInput, map[string]any]()
+	_ = gollem.MustToolSchema[getThreadMessagesInput, map[string]any]()
+	_ = gollem.MustToolSchema[getContextMessagesInput, map[string]any]()
+)
+
 func (t *internalTool) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        "slack_search_messages",
-			Description: "Search for messages in Slack workspace using the search.messages API",
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "The search query (e.g., 'from:@user', 'in:general', 'has:link')",
-					Required:    true,
-				},
-				"sort": {
-					Type:        gollem.TypeString,
-					Description: "Sort order: 'score' (relevance) or 'timestamp' (newest first)",
-				},
-				"sort_dir": {
-					Type:        gollem.TypeString,
-					Description: "Sort direction: 'asc' or 'desc'",
-				},
-				"count": {
-					Type:        gollem.TypeNumber,
-					Description: "Number of results to return (default: 20, max: 100)",
-				},
-				"page": {
-					Type:        gollem.TypeNumber,
-					Description: "Page number for pagination (default: 1)",
-				},
-				"highlight": {
-					Type:        gollem.TypeBoolean,
-					Description: "Enable highlighting of search terms in results",
-				},
-			},
-		},
-		{
-			Name:        "slack_get_thread_messages",
-			Description: "Get all messages in a thread",
-			Parameters: map[string]*gollem.Parameter{
-				"channel": {
-					Type:        gollem.TypeString,
-					Description: "Channel ID",
-					Required:    true,
-				},
-				"thread_ts": {
-					Type:        gollem.TypeString,
-					Description: "Thread timestamp (ts of the parent message)",
-					Required:    true,
-				},
-				"limit": {
-					Type:        gollem.TypeNumber,
-					Description: "Maximum number of messages to return (default: 50, max: 200)",
-				},
-			},
-		},
-		{
-			Name:        "slack_get_context_messages",
-			Description: "Get messages before and after a specific message timestamp",
-			Parameters: map[string]*gollem.Parameter{
-				"channel": {
-					Type:        gollem.TypeString,
-					Description: "Channel ID",
-					Required:    true,
-				},
-				"around_ts": {
-					Type:        gollem.TypeString,
-					Description: "Timestamp of the message to get context around",
-					Required:    true,
-				},
-				"before": {
-					Type:        gollem.TypeNumber,
-					Description: "Number of messages before the timestamp (default: 10)",
-				},
-				"after": {
-					Type:        gollem.TypeNumber,
-					Description: "Number of messages after the timestamp (default: 10)",
-				},
-			},
-		},
-	}, nil
+	return t.tools.Specs(ctx)
 }
 
 func (t *internalTool) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	switch name {
-	case "slack_search_messages":
-		return t.searchMessages(ctx, args)
-	case "slack_get_thread_messages":
-		return t.getThreadMessages(ctx, args)
-	case "slack_get_context_messages":
-		return t.getContextMessages(ctx, args)
-	default:
-		return nil, goerr.New("unknown tool name", goerr.V("name", name))
-	}
+	return t.tools.Run(ctx, name, args)
 }
 
-func (t *internalTool) searchMessages(ctx context.Context, args map[string]any) (map[string]any, error) {
-	query, ok := args["query"].(string)
-	if !ok || query == "" {
+func (t *internalTool) searchMessages(ctx context.Context, in searchMessagesInput) (map[string]any, error) {
+	query := in.Query
+	if query == "" {
 		return nil, goerr.New("query is required")
 	}
 
@@ -157,21 +131,15 @@ func (t *internalTool) searchMessages(ctx context.Context, args map[string]any) 
 		Page:  1,
 	}
 
-	if sort, ok := args["sort"].(string); ok {
-		params.Sort = sort
+	params.Sort = in.Sort
+	params.SortDirection = in.SortDir
+	if in.Count > 0 {
+		params.Count = int(in.Count)
 	}
-	if sortDir, ok := args["sort_dir"].(string); ok {
-		params.SortDirection = sortDir
+	if in.Page > 0 {
+		params.Page = int(in.Page)
 	}
-	if count, ok := args["count"].(float64); ok {
-		params.Count = int(count)
-	}
-	if page, ok := args["page"].(float64); ok {
-		params.Page = int(page)
-	}
-	if highlight, ok := args["highlight"].(bool); ok {
-		params.Highlight = highlight
-	}
+	params.Highlight = in.Highlight
 
 	resp, err := t.slackClient.SearchMessagesContext(ctx, query, params)
 	if err != nil {
@@ -216,20 +184,20 @@ func (t *internalTool) searchMessages(ctx context.Context, args map[string]any) 
 	}, nil
 }
 
-func (t *internalTool) getThreadMessages(ctx context.Context, args map[string]any) (map[string]any, error) {
-	channel, ok := args["channel"].(string)
-	if !ok || channel == "" {
+func (t *internalTool) getThreadMessages(ctx context.Context, in getThreadMessagesInput) (map[string]any, error) {
+	channel := in.Channel
+	if channel == "" {
 		return nil, goerr.New("channel is required")
 	}
 
-	threadTS, ok := args["thread_ts"].(string)
-	if !ok || threadTS == "" {
+	threadTS := in.ThreadTS
+	if threadTS == "" {
 		return nil, goerr.New("thread_ts is required")
 	}
 
 	limit := 50
-	if l, ok := args["limit"].(float64); ok {
-		limit = int(l)
+	if in.Limit > 0 {
+		limit = int(in.Limit)
 	}
 	if limit > 200 {
 		limit = 200
@@ -263,25 +231,26 @@ func (t *internalTool) getThreadMessages(ctx context.Context, args map[string]an
 	}, nil
 }
 
-func (t *internalTool) getContextMessages(ctx context.Context, args map[string]any) (map[string]any, error) {
-	channel, ok := args["channel"].(string)
-	if !ok || channel == "" {
+func (t *internalTool) getContextMessages(ctx context.Context, in getContextMessagesInput) (map[string]any, error) {
+	channel := in.Channel
+	if channel == "" {
 		return nil, goerr.New("channel is required")
 	}
 
-	aroundTS, ok := args["around_ts"].(string)
-	if !ok || aroundTS == "" {
+	aroundTS := in.AroundTS
+	if aroundTS == "" {
 		return nil, goerr.New("around_ts is required")
 	}
 
+	// A zero/absent count falls back to the documented default of 10.
 	before := 10
-	if b, ok := args["before"].(float64); ok {
-		before = int(b)
+	if in.Before > 0 {
+		before = int(in.Before)
 	}
 
 	after := 10
-	if a, ok := args["after"].(float64); ok {
-		after = int(a)
+	if in.After > 0 {
+		after = int(in.After)
 	}
 
 	// Parse the timestamp

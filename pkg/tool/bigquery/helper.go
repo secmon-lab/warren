@@ -18,6 +18,7 @@ import (
 	"github.com/secmon-lab/warren/pkg/domain/model/prompt"
 	"github.com/secmon-lab/warren/pkg/service/llm"
 	"github.com/secmon-lab/warren/pkg/utils/logging"
+	"github.com/secmon-lab/warren/pkg/utils/toolset"
 	"github.com/urfave/cli/v3"
 	"google.golang.org/api/iterator"
 	"gopkg.in/yaml.v3"
@@ -331,14 +332,14 @@ func generateConfigWithFactory(ctx context.Context, cfg generateConfigInput, fac
 		gollem.WithLogger(logger),
 		gollem.WithContentBlockMiddleware(llm.NewCompactionMiddleware(llmClient, logger)),
 		gollem.WithContentStreamMiddleware(llm.NewCompactionStreamMiddleware(llmClient)),
-		gollem.WithToolSets(&configGeneratorTools{
+		gollem.WithToolSets(newConfigGeneratorTools(&configGeneratorTools{
 			bqClient:       bqClient,
 			scanLimit:      cfg.ScanLimit,
 			tableDatasetID: cfg.TableDatasetID,
 			tableTableID:   cfg.TableTableID,
 			outputPath:     outputPath,
 			metadata:       tableMetadata,
-		}),
+		})),
 	)
 
 	if _, err := agent.Execute(ctx, gollem.Text("Generate configuration")); err != nil {
@@ -393,49 +394,52 @@ type configGeneratorTools struct {
 	tableTableID   string
 	outputPath     string
 	metadata       *bigquery.TableMetadata
+
+	tools gollem.ToolSet
+}
+
+// configQueryInput is the typed argument for the bigquery_query helper tool.
+type configQueryInput struct {
+	Query string `json:"query" required:"true" description:"The SQL query to execute"`
+}
+
+// generateConfigToolInput is the typed argument for the generate_config helper
+// tool. Config stays a map[string]any so the inferred schema remains an opaque
+// object property (the concrete shape is described to the LLM via the system
+// prompt), matching the wire schema before this migration.
+type generateConfigToolInput struct {
+	Config map[string]any `json:"config" required:"true" description:"The complete configuration object"`
+}
+
+// Startup assertions: validate each tool's In/Out types form a valid schema at
+// package init, so a malformed type fails immediately rather than at first use.
+var (
+	_ = gollem.MustToolSchema[configQueryInput, map[string]any]()
+	_ = gollem.MustToolSchema[generateConfigToolInput, map[string]any]()
+)
+
+// newConfigGeneratorTools builds the configGeneratorTools and its type-safe tool
+// set. The bigquery_query description embeds the configured scan-size limit.
+func newConfigGeneratorTools(t *configGeneratorTools) *configGeneratorTools {
+	queryDesc := fmt.Sprintf("Execute SQL query against BigQuery. Performs dry run to check scan size (limit: %s). Only use field names from the provided schema.", humanize.Bytes(t.scanLimit))
+	t.tools = toolset.New(
+		gollem.MustNewTool("bigquery_query", queryDesc, t.executeBigQueryQuery),
+		gollem.MustNewTool("generate_config", "Generate the final YAML configuration. This validates the config against the actual schema and saves it to a file.", t.generateConfigOutput),
+	)
+	return t
 }
 
 func (t *configGeneratorTools) Specs(ctx context.Context) ([]gollem.ToolSpec, error) {
-	return []gollem.ToolSpec{
-		{
-			Name:        "bigquery_query",
-			Description: fmt.Sprintf("Execute SQL query against BigQuery. Performs dry run to check scan size (limit: %s). Only use field names from the provided schema.", humanize.Bytes(t.scanLimit)),
-			Parameters: map[string]*gollem.Parameter{
-				"query": {
-					Type:        gollem.TypeString,
-					Description: "The SQL query to execute",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:        "generate_config",
-			Description: "Generate the final YAML configuration. This validates the config against the actual schema and saves it to a file.",
-			Parameters: map[string]*gollem.Parameter{
-				"config": {
-					Type:        gollem.TypeObject,
-					Description: "The complete configuration object",
-					Required:    true,
-				},
-			},
-		},
-	}, nil
+	return t.tools.Specs(ctx)
 }
 
 func (t *configGeneratorTools) Run(ctx context.Context, name string, args map[string]any) (map[string]any, error) {
-	switch name {
-	case "bigquery_query":
-		return t.executeBigQueryQuery(ctx, args)
-	case "generate_config":
-		return t.generateConfigOutput(ctx, args)
-	default:
-		return nil, goerr.New("invalid function name", goerr.V("name", name))
-	}
+	return t.tools.Run(ctx, name, args)
 }
 
-func (t *configGeneratorTools) executeBigQueryQuery(ctx context.Context, args map[string]any) (map[string]any, error) {
-	query, ok := args["query"].(string)
-	if !ok {
+func (t *configGeneratorTools) executeBigQueryQuery(ctx context.Context, in configQueryInput) (map[string]any, error) {
+	query := in.Query
+	if query == "" {
 		return nil, goerr.New("query parameter is required")
 	}
 
@@ -508,9 +512,9 @@ func (t *configGeneratorTools) executeBigQueryQuery(ctx context.Context, args ma
 	}, nil
 }
 
-func (t *configGeneratorTools) generateConfigOutput(ctx context.Context, args map[string]any) (map[string]any, error) {
-	config, ok := args["config"].(map[string]any)
-	if !ok {
+func (t *configGeneratorTools) generateConfigOutput(ctx context.Context, in generateConfigToolInput) (map[string]any, error) {
+	config := in.Config
+	if config == nil {
 		return nil, goerr.New("config parameter is required")
 	}
 
