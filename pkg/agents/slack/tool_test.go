@@ -224,6 +224,53 @@ func TestInternalTool_GetContextMessages(t *testing.T) {
 	gt.V(t, afterMsg["user_name"]).Equal("user2")
 }
 
+// TestInternalTool_GetContextMessages_ExplicitZeroSkipsSide guards the regression
+// where an explicit before=0 (meaning "fetch nothing before, only after") was
+// collapsed into the default of 10 by a `> 0` value check. The pointer-typed
+// field must let an explicit 0 skip that side while an omitted field defaults.
+func TestInternalTool_GetContextMessages_ExplicitZeroSkipsSide(t *testing.T) {
+	ctx := context.Background()
+
+	var beforeCalls, afterCalls int
+	slackClient := &domainmock.SlackClientMock{
+		GetConversationHistoryContextFunc: func(ctx context.Context, params *slackSDK.GetConversationHistoryParameters) (*slackSDK.GetConversationHistoryResponse, error) {
+			if params.Latest != "" {
+				beforeCalls++
+			}
+			if params.Oldest != "" {
+				afterCalls++
+			}
+			return &slackSDK.GetConversationHistoryResponse{
+				Messages: []slackSDK.Message{
+					{Msg: slackSDK.Msg{Timestamp: "1234567892.654321", Text: "ctx", Username: "u"}},
+				},
+			}, nil
+		},
+	}
+
+	tool := slackagent.NewInternalToolForTest(slackClient, 0)
+
+	result, err := tool.Run(ctx, "slack_get_context_messages", map[string]any{
+		"channel":   "C123456",
+		"around_ts": "1234567890",
+		"before":    float64(0),
+		"after":     float64(2),
+	})
+	gt.NoError(t, err)
+
+	// before=0 must skip the "before" fetch entirely; after=2 still runs.
+	gt.V(t, beforeCalls).Equal(0)
+	gt.V(t, afterCalls).Equal(1)
+
+	beforeMessages, ok := result["before_messages"].([]any)
+	gt.True(t, ok)
+	gt.V(t, len(beforeMessages)).Equal(0)
+
+	afterMessages, ok := result["after_messages"].([]any)
+	gt.True(t, ok)
+	gt.V(t, len(afterMessages)).Equal(1)
+}
+
 func TestInternalTool_DirectLimitEnforcement(t *testing.T) {
 	ctx := context.Background()
 

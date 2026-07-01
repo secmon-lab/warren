@@ -98,10 +98,14 @@ type getThreadMessagesInput struct {
 }
 
 type getContextMessagesInput struct {
-	Channel  string  `json:"channel" required:"true" description:"Channel ID"`
-	AroundTS string  `json:"around_ts" required:"true" description:"Timestamp of the message to get context around"`
-	Before   float64 `json:"before" description:"Number of messages before the timestamp (default: 10)"`
-	After    float64 `json:"after" description:"Number of messages after the timestamp (default: 10)"`
+	Channel  string `json:"channel" required:"true" description:"Channel ID"`
+	AroundTS string `json:"around_ts" required:"true" description:"Timestamp of the message to get context around"`
+	// Before/After are pointers so an omitted argument (nil → default 10) can be
+	// distinguished from an explicit 0 ("fetch nothing on this side"), which a
+	// plain value field would collapse into the default. The pointer is unwrapped
+	// to float64 for schema inference, so the wire type stays "number".
+	Before *float64 `json:"before" description:"Number of messages before the timestamp (default: 10)"`
+	After  *float64 `json:"after" description:"Number of messages after the timestamp (default: 10)"`
 }
 
 // Startup assertions: validate each tool's In/Out types form a valid schema at
@@ -242,15 +246,17 @@ func (t *internalTool) getContextMessages(ctx context.Context, in getContextMess
 		return nil, goerr.New("around_ts is required")
 	}
 
-	// A zero/absent count falls back to the documented default of 10.
+	// nil (argument omitted) falls back to the documented default of 10; an
+	// explicit value — including 0, meaning "fetch nothing on this side" — is
+	// honored as-is.
 	before := 10
-	if in.Before > 0 {
-		before = int(in.Before)
+	if in.Before != nil {
+		before = int(*in.Before)
 	}
 
 	after := 10
-	if in.After > 0 {
-		after = int(in.After)
+	if in.After != nil {
+		after = int(*in.After)
 	}
 
 	// Parse the timestamp
