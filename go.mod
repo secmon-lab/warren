@@ -12,7 +12,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/getsentry/sentry-go v0.44.1
 	github.com/go-chi/chi/v5 v5.2.5
-	github.com/gollem-dev/gollem v0.26.2-0.20260630002044-aed22083a5b0
+	github.com/gollem-dev/gollem v0.27.0
 	github.com/gollem-dev/tools/abusech v0.2.0
 	github.com/gollem-dev/tools/bigquery v0.2.0
 	github.com/gollem-dev/tools/github v0.3.0

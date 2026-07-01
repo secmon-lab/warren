@@ -218,8 +218,8 @@ github.com/golang-jwt/jwt/v5 v5.3.1 h1:kYf81DTWFe7t+1VvL7eS+jKFVWaUnK9cB1qbwn63Y
 github.com/golang-jwt/jwt/v5 v5.3.1/go.mod h1:fxCRLWMO43lRc8nhHWY6LGqRcf+1gQWArsqaEUEa5bE=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
-github.com/gollem-dev/gollem v0.26.2-0.20260630002044-aed22083a5b0 h1:8W3NXX/O2S1TQF7dTYQUER+H39cnny4V32DanPQyB+Y=
-github.com/gollem-dev/gollem v0.26.2-0.20260630002044-aed22083a5b0/go.mod h1:20atdewh0lJcT3JV7eD3VeemZqwLFJFO7cQsBFnOtdk=
+github.com/gollem-dev/gollem v0.27.0 h1:h2rMohrG5gjvIQdWHKDZzNbwL6M1VUj/VtIYiu2q4t4=
+github.com/gollem-dev/gollem v0.27.0/go.mod h1:20atdewh0lJcT3JV7eD3VeemZqwLFJFO7cQsBFnOtdk=
 github.com/gollem-dev/tools/abusech v0.2.0 h1:VxLz8IRIYrajTb6YyVR7D5g9fIAvmV7nkh8K10JJCYw=
 github.com/gollem-dev/tools/abusech v0.2.0/go.mod h1:sPSiX1y2ci+ne4SA+VSJ//rFMJ2kKj/ELIKDPF6CuIk=
 github.com/gollem-dev/tools/bigquery v0.2.0 h1:MsOaLHPNK5baVvjr7v/5JME7EXdhsq/Glm/JUvUA8ig=
