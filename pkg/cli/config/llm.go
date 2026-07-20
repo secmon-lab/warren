@@ -9,6 +9,7 @@ import (
 	"github.com/gollem-dev/gollem/llm/gemini"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/domain/interfaces"
+	"github.com/secmon-lab/warren/pkg/utils/llmclient"
 	"github.com/urfave/cli/v3"
 )
 
@@ -38,9 +39,10 @@ func (a *llmEmbeddingAdapter) Embeddings(ctx context.Context, texts []string, di
 
 type LLMCfg struct {
 	// Claude configuration
-	claudeModel     string
-	claudeProjectID string
-	claudeLocation  string
+	claudeModel       string
+	claudeProjectID   string
+	claudeLocation    string
+	claudePromptCache bool
 
 	// Gemini configuration
 	geminiModel          string
@@ -73,6 +75,14 @@ func (x *LLMCfg) Flags() []cli.Flag {
 			Sources:     cli.EnvVars("WARREN_CLAUDE_LOCATION"),
 			Value:       "us-east5",
 			Destination: &x.claudeLocation,
+			Category:    "Claude",
+		},
+		&cli.BoolFlag{
+			Name:        "claude-prompt-cache",
+			Usage:       "Enable Claude prompt caching. Reuses the cached stable prefix (system prompt and tool definitions) across requests. Disable if the workload rarely reuses a prefix, since cache writes cost more than uncached input",
+			Sources:     cli.EnvVars("WARREN_CLAUDE_PROMPT_CACHE"),
+			Value:       true,
+			Destination: &x.claudePromptCache,
 			Category:    "Claude",
 		},
 		// Gemini flags
@@ -118,6 +128,7 @@ func (x LLMCfg) LogValue() slog.Value {
 			slog.String("claude_model", x.claudeModel),
 			slog.String("claude_project_id", x.claudeProjectID),
 			slog.String("claude_location", x.claudeLocation),
+			slog.Bool("claude_prompt_cache", x.claudePromptCache),
 		)
 	}
 
@@ -174,7 +185,9 @@ func (x *LLMCfg) configureClaude(ctx context.Context) (gollem.LLMClient, error) 
 			goerr.V("model", x.claudeModel))
 	}
 
-	return client, nil
+	// Applied at construction so every session reached through this client caches,
+	// including the ones gollem agents create internally.
+	return llmclient.WithPromptCache(client, x.claudePromptCache), nil
 }
 
 func (x *LLMCfg) configureGemini(ctx context.Context) (gollem.LLMClient, error) {

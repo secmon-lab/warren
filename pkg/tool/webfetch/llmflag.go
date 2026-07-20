@@ -11,6 +11,7 @@ import (
 	"github.com/gollem-dev/gollem/llm/openai"
 	"github.com/m-mizutani/goerr/v2"
 	"github.com/secmon-lab/warren/pkg/utils/errutil"
+	"github.com/secmon-lab/warren/pkg/utils/llmclient"
 )
 
 const (
@@ -21,6 +22,10 @@ const (
 	argProjectID   = "project_id"
 	argLocation    = "location"
 	argTemperature = "temperature"
+	// argPromptCache is claude-only: Gemini and OpenAI cache automatically and
+	// ignore the option, so accepting it for them would imply a control that
+	// does not exist.
+	argPromptCache = "prompt_cache"
 )
 
 // parseLLMArgs parses a "key=value,key=value" string into a map.
@@ -132,7 +137,12 @@ func buildGeminiClient(ctx context.Context, model string, args map[string]string
 }
 
 func buildClaudeClient(ctx context.Context, model string, args map[string]string, apiKey string) (gollem.LLMClient, error) {
-	if err := checkKnownArgs(providerClaude, args, argProjectID, argLocation, argTemperature); err != nil {
+	if err := checkKnownArgs(providerClaude, args, argProjectID, argLocation, argTemperature, argPromptCache); err != nil {
+		return nil, err
+	}
+
+	promptCache, err := parsePromptCache(args)
+	if err != nil {
 		return nil, err
 	}
 
@@ -174,7 +184,7 @@ func buildClaudeClient(ctx context.Context, model string, args map[string]string
 				goerr.V("route", "vertex"),
 				goerr.V("model", model))
 		}
-		return client, nil
+		return llmclient.WithPromptCache(client, promptCache), nil
 	}
 
 	// Anthropic direct route.
@@ -193,7 +203,7 @@ func buildClaudeClient(ctx context.Context, model string, args map[string]string
 			goerr.V("route", "anthropic"),
 			goerr.V("model", model))
 	}
-	return client, nil
+	return llmclient.WithPromptCache(client, promptCache), nil
 }
 
 func buildOpenAIClient(ctx context.Context, model string, args map[string]string, apiKey string) (gollem.LLMClient, error) {
@@ -238,6 +248,22 @@ func checkKnownArgs(provider string, args map[string]string, allowed ...string) 
 		}
 	}
 	return nil
+}
+
+// parsePromptCache reads the optional prompt_cache arg. Caching is on unless the
+// operator explicitly turns it off, so an absent key means true.
+func parsePromptCache(args map[string]string) (bool, error) {
+	raw, ok := args[argPromptCache]
+	if !ok {
+		return true, nil
+	}
+	v, err := strconv.ParseBool(strings.TrimSpace(raw))
+	if err != nil {
+		return false, goerr.Wrap(err, "prompt_cache must be a boolean",
+			goerr.T(errutil.TagValidation),
+			goerr.V("value", raw))
+	}
+	return v, nil
 }
 
 // parseTemperature parses the temperature arg and validates the range. The

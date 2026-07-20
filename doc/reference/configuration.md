@@ -40,6 +40,11 @@ Warren uses the following precedence (highest to lowest):
 | `WARREN_CLAUDE_PROJECT_ID` | `--claude-project-id` | - | GCP project ID for Claude on Vertex AI |
 | `WARREN_CLAUDE_MODEL` | `--claude-model` | `claude-sonnet-4@20250514` | Claude model name |
 | `WARREN_CLAUDE_LOCATION` | `--claude-location` | `us-east5` | GCP region for Claude |
+| `WARREN_CLAUDE_PROMPT_CACHE` | `--claude-prompt-cache` | `true` | Enable Claude prompt caching |
+
+**Prompt caching**: When enabled, Warren marks the stable prefix of each request (system prompt and tool definitions) so Claude serves it from its prompt cache on subsequent requests. Repeated requests that share a prefix become cheaper and faster.
+
+Cache writes cost more than uncached input, so caching pays off only when a prefix is actually reused within the cache lifetime. Set this to `false` for deployments whose Claude traffic is sparse or rarely shares a prefix. This setting applies to Claude only — Gemini and OpenAI cache automatically and are unaffected. The webfetch tool builds its own LLM client and is configured separately (see the `prompt_cache` arg under Web Fetch Tool).
 
 ### Firestore
 
@@ -179,7 +184,7 @@ Tools are automatically enabled when their API key is configured. Missing keys a
 |---|---|---|---|
 | `WARREN_WEBFETCH_LLM_PROVIDER` | `--webfetch-llm-provider` | _(empty)_ | LLM provider for analyze step: `gemini`, `claude`, or `openai`. Empty disables LLM analysis and forces HITL approval per call. |
 | `WARREN_WEBFETCH_LLM_MODEL` | `--webfetch-llm-model` | _(empty)_ | LLM model name. Required when `--webfetch-llm-provider` is set. Examples: `gemini-2.5-flash`, `claude-sonnet-4@20250514`, `gpt-4o`. |
-| `WARREN_WEBFETCH_LLM_ARGS` | `--webfetch-llm-args` | _(empty)_ | Provider-specific options as `key=value,key=value`. Recognized keys: `project_id`, `location` (Vertex routes), `temperature` (all providers). |
+| `WARREN_WEBFETCH_LLM_ARGS` | `--webfetch-llm-args` | _(empty)_ | Provider-specific options as `key=value,key=value`. Recognized keys: `project_id`, `location` (Vertex routes), `temperature` (all providers), `prompt_cache` (`claude` only). |
 | `WARREN_WEBFETCH_LLM_API_KEY` | `--webfetch-llm-api-key` | _(empty)_ | API key. Required for `openai` and for the `claude` Anthropic-direct route. Ignored for `gemini` and for the `claude` Vertex route. |
 
 **HITL behavior**: When `--webfetch-llm-provider` is empty, indirect-prompt-injection screening is not performed, so every `web_fetch` call is gated by a human-in-the-loop (HITL) approval dialog. When the provider is set, the LLM performs the screening and the dialog is suppressed to reduce friction.
@@ -192,6 +197,8 @@ Tools are automatically enabled when their API key is configured. Missing keys a
 - Set `--webfetch-llm-api-key`, no `project_id`/`location` → Anthropic direct route
 - Set both → start-up error (ambiguous)
 - Set neither → start-up error (route unspecified)
+
+**Prompt caching**: The `claude` provider caches the stable prefix of each analyze request by default. Set `prompt_cache=false` in `--webfetch-llm-args` to turn it off — worthwhile when webfetch analysis is infrequent enough that cache writes never pay for themselves. The key is rejected for `gemini` and `openai`, which cache automatically and expose no such control. This is independent of `--claude-prompt-cache`, which governs Warren's main LLM client.
 
 #### Examples
 
