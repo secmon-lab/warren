@@ -20,7 +20,7 @@ The webfetch tool owns its LLM configuration independently from warren's main `-
 |---|---|---|---|
 | `WARREN_WEBFETCH_LLM_PROVIDER` | `--webfetch-llm-provider` | _(empty)_ | LLM provider for analyze step: `gemini`, `claude`, or `openai`. Empty disables LLM analysis. |
 | `WARREN_WEBFETCH_LLM_MODEL` | `--webfetch-llm-model` | _(empty)_ | LLM model name. Required when provider is set. |
-| `WARREN_WEBFETCH_LLM_ARGS` | `--webfetch-llm-args` | _(empty)_ | Provider-specific options as `key=value,key=value`. Recognized: `project_id`, `location`, `temperature`. |
+| `WARREN_WEBFETCH_LLM_ARGS` | `--webfetch-llm-args` | _(empty)_ | Provider-specific options as `key=value,key=value`. Recognized: `project_id`, `location`, `temperature`, `prompt_cache` (`claude` only, default `true`). |
 | `WARREN_WEBFETCH_LLM_API_KEY` | `--webfetch-llm-api-key` | _(empty)_ | API key. Required for `openai` and `claude` Anthropic-direct. Ignored for `gemini` and `claude` Vertex. |
 
 ### Claude routing

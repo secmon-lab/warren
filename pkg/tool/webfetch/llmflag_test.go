@@ -207,6 +207,52 @@ func TestBuildLLMClient_ClaudeRoute_DirectHappy(t *testing.T) {
 	gt.NotNil(t, client)
 }
 
+// TestBuildLLMClient_ClaudeRoute_PromptCacheArg covers the prompt_cache opt-out.
+// Whether the returned client actually caches is covered by the llmclient
+// package; here the contract is that the arg is accepted, parsed, and rejected
+// when malformed.
+func TestBuildLLMClient_ClaudeRoute_PromptCacheArg(t *testing.T) {
+	t.Run("accepts explicit false", func(t *testing.T) {
+		args := map[string]string{"prompt_cache": "false"}
+		client, err := webfetch.BuildLLMClient(t.Context(), "claude", "claude-sonnet-4-5-20250929", args, "fake-key")
+		gt.NoError(t, err).Required()
+		gt.NotNil(t, client)
+	})
+
+	t.Run("accepts explicit true", func(t *testing.T) {
+		args := map[string]string{"prompt_cache": "true"}
+		client, err := webfetch.BuildLLMClient(t.Context(), "claude", "claude-sonnet-4-5-20250929", args, "fake-key")
+		gt.NoError(t, err).Required()
+		gt.NotNil(t, client)
+	})
+
+	t.Run("rejects a non-boolean value", func(t *testing.T) {
+		args := map[string]string{"prompt_cache": "yes-please"}
+		_, err := webfetch.BuildLLMClient(t.Context(), "claude", "claude-sonnet-4-5-20250929", args, "fake-key")
+		gt.Error(t, err).Required()
+		gt.True(t, goerr.HasTag(err, errutil.TagValidation))
+	})
+}
+
+// TestBuildLLMClient_PromptCacheRejectedForOtherProviders pins that prompt_cache
+// is claude-only: Gemini and OpenAI cache automatically, so accepting the key
+// would advertise a control they do not have.
+func TestBuildLLMClient_PromptCacheRejectedForOtherProviders(t *testing.T) {
+	t.Run("gemini", func(t *testing.T) {
+		args := map[string]string{"project_id": "p", "location": "us-central1", "prompt_cache": "true"}
+		_, err := webfetch.BuildLLMClient(t.Context(), "gemini", "gemini-2.5-flash", args, "")
+		gt.Error(t, err).Required()
+		gt.True(t, goerr.HasTag(err, errutil.TagValidation))
+	})
+
+	t.Run("openai", func(t *testing.T) {
+		args := map[string]string{"prompt_cache": "true"}
+		_, err := webfetch.BuildLLMClient(t.Context(), "openai", "gpt-5.2", args, "fake-key")
+		gt.Error(t, err).Required()
+		gt.True(t, goerr.HasTag(err, errutil.TagValidation))
+	})
+}
+
 func TestPingLLMClient_NilClient(t *testing.T) {
 	err := webfetch.PingLLMClient(t.Context(), nil)
 	gt.Error(t, err).Required()
